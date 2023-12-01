@@ -173,18 +173,13 @@ mod tests {
 
         let actual = field::build_interleaved_polynomials::<E, P>(&elements, m);
 
-        let expected = if let Some(expected) = expected {
-            Some(
-                expected
-                    .iter()
-                    .map(|r| {
-                        P::from_coefficients_vec(r.iter().map(|&i| elements[i]).collect::<Vec<_>>())
-                    })
-                    .collect::<Vec<_>>(),
-            )
-        } else {
-            None
-        };
+        let expected = expected.map(|e| {
+            e.iter()
+                .map(|r| {
+                    P::from_coefficients_vec(r.iter().map(|&i| elements[i]).collect::<Vec<_>>())
+                })
+                .collect::<Vec<_>>()
+        });
 
         assert_eq!(actual, expected);
     }

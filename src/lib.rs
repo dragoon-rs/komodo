@@ -71,7 +71,7 @@ where
                     weight: 1,
                 }],
                 hash: hash.to_vec(),
-                bytes: field::merge_elements_into_bytes::<E>(&row),
+                bytes: field::merge_elements_into_bytes::<E>(row),
                 size: nb_bytes,
             },
             commit: commits.clone(),
@@ -121,7 +121,7 @@ where
         .collect::<Vec<P>>();
 
     debug!("committing the polynomials");
-    let (commits, _) = commit(&powers, &polynomials_to_commit)?;
+    let (commits, _) = commit(powers, &polynomials_to_commit)?;
 
     debug!("creating the {} evaluation points", n);
     let points: Vec<E::ScalarField> = (0..n)

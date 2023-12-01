@@ -85,7 +85,7 @@ fn generate_powers(bytes: &[u8], powers_file: &str) -> Result<(), std::io::Error
         .unwrap();
 
     info!("dumping powers into `{}`", powers_file);
-    let mut file = File::create(&powers_file)?;
+    let mut file = File::create(powers_file)?;
     file.write_all(&serialized)?;
 
     Ok(())
@@ -117,7 +117,7 @@ where
     let res: Vec<_> = blocks
         .iter()
         // FIXME: do not unwrap and return an error with std::io::Error
-        .map(|(f, b)| (f, verify::<E, P>(&b, &powers).unwrap()))
+        .map(|(f, b)| (f, verify::<E, P>(b, &powers).unwrap()))
         .collect();
 
     eprint!("[");

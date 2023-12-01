@@ -199,7 +199,7 @@ mod tests {
                         weight: 1,
                     }],
                     hash: hash.clone(),
-                    bytes: field::merge_elements_into_bytes::<Bls12_381>(&bytes),
+                    bytes: field::merge_elements_into_bytes::<Bls12_381>(bytes),
                     size: DATA.len(),
                 });
             }
