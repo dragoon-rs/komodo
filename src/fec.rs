@@ -95,15 +95,6 @@ impl<E: Pairing> Shard<E> {
     }
 }
 
-fn u32_to_u8_vec(num: u32) -> Vec<u8> {
-    vec![
-        (num & 0xFF) as u8,
-        ((num >> 8) & 0xFF) as u8,
-        ((num >> 16) & 0xFF) as u8,
-        ((num >> 24) & 0xFF) as u8,
-    ]
-}
-
 pub fn decode<F: GF, E: Pairing>(blocks: Vec<Shard<E>>) -> Result<Vec<u8>, Error> {
     let k = blocks[0].k;
     let n = blocks
@@ -144,7 +135,7 @@ mod tests {
     use rs_merkle::Hasher;
 
     use crate::{
-        fec::{decode, u32_to_u8_vec, LinearCombinationElement, Shard},
+        fec::{decode, LinearCombinationElement, Shard},
         field,
     };
 
@@ -202,15 +193,6 @@ mod tests {
         }
 
         assert_eq!(DATA, decode::<GF, Bls12_381>(blocks).unwrap())
-    }
-
-    #[test]
-    fn u32_to_u8_conversion() {
-        assert_eq!(u32_to_u8_vec(0u32), vec![0u8, 0u8, 0u8, 0u8]);
-        assert_eq!(u32_to_u8_vec(1u32), vec![1u8, 0u8, 0u8, 0u8]);
-        assert_eq!(u32_to_u8_vec(256u32), vec![0u8, 1u8, 0u8, 0u8]);
-        assert_eq!(u32_to_u8_vec(65536u32), vec![0u8, 0u8, 1u8, 0u8]);
-        assert_eq!(u32_to_u8_vec(16777216u32), vec![0u8, 0u8, 0u8, 1u8]);
     }
 
     fn create_fake_shard<E: Pairing>(
