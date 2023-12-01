@@ -96,7 +96,7 @@ where
     info!("encoding and proving {} bytes", bytes.len());
 
     debug!("splitting bytes into polynomials");
-    let elements = field::split_data_into_field_elements::<E>(bytes, k);
+    let elements = field::split_data_into_field_elements::<E>(bytes, k, false);
     let nb_polynomials = elements.len() / k;
     let polynomials = match field::build_interleaved_polynomials::<E, P>(&elements, nb_polynomials)
     {
@@ -148,7 +148,7 @@ where
     P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
-    let elements = field::split_data_into_field_elements::<E>(&block.shard.bytes, 1);
+    let elements = field::split_data_into_field_elements::<E>(&block.shard.bytes, 1, true);
     let polynomial = P::from_coefficients_vec(elements);
     let (commit, _) = KZG10::<E, P>::commit(verifier_key, &polynomial, None, None)?;
 

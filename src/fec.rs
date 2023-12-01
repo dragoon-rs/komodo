@@ -30,7 +30,7 @@ impl Shard {
             _ => {
                 let alpha = E::ScalarField::from_le_bytes_mod_order(&u32_to_u8_vec(alpha));
 
-                let elements = field::split_data_into_field_elements::<E>(&self.bytes, 1)
+                let elements = field::split_data_into_field_elements::<E>(&self.bytes, 1, true)
                     .iter()
                     .map(|e| e.mul(alpha))
                     .collect::<Vec<_>>();
@@ -66,8 +66,8 @@ impl Shard {
             let alpha = E::ScalarField::from_le_bytes_mod_order(&u32_to_u8_vec(alpha));
             let beta = E::ScalarField::from_le_bytes_mod_order(&u32_to_u8_vec(beta));
 
-            let elements_self = field::split_data_into_field_elements::<E>(&self.bytes, 1);
-            let elements_other = field::split_data_into_field_elements::<E>(&other.bytes, 1);
+            let elements_self = field::split_data_into_field_elements::<E>(&self.bytes, 1, true);
+            let elements_other = field::split_data_into_field_elements::<E>(&other.bytes, 1, true);
 
             elements_self
                 .iter()

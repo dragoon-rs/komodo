@@ -11,10 +11,16 @@ use ark_std::One;
 pub(crate) fn split_data_into_field_elements<E: Pairing>(
     bytes: &[u8],
     modulus: usize,
+    one_more: bool,
 ) -> Vec<E::ScalarField> {
-    let mut elements = Vec::new();
+    let bytes_per_element = if one_more {
+        (E::ScalarField::MODULUS_BIT_SIZE as usize) / 8 + 1
+    } else {
+        (E::ScalarField::MODULUS_BIT_SIZE as usize) / 8
+    };
 
-    for chunk in bytes.chunks((E::ScalarField::MODULUS_BIT_SIZE as usize) / 8 + 1) {
+    let mut elements = Vec::new();
+    for chunk in bytes.chunks(bytes_per_element) {
         elements.push(E::ScalarField::from_le_bytes_mod_order(chunk));
     }
 
@@ -113,7 +119,7 @@ mod tests {
     }
 
     fn split_data_template<E: Pairing>(bytes: &[u8], modulus: usize, exact_length: Option<usize>) {
-        let elements = field::split_data_into_field_elements::<E>(bytes, modulus);
+        let elements = field::split_data_into_field_elements::<E>(bytes, modulus, false);
         assert!(
             elements.len() % modulus == 0,
             "number of elements should be divisible by {}, found {}",
