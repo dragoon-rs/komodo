@@ -1,1 +1,1 @@
-# Cryptographically-proven Erasure Coding
+# Komodo: Cryptographically-proven Erasure Coding
