@@ -1,0 +1,53 @@
+image: "rust:latest"
+
+stages:
+  - fmt
+  - test
+
+variables:
+  RUSTUP_CHANNEL: "1.71.0"
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_MESSAGE =~ /^(draft|no-ci):/
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: ($CI_PIPELINE_SOURCE == "push") && ($CI_COMMIT_BRANCH == "master")
+
+fmt:
+  stage: fmt
+  before_script:
+    - rustup install "$RUSTUP_CHANNEL"
+    - rustup component add rustfmt --toolchain "$RUSTUP_CHANNEL"
+
+    - rustup default "$RUSTUP_CHANNEL"
+
+  script:
+    - cargo fmt --all -- --check
+
+test:
+  stage: test
+  needs:
+    - fmt
+  before_script:
+    - apt update --yes
+    - apt upgrade --yes
+    - apt install protobuf-compiler --yes
+
+    - rustup install "$RUSTUP_CHANNEL"
+    - rustup component add clippy --toolchain "$RUSTUP_CHANNEL"
+
+    - rustup default "$RUSTUP_CHANNEL"
+
+    - rustup --version
+    - rustup show --verbose
+    - rustc --version
+    - cargo --version
+    - cargo clippy --version
+
+  script:
+    - cargo check --workspace --all-targets
+    - cargo clippy --workspace --all-targets -- -D warnings
+    - cargo test --workspace --verbose
