@@ -5,6 +5,7 @@ use ark_ff::{Field, PrimeField};
 use ark_poly::DenseUVPolynomial;
 use ark_poly_commit::kzg10::{Commitment, Powers, Randomness, KZG10};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::One;
 use fec::LinearCombinationElement;
 use rs_merkle::algorithms::Sha256;
 use rs_merkle::Hasher;
@@ -16,7 +17,7 @@ pub mod setup;
 
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Block<E: Pairing> {
-    pub shard: fec::Shard,
+    pub shard: fec::Shard<E>,
     commit: Vec<Commitment<E>>,
     m: usize,
 }
@@ -68,7 +69,7 @@ where
                 k: k as u32,
                 linear_combination: vec![LinearCombinationElement {
                     index: i as u32,
-                    weight: 1,
+                    weight: E::ScalarField::one(),
                 }],
                 hash: hash.to_vec(),
                 bytes: field::merge_elements_into_bytes::<E>(row),
@@ -168,7 +169,7 @@ where
                     commit.mul(alpha.pow([j as u64]))
                 })
                 .sum();
-            f.mul(E::ScalarField::from_le_bytes_mod_order(&[lce.weight as u8]))
+            f * lce.weight
         })
         .sum();
     Ok(Into::<E::G1>::into(commit.0) == rhs)
@@ -201,6 +202,7 @@ mod tests {
     use ark_ff::{Field, PrimeField};
     use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
     use ark_poly_commit::kzg10::Commitment;
+    use ark_std::One;
 
     use crate::{batch_verify, encode, setup, verify, Block};
 
@@ -364,28 +366,38 @@ mod tests {
         let blocks = encode::<E, P>(bytes, k, n, &powers)?;
 
         let block = Block {
-            shard: blocks[0].shard.mul::<E>(1),
+            shard: blocks[0].shard.mul(E::ScalarField::one()),
             commit: blocks[0].commit.clone(),
             m: blocks[0].m,
         };
         assert!(verify::<E, P>(&block, &powers)?);
 
         let block = Block {
-            shard: blocks[3].shard.mul::<E>(2),
+            shard: blocks[3]
+                .shard
+                .mul(E::ScalarField::from_le_bytes_mod_order(&[2u8])),
             commit: blocks[3].commit.clone(),
             m: blocks[3].m,
         };
         assert!(verify::<E, P>(&block, &powers)?);
 
         let block = Block {
-            shard: blocks[3].shard.combine::<E>(2, &blocks[2].shard, 5),
+            shard: blocks[3].shard.combine(
+                E::ScalarField::from_le_bytes_mod_order(&[2u8]),
+                &blocks[2].shard,
+                E::ScalarField::from_le_bytes_mod_order(&[5u8]),
+            ),
             commit: blocks[3].commit.clone(),
             m: blocks[3].m,
         };
         assert!(verify::<E, P>(&block, &powers)?);
 
         let block = Block {
-            shard: block.shard.combine::<E>(3, &blocks[5].shard, 4),
+            shard: blocks[3].shard.combine(
+                E::ScalarField::from_le_bytes_mod_order(&[3u8]),
+                &blocks[5].shard,
+                E::ScalarField::from_le_bytes_mod_order(&[4u8]),
+            ),
             commit: block.commit.clone(),
             m: block.m,
         };

@@ -1,42 +1,40 @@
 use std::ops::{Add, Mul};
 
 use ark_ec::pairing::Pairing;
-use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::{One, Zero};
 use reed_solomon_erasure::{Error, Field as GF, ReedSolomonNonSystematic};
 
 use crate::field;
 
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
-pub struct LinearCombinationElement {
+pub struct LinearCombinationElement<E: Pairing> {
     pub index: u32,
-    pub weight: u32,
+    pub weight: E::ScalarField,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
-pub struct Shard {
+pub struct Shard<E: Pairing> {
     pub k: u32,
-    pub linear_combination: Vec<LinearCombinationElement>,
+    pub linear_combination: Vec<LinearCombinationElement<E>>,
     pub hash: Vec<u8>,
     pub bytes: Vec<u8>,
     pub size: usize,
 }
 
-impl Shard {
-    pub fn mul<E: Pairing>(&self, alpha: u32) -> Self {
-        let bytes = match alpha {
-            0 => vec![0u8; self.bytes.len()],
-            1 => self.bytes.to_vec(),
-            _ => {
-                let alpha = E::ScalarField::from_le_bytes_mod_order(&u32_to_u8_vec(alpha));
+impl<E: Pairing> Shard<E> {
+    pub fn mul(&self, alpha: E::ScalarField) -> Self {
+        let bytes = if alpha.is_zero() {
+            vec![0u8; self.bytes.len()]
+        } else if alpha.is_one() {
+            self.bytes.to_vec()
+        } else {
+            let elements = field::split_data_into_field_elements::<E>(&self.bytes, 1, true)
+                .iter()
+                .map(|e| e.mul(alpha))
+                .collect::<Vec<_>>();
 
-                let elements = field::split_data_into_field_elements::<E>(&self.bytes, 1, true)
-                    .iter()
-                    .map(|e| e.mul(alpha))
-                    .collect::<Vec<_>>();
-
-                field::merge_elements_into_bytes::<E>(&elements)
-            }
+            field::merge_elements_into_bytes::<E>(&elements)
         };
 
         Shard {
@@ -46,7 +44,7 @@ impl Shard {
                 .iter()
                 .map(|l| LinearCombinationElement {
                     index: l.index,
-                    weight: l.weight * alpha,
+                    weight: l.weight.mul(alpha),
                 })
                 .collect(),
             hash: self.hash.clone(),
@@ -55,17 +53,14 @@ impl Shard {
         }
     }
 
-    pub fn combine<E: Pairing>(&self, alpha: u32, other: &Self, beta: u32) -> Self {
-        if alpha == 0 {
+    pub fn combine(&self, alpha: E::ScalarField, other: &Self, beta: E::ScalarField) -> Self {
+        if alpha.is_zero() {
             return other.clone();
-        } else if beta == 0 {
+        } else if beta.is_zero() {
             return self.clone();
         }
 
         let elements = {
-            let alpha = E::ScalarField::from_le_bytes_mod_order(&u32_to_u8_vec(alpha));
-            let beta = E::ScalarField::from_le_bytes_mod_order(&u32_to_u8_vec(beta));
-
             let elements_self = field::split_data_into_field_elements::<E>(&self.bytes, 1, true);
             let elements_other = field::split_data_into_field_elements::<E>(&other.bytes, 1, true);
 
@@ -80,13 +75,13 @@ impl Shard {
         for lce in &self.linear_combination {
             linear_combination.push(LinearCombinationElement {
                 index: lce.index,
-                weight: lce.weight * alpha,
+                weight: lce.weight.mul(alpha),
             });
         }
         for lce in &other.linear_combination {
             linear_combination.push(LinearCombinationElement {
                 index: lce.index,
-                weight: lce.weight * beta,
+                weight: lce.weight.mul(beta),
             });
         }
 
@@ -109,7 +104,7 @@ fn u32_to_u8_vec(num: u32) -> Vec<u8> {
     ]
 }
 
-pub fn decode<F: GF>(blocks: Vec<Shard>) -> Result<Vec<u8>, Error> {
+pub fn decode<F: GF, E: Pairing>(blocks: Vec<Shard<E>>) -> Result<Vec<u8>, Error> {
     let k = blocks[0].k;
     let n = blocks
         .iter()
@@ -143,6 +138,7 @@ mod tests {
     use ark_bls12_381::Bls12_381;
     use ark_ec::pairing::Pairing;
     use ark_ff::PrimeField;
+    use ark_std::One;
     use reed_solomon_erasure::galois_prime::Field as GF;
     use rs_merkle::algorithms::Sha256;
     use rs_merkle::Hasher;
@@ -196,7 +192,7 @@ mod tests {
                     k: K as u32,
                     linear_combination: vec![LinearCombinationElement {
                         index: i as u32,
-                        weight: 1,
+                        weight: <Bls12_381 as Pairing>::ScalarField::one(),
                     }],
                     hash: hash.clone(),
                     bytes: field::merge_elements_into_bytes::<Bls12_381>(bytes),
@@ -205,7 +201,7 @@ mod tests {
             }
         }
 
-        assert_eq!(DATA, decode::<GF>(blocks).unwrap())
+        assert_eq!(DATA, decode::<GF, Bls12_381>(blocks).unwrap())
     }
 
     #[test]
@@ -217,7 +213,10 @@ mod tests {
         assert_eq!(u32_to_u8_vec(16777216u32), vec![0u8, 0u8, 0u8, 1u8]);
     }
 
-    fn create_fake_shard(linear_combination: &[LinearCombinationElement], bytes: &[u8]) -> Shard {
+    fn create_fake_shard<E: Pairing>(
+        linear_combination: &[LinearCombinationElement<E>],
+        bytes: &[u8],
+    ) -> Shard<E> {
         let mut bytes = bytes.to_vec();
         bytes.resize(32, 0);
 
@@ -232,33 +231,37 @@ mod tests {
 
     #[test]
     fn recoding() {
-        let a = create_fake_shard(
+        let a: Shard<Bls12_381> = create_fake_shard(
             &[LinearCombinationElement {
                 index: 0,
-                weight: 1,
+                weight: <Bls12_381 as Pairing>::ScalarField::one(),
             }],
             &[1, 2, 3],
         );
-        let b = create_fake_shard(
+        let b: Shard<Bls12_381> = create_fake_shard(
             &[LinearCombinationElement {
                 index: 1,
-                weight: 1,
+                weight: <Bls12_381 as Pairing>::ScalarField::one(),
             }],
             &[4, 5, 6],
         );
 
         assert_eq!(
-            a.mul::<Bls12_381>(2),
+            a.mul(<Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[2])),
             create_fake_shard(
                 &[LinearCombinationElement {
                     index: 0,
-                    weight: 2,
+                    weight: <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[2]),
                 }],
                 &[2, 4, 6],
             )
         );
 
-        let c = a.combine::<Bls12_381>(3, &b, 5);
+        let c = a.combine(
+            <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[3]),
+            &b,
+            <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[5]),
+        );
 
         assert_eq!(
             c,
@@ -266,11 +269,11 @@ mod tests {
                 &[
                     LinearCombinationElement {
                         index: 0,
-                        weight: 3,
+                        weight: <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[3]),
                     },
                     LinearCombinationElement {
                         index: 1,
-                        weight: 5,
+                        weight: <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[5]),
                     }
                 ],
                 &[23, 31, 39]
@@ -278,20 +281,24 @@ mod tests {
         );
 
         assert_eq!(
-            c.combine::<Bls12_381>(2, &a, 4),
+            c.combine(
+                <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[2]),
+                &a,
+                <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[4]),
+            ),
             create_fake_shard(
                 &[
                     LinearCombinationElement {
                         index: 0,
-                        weight: 6,
+                        weight: <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[6]),
                     },
                     LinearCombinationElement {
                         index: 1,
-                        weight: 10,
+                        weight: <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[10]),
                     },
                     LinearCombinationElement {
                         index: 0,
-                        weight: 4,
+                        weight: <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[4]),
                     }
                 ],
                 &[50, 70, 90],

@@ -177,12 +177,12 @@ fn main() {
     }
 
     if do_reconstruct_data {
-        let blocks: Vec<Shard> = read_block::<Bls12_381>(&block_files)
+        let blocks: Vec<Shard<Bls12_381>> = read_block::<Bls12_381>(&block_files)
             .iter()
             .cloned()
             .map(|b| b.1.shard)
             .collect();
-        eprintln!("{:?}", decode::<GF>(blocks).unwrap());
+        eprintln!("{:?}", decode::<GF, Bls12_381>(blocks).unwrap());
 
         exit(0);
     }
