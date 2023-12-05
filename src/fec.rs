@@ -154,12 +154,7 @@ mod tests {
     ];
     const LOST_SHARDS: [usize; 3] = [1, 3, 6];
 
-    fn to_big_int_from_bytes(i: &[u8]) -> <Bls12_381 as Pairing>::ScalarField {
-        <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(i)
-    }
-
-    #[test]
-    fn decoding() {
+    fn decoding_template<E: Pairing>() {
         let hash = Sha256::hash(DATA).to_vec();
 
         let mut shards = SHARDS
@@ -167,7 +162,7 @@ mod tests {
             .map(|r| {
                 Some(
                     r.iter()
-                        .map(|s| to_big_int_from_bytes(&s.to_le_bytes()))
+                        .map(|s| E::ScalarField::from_le_bytes_mod_order(&s.to_le_bytes()))
                         .collect::<Vec<_>>(),
                 )
             })
@@ -183,16 +178,21 @@ mod tests {
                     k: K as u32,
                     linear_combination: vec![LinearCombinationElement {
                         index: i as u32,
-                        weight: <Bls12_381 as Pairing>::ScalarField::one(),
+                        weight: E::ScalarField::one(),
                     }],
                     hash: hash.clone(),
-                    bytes: field::merge_elements_into_bytes::<Bls12_381>(bytes),
+                    bytes: field::merge_elements_into_bytes::<E>(bytes),
                     size: DATA.len(),
                 });
             }
         }
 
-        assert_eq!(DATA, decode::<GF, Bls12_381>(blocks).unwrap())
+        assert_eq!(DATA, decode::<GF, E>(blocks).unwrap())
+    }
+
+    #[test]
+    fn decoding() {
+        decoding_template::<Bls12_381>();
     }
 
     fn create_fake_shard<E: Pairing>(
@@ -211,38 +211,37 @@ mod tests {
         }
     }
 
-    #[test]
-    fn recoding() {
-        let a: Shard<Bls12_381> = create_fake_shard(
+    fn recoding_template<E: Pairing>() {
+        let a: Shard<E> = create_fake_shard(
             &[LinearCombinationElement {
                 index: 0,
-                weight: <Bls12_381 as Pairing>::ScalarField::one(),
+                weight: E::ScalarField::one(),
             }],
             &[1, 2, 3],
         );
-        let b: Shard<Bls12_381> = create_fake_shard(
+        let b: Shard<E> = create_fake_shard(
             &[LinearCombinationElement {
                 index: 1,
-                weight: <Bls12_381 as Pairing>::ScalarField::one(),
+                weight: E::ScalarField::one(),
             }],
             &[4, 5, 6],
         );
 
         assert_eq!(
-            a.mul(<Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[2])),
+            a.mul(E::ScalarField::from_le_bytes_mod_order(&[2])),
             create_fake_shard(
                 &[LinearCombinationElement {
                     index: 0,
-                    weight: <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[2]),
+                    weight: E::ScalarField::from_le_bytes_mod_order(&[2]),
                 }],
                 &[2, 4, 6],
             )
         );
 
         let c = a.combine(
-            <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[3]),
+            E::ScalarField::from_le_bytes_mod_order(&[3]),
             &b,
-            <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[5]),
+            E::ScalarField::from_le_bytes_mod_order(&[5]),
         );
 
         assert_eq!(
@@ -251,11 +250,11 @@ mod tests {
                 &[
                     LinearCombinationElement {
                         index: 0,
-                        weight: <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[3]),
+                        weight: E::ScalarField::from_le_bytes_mod_order(&[3]),
                     },
                     LinearCombinationElement {
                         index: 1,
-                        weight: <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[5]),
+                        weight: E::ScalarField::from_le_bytes_mod_order(&[5]),
                     }
                 ],
                 &[23, 31, 39]
@@ -264,27 +263,32 @@ mod tests {
 
         assert_eq!(
             c.combine(
-                <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[2]),
+                E::ScalarField::from_le_bytes_mod_order(&[2]),
                 &a,
-                <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[4]),
+                E::ScalarField::from_le_bytes_mod_order(&[4]),
             ),
             create_fake_shard(
                 &[
                     LinearCombinationElement {
                         index: 0,
-                        weight: <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[6]),
+                        weight: E::ScalarField::from_le_bytes_mod_order(&[6]),
                     },
                     LinearCombinationElement {
                         index: 1,
-                        weight: <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[10]),
+                        weight: E::ScalarField::from_le_bytes_mod_order(&[10]),
                     },
                     LinearCombinationElement {
                         index: 0,
-                        weight: <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&[4]),
+                        weight: E::ScalarField::from_le_bytes_mod_order(&[4]),
                     }
                 ],
                 &[50, 70, 90],
             )
         );
+    }
+
+    #[test]
+    fn recoding() {
+        recoding_template::<Bls12_381>();
     }
 }
