@@ -5,8 +5,9 @@ use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{One, Zero};
 
+use crate::error::KomodoError;
 use crate::field;
-use crate::linalg::{LinalgError, Matrix};
+use crate::linalg::Matrix;
 
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct LinearCombinationElement<E: Pairing> {
@@ -96,11 +97,11 @@ impl<E: Pairing> Shard<E> {
     }
 }
 
-pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>) -> Result<Vec<u8>, LinalgError> {
+pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>) -> Result<Vec<u8>, KomodoError> {
     let k = blocks[0].k;
 
     if blocks.len() < k as usize {
-        return Err(LinalgError::Other("too few shards".to_string()));
+        return Err(KomodoError::TooFewShards(blocks.len(), k as usize));
     }
 
     let points: Vec<_> = blocks

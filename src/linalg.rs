@@ -1,25 +1,12 @@
 use ark_ff::Field;
-use thiserror::Error;
+
+use crate::error::KomodoError;
 
 #[derive(Clone, PartialEq, Default, Debug)]
 pub(super) struct Matrix<T: Field> {
     pub elements: Vec<T>,
     pub height: usize,
     width: usize,
-}
-
-#[derive(Clone, Debug, Error, PartialEq)]
-pub enum LinalgError {
-    #[error("Invalid matrix elements: {0}")]
-    InvalidMatrixElements(String),
-    #[error("Matrix is not a square")]
-    NonSquareMatrix(usize, usize),
-    #[error("Matrix is not invertible at row {0}")]
-    NonInvertibleMatrix(usize),
-    #[error("Matrices don't have compatible shapes: ({0} x {1}) and ({2} x {3})")]
-    IncompatibleMatrixShapes(usize, usize, usize, usize),
-    #[error("Another error: {0}")]
-    Other(String),
 }
 
 impl<T: Field> Matrix<T> {
@@ -62,13 +49,13 @@ impl<T: Field> Matrix<T> {
         }
     }
 
-    pub(super) fn from_vec_vec(matrix: Vec<Vec<T>>) -> Result<Self, LinalgError> {
+    pub(super) fn from_vec_vec(matrix: Vec<Vec<T>>) -> Result<Self, KomodoError> {
         let height = matrix.len();
         let width = matrix[0].len();
 
         for (i, row) in matrix.iter().enumerate() {
             if row.len() != width {
-                return Err(LinalgError::InvalidMatrixElements(format!(
+                return Err(KomodoError::InvalidMatrixElements(format!(
                     "expected rows to be of same length {}, found {} at row {}",
                     width,
                     row.len(),
@@ -118,9 +105,9 @@ impl<T: Field> Matrix<T> {
         }
     }
 
-    pub(super) fn invert(&self) -> Result<Self, LinalgError> {
+    pub(super) fn invert(&self) -> Result<Self, KomodoError> {
         if self.height != self.width {
-            return Err(LinalgError::NonSquareMatrix(self.height, self.width));
+            return Err(KomodoError::NonSquareMatrix(self.height, self.width));
         }
 
         let mut inverse = Self::identity(self.height);
@@ -129,7 +116,7 @@ impl<T: Field> Matrix<T> {
         for i in 0..matrix.height {
             let pivot = matrix.get(i, i);
             if pivot.is_zero() {
-                return Err(LinalgError::NonInvertibleMatrix(i));
+                return Err(KomodoError::NonInvertibleMatrix(i));
             }
 
             inverse.divide_row_by(i, pivot);
@@ -147,9 +134,9 @@ impl<T: Field> Matrix<T> {
         Ok(inverse)
     }
 
-    pub(super) fn mul(&self, rhs: &Self) -> Result<Self, LinalgError> {
+    pub(super) fn mul(&self, rhs: &Self) -> Result<Self, KomodoError> {
         if self.width != rhs.height {
-            return Err(LinalgError::IncompatibleMatrixShapes(
+            return Err(KomodoError::IncompatibleMatrixShapes(
                 self.height,
                 self.width,
                 rhs.height,
@@ -205,7 +192,7 @@ mod tests {
     use ark_std::{One, Zero};
     use rand::Rng;
 
-    use super::{LinalgError, Matrix};
+    use super::{KomodoError, Matrix};
 
     fn random_field_element<T: Field>() -> T {
         let mut rng = rand::thread_rng();
@@ -246,7 +233,7 @@ mod tests {
         assert!(matrix.is_err());
         assert!(matches!(
             matrix.err().unwrap(),
-            LinalgError::InvalidMatrixElements(..)
+            KomodoError::InvalidMatrixElements(..)
         ));
     }
 
@@ -291,7 +278,7 @@ mod tests {
 
         assert!(matches!(
             a.mul(&Matrix::from_vec_vec(vec![vec![Fr::from(1), Fr::from(2)]]).unwrap()),
-            Err(LinalgError::IncompatibleMatrixShapes(3, 3, 1, 2))
+            Err(KomodoError::IncompatibleMatrixShapes(3, 3, 1, 2))
         ));
 
         let product = a.mul(&b).unwrap();
@@ -335,7 +322,7 @@ mod tests {
         assert!(inverse.is_err());
         assert!(matches!(
             inverse.err().unwrap(),
-            LinalgError::NonSquareMatrix(..)
+            KomodoError::NonSquareMatrix(..)
         ));
 
         let inverse =
@@ -343,7 +330,7 @@ mod tests {
         assert!(inverse.is_err());
         assert!(matches!(
             inverse.err().unwrap(),
-            LinalgError::NonInvertibleMatrix(0)
+            KomodoError::NonInvertibleMatrix(0)
         ));
 
         let inverse = Matrix::from_vec_vec(vec![
@@ -356,7 +343,7 @@ mod tests {
         assert!(inverse.is_err());
         assert!(matches!(
             inverse.err().unwrap(),
-            LinalgError::NonInvertibleMatrix(1)
+            KomodoError::NonInvertibleMatrix(1)
         ));
     }
 

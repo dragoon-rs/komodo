@@ -11,6 +11,7 @@ use rs_merkle::algorithms::Sha256;
 use rs_merkle::Hasher;
 use tracing::{debug, info};
 
+mod error;
 pub mod fec;
 mod field;
 mod linalg;
