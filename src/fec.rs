@@ -126,7 +126,6 @@ pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>) -> Result<Vec<u8>, KomodoError>
 
     let source_shards = shards
         .mul(&Matrix::vandermonde(&points, k as usize).invert()?)?
-        .transpose()
         .elements;
 
     let mut bytes = field::merge_elements_into_bytes::<E>(&source_shards, true);
@@ -163,7 +162,7 @@ mod tests {
         let encoding = Matrix::vandermonde(&points, k);
 
         let source_shards = Matrix::from_vec_vec(
-            field::split_data_into_field_elements::<E>(data, 1, false)
+            field::split_data_into_field_elements::<E>(data, k, false)
                 .chunks(k)
                 .map(|c| c.to_vec())
                 .collect(),
@@ -200,13 +199,13 @@ mod tests {
 
     #[test]
     fn decoding() {
+        let bytes = bytes();
         let (k, n) = (3, 5);
 
         let modulus_byte_size = <Bls12_381 as Pairing>::ScalarField::MODULUS_BIT_SIZE as usize / 8;
         // NOTE: starting at `modulus_byte_size * (k - 1) + 1` to include at least _k_ elements
-        // FIXME: stopping at k elements, more yields crashes
-        for b in (modulus_byte_size * (k - 1) + 1)..=(modulus_byte_size * k) {
-            decoding_template::<Bls12_381>(&bytes()[..b], k, n);
+        for b in (modulus_byte_size * (k - 1) + 1)..bytes.len() {
+            decoding_template::<Bls12_381>(&bytes[..b], k, n);
         }
     }
 
