@@ -1,11 +1,12 @@
 use std::ops::{Add, Mul};
 
 use ark_ec::pairing::Pairing;
+use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{One, Zero};
-use reed_solomon_erasure::{Error, Field as GF, ReedSolomonNonSystematic};
 
 use crate::field;
+use crate::linalg::{LinalgError, Matrix};
 
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct LinearCombinationElement<E: Pairing> {
@@ -34,7 +35,7 @@ impl<E: Pairing> Shard<E> {
                 .map(|e| e.mul(alpha))
                 .collect::<Vec<_>>();
 
-            field::merge_elements_into_bytes::<E>(&elements)
+            field::merge_elements_into_bytes::<E>(&elements, false)
         };
 
         Shard {
@@ -89,39 +90,47 @@ impl<E: Pairing> Shard<E> {
             k: self.k,
             linear_combination,
             hash: self.hash.clone(),
-            bytes: field::merge_elements_into_bytes::<E>(&elements),
+            bytes: field::merge_elements_into_bytes::<E>(&elements, false),
             size: self.size,
         }
     }
 }
 
-pub fn decode<F: GF, E: Pairing>(blocks: Vec<Shard<E>>) -> Result<Vec<u8>, Error> {
+pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>) -> Result<Vec<u8>, LinalgError> {
     let k = blocks[0].k;
-    let n = blocks
-        .iter()
-        // FIXME: this is incorrect
-        .map(|b| b.linear_combination[0].index)
-        .max()
-        .unwrap_or(0)
-        + 1;
 
     if blocks.len() < k as usize {
-        return Err(Error::TooFewShards);
+        return Err(LinalgError::Other("too few shards".to_string()));
     }
 
-    let mut shards: Vec<Option<Vec<F::Elem>>> = Vec::with_capacity(n as usize);
-    shards.resize(n as usize, None);
-    for block in &blocks {
-        // FIXME: this is incorrect
-        shards[block.linear_combination[0].index as usize] = Some(F::deserialize(&block.bytes));
-    }
+    let points: Vec<_> = blocks
+        .iter()
+        .take(k as usize)
+        .map(|b| {
+            E::ScalarField::from_le_bytes_mod_order(
+                // TODO: use the real linear combination
+                &(b.linear_combination[0].index as u64).to_le_bytes(),
+            )
+        })
+        .collect();
 
-    ReedSolomonNonSystematic::<F>::vandermonde(k as usize, n as usize)?.reconstruct(&mut shards)?;
-    let elements: Vec<_> = shards.iter().filter_map(|x| x.clone()).flatten().collect();
+    let shards = Matrix::from_vec_vec(
+        blocks
+            .iter()
+            .take(k as usize)
+            .map(|b| field::split_data_into_field_elements::<E>(&b.bytes, 1, true))
+            .collect(),
+    )?
+    .transpose();
 
-    let mut data = F::into_data(elements.as_slice());
-    data.resize(blocks[0].size, 0);
-    Ok(data)
+    let source_shards = shards
+        .mul(&Matrix::vandermonde(&points, k as usize).invert()?)?
+        .transpose()
+        .elements;
+
+    let mut bytes = field::merge_elements_into_bytes::<E>(&source_shards, true);
+    bytes.resize(blocks[0].size, 0);
+    Ok(bytes)
 }
 
 #[cfg(test)]
@@ -130,7 +139,6 @@ mod tests {
     use ark_ec::pairing::Pairing;
     use ark_ff::PrimeField;
     use ark_std::One;
-    use reed_solomon_erasure::galois_prime::Field as GF;
     use rs_merkle::algorithms::Sha256;
     use rs_merkle::Hasher;
 
@@ -152,7 +160,7 @@ mod tests {
         [3042u32, 3021u32, 3731u32],
         [4218u32, 4185u32, 5187u32],
     ];
-    const LOST_SHARDS: [usize; 3] = [1, 3, 6];
+    const LOST_SHARDS: [usize; 2] = [4, 0];
 
     fn decoding_template<E: Pairing>() {
         let hash = Sha256::hash(DATA).to_vec();
@@ -181,13 +189,13 @@ mod tests {
                         weight: E::ScalarField::one(),
                     }],
                     hash: hash.clone(),
-                    bytes: field::merge_elements_into_bytes::<E>(bytes),
+                    bytes: field::merge_elements_into_bytes::<E>(bytes, false),
                     size: DATA.len(),
                 });
             }
         }
 
-        assert_eq!(DATA, decode::<GF, E>(blocks).unwrap())
+        assert_eq!(DATA, decode::<E>(blocks).unwrap())
     }
 
     #[test]

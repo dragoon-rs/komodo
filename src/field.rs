@@ -34,10 +34,17 @@ pub(crate) fn split_data_into_field_elements<E: Pairing>(
     elements
 }
 
-pub(crate) fn merge_elements_into_bytes<E: Pairing>(elements: &[E::ScalarField]) -> Vec<u8> {
+pub(crate) fn merge_elements_into_bytes<E: Pairing>(
+    elements: &[E::ScalarField],
+    one_less: bool,
+) -> Vec<u8> {
     let mut bytes = vec![];
     for e in elements {
-        bytes.append(&mut e.into_bigint().to_bytes_le());
+        let mut b = e.into_bigint().to_bytes_le();
+        if one_less {
+            b.pop();
+        }
+        bytes.append(&mut b);
     }
 
     bytes

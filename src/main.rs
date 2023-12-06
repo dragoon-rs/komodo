@@ -9,7 +9,6 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly::DenseUVPolynomial;
 use ark_poly_commit::kzg10::Powers;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
-use reed_solomon_erasure::galois_prime::Field as GF;
 use tracing::{debug, info, warn};
 
 use komodo::{
@@ -182,7 +181,7 @@ fn main() {
             .cloned()
             .map(|b| b.1.shard)
             .collect();
-        eprintln!("{:?}", decode::<GF, Bls12_381>(blocks).unwrap());
+        eprintln!("{:?}", decode::<Bls12_381>(blocks).unwrap());
 
         exit(0);
     }

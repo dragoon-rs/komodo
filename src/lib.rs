@@ -13,6 +13,7 @@ use tracing::{debug, info};
 
 pub mod fec;
 mod field;
+mod linalg;
 pub mod setup;
 
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
@@ -72,7 +73,7 @@ where
                     weight: E::ScalarField::one(),
                 }],
                 hash: hash.to_vec(),
-                bytes: field::merge_elements_into_bytes::<E>(row),
+                bytes: field::merge_elements_into_bytes::<E>(row, false),
                 size: nb_bytes,
             },
             commit: commits.clone(),
