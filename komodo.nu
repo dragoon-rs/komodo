@@ -11,7 +11,7 @@ def "nu-complete log-levels" []: nothing -> list<string> {
 }
 
 def run-komodo [
-    args: record<bytes: string, k: int, n: int, do_generate_powers: bool, powers_file: path, do_reconstruct_data: bool, do_verify_blocks: bool, block_files: list<string>>,
+    args: record<bytes: path, k: int, n: int, do_generate_powers: bool, powers_file: path, do_reconstruct_data: bool, do_verify_blocks: bool, block_files: list<string>>,
     --log-level: string,
 ]: nothing -> any {
     with-env {RUST_LOG: $log_level} {
@@ -37,7 +37,7 @@ export def "komodo build" [] {
 }
 
 export def "komodo setup" [
-    bytes: string,
+    bytes: path,
     --powers-file: path = "powers.bin",
     --log-level: string@"nu-complete log-levels" = "INFO"
 ]: nothing -> nothing {
@@ -54,7 +54,7 @@ export def "komodo setup" [
 }
 
 export def "komodo prove" [
-    bytes: string,
+    bytes: path,
     --fec-params: record<k: int, n: int>,
     --powers-file: path = "powers.bin",
     --log-level: string@"nu-complete log-levels" = "INFO"

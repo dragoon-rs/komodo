@@ -24,11 +24,14 @@ const VALIDATE: Validate = Validate::Yes;
 const BLOCK_DIR: &str = "blocks/";
 
 fn parse_args() -> (Vec<u8>, usize, usize, bool, String, bool, bool, Vec<String>) {
-    let bytes = std::env::args()
+    let bytes_path = std::env::args()
         .nth(1)
-        .expect("expected bytes as first positional argument")
-        .as_bytes()
-        .to_vec();
+        .expect("expected path to bytes as first positional argument");
+    let bytes = if bytes_path.is_empty() {
+        vec![]
+    } else {
+        std::fs::read(bytes_path).unwrap()
+    };
     let k: usize = std::env::args()
         .nth(2)
         .expect("expected k as second positional argument")
