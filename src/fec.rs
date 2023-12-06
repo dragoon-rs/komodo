@@ -97,7 +97,7 @@ impl<E: Pairing> Shard<E> {
     }
 }
 
-pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>) -> Result<Vec<u8>, KomodoError> {
+pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>, transpose: bool) -> Result<Vec<u8>, KomodoError> {
     let k = blocks[0].k;
 
     if blocks.len() < k as usize {
@@ -124,9 +124,12 @@ pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>) -> Result<Vec<u8>, KomodoError>
     )?
     .transpose();
 
-    let source_shards = shards
-        .mul(&Matrix::vandermonde(&points, k as usize).invert()?)?
-        .elements;
+    let source_shards = shards.mul(&Matrix::vandermonde(&points, k as usize).invert()?)?;
+    let source_shards = if transpose {
+        source_shards.transpose().elements
+    } else {
+        source_shards.elements
+    };
 
     let mut bytes = field::merge_elements_into_bytes::<E>(&source_shards, true);
     bytes.resize(blocks[0].size, 0);
@@ -193,7 +196,8 @@ mod tests {
 
         assert_eq!(
             data,
-            decode::<E>(shards).expect(&format!("could not decode shards ({} bytes)", data.len()))
+            decode::<E>(shards, false)
+                .expect(&format!("could not decode shards ({} bytes)", data.len()))
         );
     }
 

@@ -181,7 +181,7 @@ fn main() {
             .cloned()
             .map(|b| b.1.shard)
             .collect();
-        eprintln!("{:?}", decode::<Bls12_381>(blocks).unwrap());
+        eprintln!("{:?}", decode::<Bls12_381>(blocks, true).unwrap());
 
         exit(0);
     }

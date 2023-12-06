@@ -206,7 +206,11 @@ mod tests {
     use ark_poly_commit::kzg10::Commitment;
     use ark_std::One;
 
-    use crate::{batch_verify, encode, setup, verify, Block};
+    use crate::{
+        batch_verify, encode,
+        fec::{decode, Shard},
+        setup, verify, Block,
+    };
 
     type UniPoly381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;
 
@@ -415,5 +419,53 @@ mod tests {
             .expect("verification failed for bls12-381");
         verify_recoding_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 10)], 4, 6)
             .expect("verification failed for bls12-381 with padding");
+    }
+
+    fn end_to_end_template<E, P>(
+        bytes: &[u8],
+        k: usize,
+        n: usize,
+    ) -> Result<(), ark_poly_commit::Error>
+    where
+        E: Pairing,
+        P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+        for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+    {
+        let powers = setup::random(bytes.len())?;
+        let blocks: Vec<Shard<E>> = encode::<E, P>(bytes, k, n, &powers)?
+            .iter()
+            .map(|b| b.shard.clone())
+            .collect();
+
+        assert_eq!(bytes, decode::<E>(blocks, true).unwrap());
+
+        Ok(())
+    }
+
+    #[test]
+    fn end_to_end_2() {
+        let bytes = bytes::<Bls12_381>(4, 2);
+        end_to_end_template::<Bls12_381, UniPoly381>(&bytes, 4, 6)
+            .expect("end to end failed for bls12-381");
+        end_to_end_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 10)], 4, 6)
+            .expect("end to end failed for bls12-381 with padding");
+    }
+
+    #[test]
+    fn end_to_end_4() {
+        let bytes = bytes::<Bls12_381>(4, 4);
+        end_to_end_template::<Bls12_381, UniPoly381>(&bytes, 4, 6)
+            .expect("end to end failed for bls12-381");
+        end_to_end_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 10)], 4, 6)
+            .expect("end to end failed for bls12-381 with padding");
+    }
+
+    #[test]
+    fn end_to_end_6() {
+        let bytes = bytes::<Bls12_381>(4, 6);
+        end_to_end_template::<Bls12_381, UniPoly381>(&bytes, 4, 6)
+            .expect("end to end failed for bls12-381");
+        end_to_end_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 10)], 4, 6)
+            .expect("end to end failed for bls12-381 with padding");
     }
 }
