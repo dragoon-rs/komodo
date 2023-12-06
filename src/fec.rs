@@ -291,6 +291,7 @@ mod tests {
         125, 10, 125, 10,
     ];
 
+    #[allow(clippy::expect_fun_call)]
     fn decoding_template<E: Pairing>(data: &[u8], k: usize, n: usize) {
         let hash = Sha256::hash(data).to_vec();
 
@@ -305,11 +306,14 @@ mod tests {
                 .map(|c| c.to_vec())
                 .collect(),
         )
-        .unwrap_or_else(|_| panic!("could not build source shard matrix ({} bytes)", data.len()));
+        .expect(&format!(
+            "could not build source shard matrix ({} bytes)",
+            data.len()
+        ));
 
         let shards = source_shards
             .mul(&encoding)
-            .unwrap_or_else(|_| panic!("could not encode shards ({} bytes)", data.len()))
+            .expect(&format!("could not encode shards ({} bytes)", data.len()))
             .transpose()
             .elements
             .chunks(source_shards.height)
@@ -328,8 +332,7 @@ mod tests {
 
         assert_eq!(
             data,
-            decode::<E>(shards)
-                .unwrap_or_else(|_| panic!("could not decode shards ({} bytes)", data.len()))
+            decode::<E>(shards).expect(&format!("could not decode shards ({} bytes)", data.len()))
         );
     }
 
