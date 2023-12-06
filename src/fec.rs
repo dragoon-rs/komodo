@@ -339,7 +339,14 @@ mod tests {
 
     #[test]
     fn decoding() {
-        decoding_template::<Bls12_381>(&BYTES[..63], 3, 5);
+        let (k, n) = (3, 5);
+
+        let modulus_byte_size = <Bls12_381 as Pairing>::ScalarField::MODULUS_BIT_SIZE as usize / 8;
+        // NOTE: starting at `modulus_byte_size * (k - 1) + 1` to include at least _k_ elements
+        // FIXME: stopping at k elements, more yields crashes
+        for b in (modulus_byte_size * (k - 1) + 1)..=(modulus_byte_size * k) {
+            decoding_template::<Bls12_381>(&BYTES[..b], k, n);
+        }
     }
 
     fn create_fake_shard<E: Pairing>(
