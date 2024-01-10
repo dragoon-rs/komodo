@@ -5,7 +5,7 @@ stages:
   - test
 
 variables:
-  RUSTUP_CHANNEL: "1.71.0"
+  RUSTUP_CHANNEL: "1.72.1"
 
 workflow:
   rules:
@@ -47,7 +47,11 @@ test:
     - cargo --version
     - cargo clippy --version
 
+    - cargo install nu@0.89.0
+    - nu --version
+
   script:
     - cargo check --workspace --all-targets
     - cargo clippy --workspace --all-targets -- -D warnings
     - cargo test --workspace --verbose
+    - nu tests/cli.nu
