@@ -16,7 +16,7 @@ def run-komodo [
 ]: nothing -> any {
     with-env {RUST_LOG: $log_level} {
         let res = do {
-            ^$KOMODO_BINARY ([
+            ^$KOMODO_BINARY ...([
                 $args.bytes
                 $args.k
                 $args.n
