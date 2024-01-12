@@ -27,7 +27,7 @@ def run-komodo [
             ] | append $args.block_files)
         } | complete
 
-        print $res.stdout
+        print --no-newline $res.stdout
         $res.stderr | from json
     }
 }
