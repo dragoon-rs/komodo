@@ -1,56 +1,35 @@
+use std::cmp::max;
 use std::ops::{Add, Mul};
 
 use ark_ec::pairing::Pairing;
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{One, Zero};
+use ark_std::Zero;
 
 use crate::error::KomodoError;
 use crate::field;
 use crate::linalg::Matrix;
 
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
-pub struct LinearCombinationElement<E: Pairing> {
-    pub index: u32,
-    pub weight: E::ScalarField,
-}
-
-#[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Shard<E: Pairing> {
     pub k: u32,
-    pub linear_combination: Vec<LinearCombinationElement<E>>,
+    pub linear_combination: Vec<E::ScalarField>,
     pub hash: Vec<u8>,
-    pub bytes: Vec<u8>,
+    pub bytes: Vec<E::ScalarField>,
     pub size: usize,
 }
 
 impl<E: Pairing> Shard<E> {
     pub fn mul(&self, alpha: E::ScalarField) -> Self {
-        let bytes = if alpha.is_zero() {
-            vec![0u8; self.bytes.len()]
-        } else if alpha.is_one() {
-            self.bytes.to_vec()
-        } else {
-            let elements = field::split_data_into_field_elements::<E>(&self.bytes, 1, true)
-                .iter()
-                .map(|e| e.mul(alpha))
-                .collect::<Vec<_>>();
-
-            field::merge_elements_into_bytes::<E>(&elements, false)
-        };
-
-        Shard {
+        Self {
             k: self.k,
             linear_combination: self
                 .linear_combination
                 .iter()
-                .map(|l| LinearCombinationElement {
-                    index: l.index,
-                    weight: l.weight.mul(alpha),
-                })
+                .map(|e| e.mul(alpha))
                 .collect(),
             hash: self.hash.clone(),
-            bytes,
+            bytes: self.bytes.iter().map(|e| e.mul(alpha)).collect(),
             size: self.size,
         }
     }
@@ -62,36 +41,31 @@ impl<E: Pairing> Shard<E> {
             return self.clone();
         }
 
-        let elements = {
-            let elements_self = field::split_data_into_field_elements::<E>(&self.bytes, 1, true);
-            let elements_other = field::split_data_into_field_elements::<E>(&other.bytes, 1, true);
-
-            elements_self
-                .iter()
-                .zip(elements_other.iter())
-                .map(|(es, eo)| es.mul(alpha).add(eo.mul(beta)))
-                .collect::<Vec<_>>()
-        };
-
-        let mut linear_combination = vec![];
-        for lce in &self.linear_combination {
-            linear_combination.push(LinearCombinationElement {
-                index: lce.index,
-                weight: lce.weight.mul(alpha),
-            });
+        let mut linear_combination = Vec::new();
+        linear_combination.resize(
+            max(
+                self.linear_combination.len(),
+                other.linear_combination.len(),
+            ),
+            E::ScalarField::zero(),
+        );
+        for (i, l) in self.linear_combination.iter().enumerate() {
+            linear_combination[i] += l.mul(alpha);
         }
-        for lce in &other.linear_combination {
-            linear_combination.push(LinearCombinationElement {
-                index: lce.index,
-                weight: lce.weight.mul(beta),
-            });
+        for (i, l) in other.linear_combination.iter().enumerate() {
+            linear_combination[i] += l.mul(beta);
         }
 
         Shard {
             k: self.k,
             linear_combination,
             hash: self.hash.clone(),
-            bytes: field::merge_elements_into_bytes::<E>(&elements, false),
+            bytes: self
+                .bytes
+                .iter()
+                .zip(other.bytes.iter())
+                .map(|(es, eo)| es.mul(alpha).add(eo.mul(beta)))
+                .collect::<Vec<_>>(),
             size: self.size,
         }
     }
@@ -108,10 +82,14 @@ pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>, transpose: bool) -> Result<Vec<
         .iter()
         .take(k as usize)
         .map(|b| {
-            E::ScalarField::from_le_bytes_mod_order(
-                // TODO: use the real linear combination
-                &(b.linear_combination[0].index as u64).to_le_bytes(),
-            )
+            // TODO: use the real linear combination
+            let first_non_zero = b
+                .linear_combination
+                .iter()
+                .enumerate()
+                .filter(|(_, l)| !l.is_zero())
+                .collect::<Vec<_>>()[0];
+            E::ScalarField::from_le_bytes_mod_order(&(first_non_zero.0 as u64).to_le_bytes())
         })
         .collect();
 
@@ -119,7 +97,7 @@ pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>, transpose: bool) -> Result<Vec<
         blocks
             .iter()
             .take(k as usize)
-            .map(|b| field::split_data_into_field_elements::<E>(&b.bytes, 1, true))
+            .map(|b| b.bytes.clone())
             .collect(),
     )?
     .transpose();
@@ -131,7 +109,7 @@ pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>, transpose: bool) -> Result<Vec<
         source_shards.elements
     };
 
-    let mut bytes = field::merge_elements_into_bytes::<E>(&source_shards, true);
+    let mut bytes = field::merge_elements_into_bytes::<E>(&source_shards);
     bytes.resize(blocks[0].size, 0);
     Ok(bytes)
 }
@@ -141,12 +119,12 @@ mod tests {
     use ark_bls12_381::Bls12_381;
     use ark_ec::pairing::Pairing;
     use ark_ff::PrimeField;
-    use ark_std::One;
+    use ark_std::{One, Zero};
     use rs_merkle::algorithms::Sha256;
     use rs_merkle::Hasher;
 
     use crate::{
-        fec::{decode, LinearCombinationElement, Shard},
+        fec::{decode, Shard},
         field,
         linalg::Matrix,
     };
@@ -165,7 +143,7 @@ mod tests {
         let encoding = Matrix::vandermonde(&points, k);
 
         let source_shards = Matrix::from_vec_vec(
-            field::split_data_into_field_elements::<E>(data, k, false)
+            field::split_data_into_field_elements::<E>(data, k)
                 .chunks(k)
                 .map(|c| c.to_vec())
                 .collect(),
@@ -182,15 +160,18 @@ mod tests {
             .elements
             .chunks(source_shards.height)
             .enumerate()
-            .map(|(i, s)| Shard {
-                k: k as u32,
-                linear_combination: vec![LinearCombinationElement {
-                    index: i as u32,
-                    weight: E::ScalarField::one(),
-                }],
-                hash: hash.clone(),
-                bytes: field::merge_elements_into_bytes::<E>(s, false),
-                size: data.len(),
+            .map(|(i, s)| {
+                let mut linear_combination = Vec::new();
+                linear_combination.resize(i + 1, E::ScalarField::zero());
+                linear_combination[i] = E::ScalarField::one();
+
+                Shard {
+                    k: k as u32,
+                    linear_combination,
+                    hash: hash.clone(),
+                    bytes: s.to_vec(),
+                    size: data.len(),
+                }
             })
             .collect();
 
@@ -214,12 +195,10 @@ mod tests {
     }
 
     fn create_fake_shard<E: Pairing>(
-        linear_combination: &[LinearCombinationElement<E>],
+        linear_combination: &[E::ScalarField],
         bytes: &[u8],
     ) -> Shard<E> {
-        let mut bytes = bytes.to_vec();
-        bytes.resize(32, 0);
-
+        let bytes = field::split_data_into_field_elements::<E>(bytes, 1);
         Shard {
             k: 0,
             linear_combination: linear_combination.to_vec(),
@@ -230,30 +209,13 @@ mod tests {
     }
 
     fn recoding_template<E: Pairing>() {
-        let a: Shard<E> = create_fake_shard(
-            &[LinearCombinationElement {
-                index: 0,
-                weight: E::ScalarField::one(),
-            }],
-            &[1, 2, 3],
-        );
-        let b: Shard<E> = create_fake_shard(
-            &[LinearCombinationElement {
-                index: 1,
-                weight: E::ScalarField::one(),
-            }],
-            &[4, 5, 6],
-        );
+        let a: Shard<E> = create_fake_shard(&[E::ScalarField::one()], &[1, 2, 3]);
+        let b: Shard<E> =
+            create_fake_shard(&[E::ScalarField::zero(), E::ScalarField::one()], &[4, 5, 6]);
 
         assert_eq!(
             a.mul(E::ScalarField::from_le_bytes_mod_order(&[2])),
-            create_fake_shard(
-                &[LinearCombinationElement {
-                    index: 0,
-                    weight: E::ScalarField::from_le_bytes_mod_order(&[2]),
-                }],
-                &[2, 4, 6],
-            )
+            create_fake_shard(&[E::ScalarField::from_le_bytes_mod_order(&[2])], &[2, 4, 6],)
         );
 
         let c = a.combine(
@@ -266,14 +228,8 @@ mod tests {
             c,
             create_fake_shard(
                 &[
-                    LinearCombinationElement {
-                        index: 0,
-                        weight: E::ScalarField::from_le_bytes_mod_order(&[3]),
-                    },
-                    LinearCombinationElement {
-                        index: 1,
-                        weight: E::ScalarField::from_le_bytes_mod_order(&[5]),
-                    }
+                    E::ScalarField::from_le_bytes_mod_order(&[3]),
+                    E::ScalarField::from_le_bytes_mod_order(&[5]),
                 ],
                 &[23, 31, 39]
             )
@@ -287,18 +243,8 @@ mod tests {
             ),
             create_fake_shard(
                 &[
-                    LinearCombinationElement {
-                        index: 0,
-                        weight: E::ScalarField::from_le_bytes_mod_order(&[6]),
-                    },
-                    LinearCombinationElement {
-                        index: 1,
-                        weight: E::ScalarField::from_le_bytes_mod_order(&[10]),
-                    },
-                    LinearCombinationElement {
-                        index: 0,
-                        weight: E::ScalarField::from_le_bytes_mod_order(&[4]),
-                    }
+                    E::ScalarField::from_le_bytes_mod_order(&[10]),
+                    E::ScalarField::from_le_bytes_mod_order(&[10]),
                 ],
                 &[50, 70, 90],
             )

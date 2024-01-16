@@ -5,8 +5,7 @@ use ark_ff::{Field, PrimeField};
 use ark_poly::DenseUVPolynomial;
 use ark_poly_commit::kzg10::{Commitment, Powers, Randomness, KZG10};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::One;
-use fec::LinearCombinationElement;
+use ark_std::{One, Zero};
 use rs_merkle::algorithms::Sha256;
 use rs_merkle::Hasher;
 use tracing::{debug, info};
@@ -66,15 +65,16 @@ where
 
     let mut proofs = Vec::new();
     for (i, row) in evaluations.iter().enumerate() {
+        let mut linear_combination = Vec::new();
+        linear_combination.resize(i + 1, E::ScalarField::zero());
+        linear_combination[i] = E::ScalarField::one();
+
         proofs.push(Block {
             shard: fec::Shard {
                 k: k as u32,
-                linear_combination: vec![LinearCombinationElement {
-                    index: i as u32,
-                    weight: E::ScalarField::one(),
-                }],
+                linear_combination,
                 hash: hash.to_vec(),
-                bytes: field::merge_elements_into_bytes::<E>(row, false),
+                bytes: row.clone(),
                 size: nb_bytes,
             },
             commit: commits.clone(),
@@ -99,7 +99,7 @@ where
     info!("encoding and proving {} bytes", bytes.len());
 
     debug!("splitting bytes into polynomials");
-    let elements = field::split_data_into_field_elements::<E>(bytes, k, false);
+    let elements = field::split_data_into_field_elements::<E>(bytes, k);
     let nb_polynomials = elements.len() / k;
     let polynomials = match field::build_interleaved_polynomials::<E, P>(&elements, nb_polynomials)
     {
@@ -151,7 +151,7 @@ where
     P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
-    let elements = field::split_data_into_field_elements::<E>(&block.shard.bytes, 1, true);
+    let elements = block.shard.bytes.clone();
     let polynomial = P::from_coefficients_vec(elements);
     let (commit, _) = KZG10::<E, P>::commit(verifier_key, &polynomial, None, None)?;
 
@@ -159,8 +159,9 @@ where
         .shard
         .linear_combination
         .iter()
-        .map(|lce| {
-            let alpha = E::ScalarField::from_le_bytes_mod_order(&[lce.index as u8]);
+        .enumerate()
+        .map(|(i, w)| {
+            let alpha = E::ScalarField::from_le_bytes_mod_order(&[i as u8]);
 
             let f: E::G1 = block
                 .commit
@@ -171,7 +172,7 @@ where
                     commit.mul(alpha.pow([j as u64]))
                 })
                 .sum();
-            f * lce.weight
+            f * w
         })
         .sum();
     Ok(Into::<E::G1>::into(commit.0) == rhs)
