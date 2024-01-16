@@ -183,6 +183,35 @@ impl<T: Field> Matrix<T> {
             width,
         }
     }
+
+    pub(super) fn truncate(&self, rows: Option<usize>, cols: Option<usize>) -> Self {
+        let width = if let Some(w) = cols {
+            self.width - w
+        } else {
+            self.width
+        };
+
+        let height = if let Some(h) = rows {
+            self.height - h
+        } else {
+            self.height
+        };
+
+        let mut elements = Vec::new();
+        elements.resize(height * width, T::zero());
+
+        for i in 0..height {
+            for j in 0..width {
+                elements[i * width + j] = self.get(i, j);
+            }
+        }
+
+        Self {
+            elements,
+            height,
+            width,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -387,5 +416,27 @@ mod tests {
         .unwrap();
 
         assert_eq!(matrix.transpose(), transpose);
+    }
+
+    #[test]
+    fn truncate() {
+        let matrix = Matrix::from_vec_vec(vec![
+            vec![Fr::from(1), Fr::from(2), Fr::from(3), Fr::from(10)],
+            vec![Fr::from(4), Fr::from(5), Fr::from(6), Fr::from(11)],
+            vec![Fr::from(7), Fr::from(8), Fr::from(9), Fr::from(12)],
+        ])
+        .unwrap();
+
+        assert_eq!(matrix.truncate(None, None), matrix);
+        assert_eq!(matrix.truncate(Some(0), None), matrix);
+        assert_eq!(matrix.truncate(None, Some(0)), matrix);
+        assert_eq!(matrix.truncate(Some(0), Some(0)), matrix);
+
+        let truncated = Matrix::from_vec_vec(vec![
+            vec![Fr::from(1), Fr::from(2)],
+            vec![Fr::from(4), Fr::from(5)],
+        ])
+        .unwrap();
+        assert_eq!(matrix.truncate(Some(1), Some(2)), truncated);
     }
 }

@@ -123,7 +123,7 @@ const FEC_PARAMS = {k: 3, n: 5}
 
 def test [blocks: list<int>] {
     let actual = try {
-        komodo reconstruct ...($blocks | each { $"blocks/($in).bin" }) | bytes decode
+        komodo reconstruct ...($blocks | each {|i| ls blocks | get name | get $i}) | bytes decode
     } catch {
         error make --unspanned { msg: "woopsie" }
     }
@@ -138,7 +138,7 @@ def main [] {
     komodo setup $BYTES
     komodo prove $BYTES --fec-params $FEC_PARAMS
 
-    komodo verify blocks/0.bin blocks/1.bin
+    komodo verify (ls blocks).0.name (ls blocks).1.name
 
     let all_k_choose_n_permutations = seq $FEC_PARAMS.k $FEC_PARAMS.n
         | each {|ki|

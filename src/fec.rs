@@ -73,25 +73,39 @@ impl<E: Pairing> Shard<E> {
 
 pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>, transpose: bool) -> Result<Vec<u8>, KomodoError> {
     let k = blocks[0].k;
+    let np = blocks.len();
 
-    if blocks.len() < k as usize {
-        return Err(KomodoError::TooFewShards(blocks.len(), k as usize));
+    if np < k as usize {
+        return Err(KomodoError::TooFewShards(np, k as usize));
     }
 
-    let points: Vec<_> = blocks
+    let n = 1 + blocks
         .iter()
-        .take(k as usize)
-        .map(|b| {
-            // TODO: use the real linear combination
-            let first_non_zero = b
-                .linear_combination
+        .flat_map(|b| {
+            b.linear_combination
                 .iter()
                 .enumerate()
                 .filter(|(_, l)| !l.is_zero())
-                .collect::<Vec<_>>()[0];
-            E::ScalarField::from_le_bytes_mod_order(&(first_non_zero.0 as u64).to_le_bytes())
+                .map(|(i, _)| i)
+                .collect::<Vec<_>>()
         })
+        .max()
+        .unwrap();
+    let points: Vec<E::ScalarField> = (0..n)
+        .map(|i| E::ScalarField::from_le_bytes_mod_order(&[i as u8]))
         .collect();
+    let encoding_mat = Matrix::vandermonde(&points, k as usize);
+
+    let lin_comb_mat = Matrix::from_vec_vec(
+        blocks
+            .iter()
+            .map(|b| {
+                let mut comb = b.linear_combination.clone();
+                comb.resize(n, E::ScalarField::zero());
+                comb
+            })
+            .collect(),
+    )?;
 
     let shards = Matrix::from_vec_vec(
         blocks
@@ -102,7 +116,11 @@ pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>, transpose: bool) -> Result<Vec<
     )?
     .transpose();
 
-    let source_shards = shards.mul(&Matrix::vandermonde(&points, k as usize).invert()?)?;
+    let ra = encoding_mat
+        .mul(&lin_comb_mat.transpose())?
+        .truncate(None, Some(np - k as usize));
+
+    let source_shards = shards.mul(&ra.invert()?)?;
     let source_shards = if transpose {
         source_shards.transpose().elements
     } else {
@@ -134,7 +152,7 @@ mod tests {
     }
 
     #[allow(clippy::expect_fun_call)]
-    fn decoding_template<E: Pairing>(data: &[u8], k: usize, n: usize) {
+    fn encode<E: Pairing>(data: &[u8], k: usize, n: usize) -> Vec<Shard<E>> {
         let hash = Sha256::hash(data).to_vec();
 
         let points: Vec<E::ScalarField> = (0..n)
@@ -153,7 +171,7 @@ mod tests {
             data.len()
         ));
 
-        let shards = source_shards
+        source_shards
             .mul(&encoding)
             .expect(&format!("could not encode shards ({} bytes)", data.len()))
             .transpose()
@@ -173,12 +191,14 @@ mod tests {
                     size: data.len(),
                 }
             })
-            .collect();
+            .collect()
+    }
 
+    fn decoding_template<E: Pairing>(data: &[u8], k: usize, n: usize) {
         assert_eq!(
             data,
-            decode::<E>(shards, false)
-                .expect(&format!("could not decode shards ({} bytes)", data.len()))
+            decode::<E>(encode(data, k, n), false)
+                .unwrap_or_else(|_| panic!("could not decode shards ({} bytes)", data.len()))
         );
     }
 
@@ -191,6 +211,37 @@ mod tests {
         // NOTE: starting at `modulus_byte_size * (k - 1) + 1` to include at least _k_ elements
         for b in (modulus_byte_size * (k - 1) + 1)..bytes.len() {
             decoding_template::<Bls12_381>(&bytes[..b], k, n);
+        }
+    }
+
+    fn decoding_with_recoding_template<E: Pairing>(data: &[u8], k: usize, n: usize) {
+        let mut shards = encode(data, k, n);
+        shards[1] = shards[2].combine(
+            E::ScalarField::from_le_bytes_mod_order(&[7]),
+            &shards[4],
+            E::ScalarField::from_le_bytes_mod_order(&[6]),
+        );
+        shards[2] = shards[1].combine(
+            E::ScalarField::from_le_bytes_mod_order(&[5]),
+            &shards[3],
+            E::ScalarField::from_le_bytes_mod_order(&[4]),
+        );
+        assert_eq!(
+            data,
+            decode::<E>(shards, false)
+                .unwrap_or_else(|_| panic!("could not decode shards ({} bytes)", data.len()))
+        );
+    }
+
+    #[test]
+    fn decoding_with_recoding() {
+        let bytes = bytes();
+        let (k, n) = (3, 5);
+
+        let modulus_byte_size = <Bls12_381 as Pairing>::ScalarField::MODULUS_BIT_SIZE as usize / 8;
+        // NOTE: starting at `modulus_byte_size * (k - 1) + 1` to include at least _k_ elements
+        for b in (modulus_byte_size * (k - 1) + 1)..bytes.len() {
+            decoding_with_recoding_template::<Bls12_381>(&bytes[..b], k, n);
         }
     }
 

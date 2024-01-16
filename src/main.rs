@@ -9,6 +9,9 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly::DenseUVPolynomial;
 use ark_poly_commit::kzg10::Powers;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
+use komodo::recode;
+use rs_merkle::algorithms::Sha256;
+use rs_merkle::Hasher;
 use tracing::{debug, info, warn};
 
 use komodo::{
@@ -23,7 +26,17 @@ const COMPRESS: Compress = Compress::Yes;
 const VALIDATE: Validate = Validate::Yes;
 const BLOCK_DIR: &str = "blocks/";
 
-fn parse_args() -> (Vec<u8>, usize, usize, bool, String, bool, bool, Vec<String>) {
+fn parse_args() -> (
+    Vec<u8>,
+    usize,
+    usize,
+    bool,
+    String,
+    bool,
+    bool,
+    bool,
+    Vec<String>,
+) {
     let bytes_path = std::env::args()
         .nth(1)
         .expect("expected path to bytes as first positional argument");
@@ -60,7 +73,12 @@ fn parse_args() -> (Vec<u8>, usize, usize, bool, String, bool, bool, Vec<String>
         .expect("expected do_verify_blocks as seventh positional argument")
         .parse()
         .expect("could not parse do_verify_blocks as a bool");
-    let block_files = std::env::args().skip(8).collect::<Vec<_>>();
+    let do_combine_blocks: bool = std::env::args()
+        .nth(8)
+        .expect("expected do_combine_blocks as eigth positional argument")
+        .parse()
+        .expect("could not parse do_combine_blocks as a bool");
+    let block_files = std::env::args().skip(9).collect::<Vec<_>>();
 
     (
         bytes,
@@ -70,6 +88,7 @@ fn parse_args() -> (Vec<u8>, usize, usize, bool, String, bool, bool, Vec<String>
         powers_file,
         do_reconstruct_data,
         do_verify_blocks,
+        do_combine_blocks,
         block_files,
     )
 }
@@ -96,11 +115,8 @@ fn generate_powers(bytes: &[u8], powers_file: &str) -> Result<(), std::io::Error
 fn read_block<E: Pairing>(block_files: &[String]) -> Vec<(String, Block<E>)> {
     block_files
         .iter()
-        .filter_map(|f| match std::fs::read(f) {
-            Ok(bytes) => Some((f, bytes)),
-            Err(_) => None,
-        })
-        .map(|(f, s)| {
+        .map(|f| {
+            let s = std::fs::read(f).unwrap_or_else(|_| panic!("could not read {}", f));
             (
                 f.clone(),
                 // FIXME: do not unwrap and return an error
@@ -132,11 +148,23 @@ where
 fn dump_blocks<E: Pairing>(blocks: &[Block<E>]) -> Result<(), std::io::Error> {
     info!("dumping blocks to `{}`", BLOCK_DIR);
     let mut block_files = vec![];
-    for (i, block) in blocks.iter().enumerate() {
-        let filename = PathBuf::from(BLOCK_DIR).join(format!("{}.bin", i));
+    for block in blocks {
+        let mut serialized = vec![0; block.shard.linear_combination.serialized_size(COMPRESS)];
+        block
+            .shard
+            .linear_combination
+            .serialize_with_mode(&mut serialized[..], COMPRESS)
+            .unwrap();
+        let repr = Sha256::hash(&serialized)
+            .iter()
+            .map(|x| format!("{:x}", x))
+            .collect::<Vec<_>>()
+            .join("");
+
+        let filename = PathBuf::from(BLOCK_DIR).join(format!("{}.bin", repr));
         std::fs::create_dir_all(BLOCK_DIR)?;
 
-        debug!("serializing block {}", i);
+        debug!("serializing block {}", repr);
         let mut serialized = vec![0; block.serialized_size(COMPRESS)];
         // FIXME: do not unwrap and return an error with std::io::Error
         block
@@ -170,6 +198,7 @@ fn main() {
         powers_file,
         do_reconstruct_data,
         do_verify_blocks,
+        do_combine_blocks,
         block_files,
     ) = parse_args();
 
@@ -185,6 +214,18 @@ fn main() {
             .map(|b| b.1.shard)
             .collect();
         eprintln!("{:?}", decode::<Bls12_381>(blocks, true).unwrap());
+
+        exit(0);
+    }
+
+    if do_combine_blocks {
+        let blocks = read_block::<Bls12_381>(&block_files);
+        if blocks.len() != 2 {
+            eprintln!("expected exactly 2 blocks, found {}", blocks.len());
+            exit(1);
+        }
+
+        dump_blocks(&[recode(&blocks[0].1, &blocks[1].1)]).unwrap();
 
         exit(0);
     }

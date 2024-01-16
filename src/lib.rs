@@ -5,6 +5,7 @@ use ark_ff::{Field, PrimeField};
 use ark_poly::DenseUVPolynomial;
 use ark_poly_commit::kzg10::{Commitment, Powers, Randomness, KZG10};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::UniformRand;
 use ark_std::{One, Zero};
 use rs_merkle::algorithms::Sha256;
 use rs_merkle::Hasher;
@@ -19,8 +20,8 @@ pub mod setup;
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Block<E: Pairing> {
     pub shard: fec::Shard<E>,
-    commit: Vec<Commitment<E>>,
-    m: usize,
+    pub commit: Vec<Commitment<E>>,
+    pub m: usize,
 }
 
 #[allow(clippy::type_complexity)]
@@ -142,6 +143,19 @@ where
     prove::<E, P>(commits, hash, bytes.len(), polynomials, &points)
 }
 
+pub fn recode<E: Pairing>(b1: &Block<E>, b2: &Block<E>) -> Block<E> {
+    let mut rng = rand::thread_rng();
+
+    let alpha = E::ScalarField::rand(&mut rng);
+    let beta = E::ScalarField::rand(&mut rng);
+
+    Block {
+        shard: b1.shard.combine(alpha, &b2.shard, beta),
+        commit: b1.commit.clone(),
+        m: b1.m,
+    }
+}
+
 pub fn verify<E, P>(
     block: &Block<E>,
     verifier_key: &Powers<E>,
@@ -205,12 +219,11 @@ mod tests {
     use ark_ff::{Field, PrimeField};
     use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
     use ark_poly_commit::kzg10::Commitment;
-    use ark_std::One;
 
     use crate::{
         batch_verify, encode,
         fec::{decode, Shard},
-        setup, verify, Block,
+        recode, setup, verify, Block,
     };
 
     type UniPoly381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;
@@ -372,43 +385,8 @@ mod tests {
         let powers = setup::random(bytes.len())?;
         let blocks = encode::<E, P>(bytes, k, n, &powers)?;
 
-        let block = Block {
-            shard: blocks[0].shard.mul(E::ScalarField::one()),
-            commit: blocks[0].commit.clone(),
-            m: blocks[0].m,
-        };
-        assert!(verify::<E, P>(&block, &powers)?);
-
-        let block = Block {
-            shard: blocks[3]
-                .shard
-                .mul(E::ScalarField::from_le_bytes_mod_order(&[2u8])),
-            commit: blocks[3].commit.clone(),
-            m: blocks[3].m,
-        };
-        assert!(verify::<E, P>(&block, &powers)?);
-
-        let block = Block {
-            shard: blocks[3].shard.combine(
-                E::ScalarField::from_le_bytes_mod_order(&[2u8]),
-                &blocks[2].shard,
-                E::ScalarField::from_le_bytes_mod_order(&[5u8]),
-            ),
-            commit: blocks[3].commit.clone(),
-            m: blocks[3].m,
-        };
-        assert!(verify::<E, P>(&block, &powers)?);
-
-        let block = Block {
-            shard: blocks[3].shard.combine(
-                E::ScalarField::from_le_bytes_mod_order(&[3u8]),
-                &blocks[5].shard,
-                E::ScalarField::from_le_bytes_mod_order(&[4u8]),
-            ),
-            commit: block.commit.clone(),
-            m: block.m,
-        };
-        assert!(verify::<E, P>(&block, &powers)?);
+        assert!(verify::<E, P>(&recode(&blocks[2], &blocks[3]), &powers)?);
+        assert!(verify::<E, P>(&recode(&blocks[3], &blocks[5]), &powers)?);
 
         Ok(())
     }
@@ -468,5 +446,51 @@ mod tests {
             .expect("end to end failed for bls12-381");
         end_to_end_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 10)], 4, 6)
             .expect("end to end failed for bls12-381 with padding");
+    }
+
+    fn end_to_end_with_recoding_template<E, P>(bytes: &[u8]) -> Result<(), ark_poly_commit::Error>
+    where
+        E: Pairing,
+        P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+        for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+    {
+        let powers = setup::random(bytes.len())?;
+        let blocks = encode::<E, P>(bytes, 3, 5, &powers)?;
+
+        let b_0_1 = recode(&blocks[0], &blocks[1]);
+        let shards = vec![
+            b_0_1.shard,
+            blocks[2].shard.clone(),
+            blocks[3].shard.clone(),
+        ];
+        assert_eq!(bytes, decode::<E>(shards, true).unwrap());
+
+        let b_0_1 = recode(&blocks[0], &blocks[1]);
+        let shards = vec![
+            blocks[0].shard.clone(),
+            blocks[1].shard.clone(),
+            b_0_1.shard,
+        ];
+        assert!(decode::<E>(shards, true).is_err());
+
+        let b_0_1 = recode(&blocks[0], &blocks[1]);
+        let b_2_3 = recode(&blocks[2], &blocks[3]);
+        let b_1_4 = recode(&blocks[1], &blocks[4]);
+        let shards = vec![b_0_1.shard, b_2_3.shard, b_1_4.shard];
+        assert_eq!(bytes, decode::<E>(shards, true).unwrap());
+
+        let fully_recoded_shards = (0..3)
+            .map(|_| recode(&recode(&blocks[0], &blocks[1]), &blocks[2]).shard)
+            .collect();
+        assert_eq!(bytes, decode::<E>(fully_recoded_shards, true).unwrap());
+
+        Ok(())
+    }
+
+    #[test]
+    fn end_to_end_with_recoding_2() {
+        let bytes = bytes::<Bls12_381>(4, 2);
+        end_to_end_with_recoding_template::<Bls12_381, UniPoly381>(&bytes)
+            .expect("end to end failed for bls12-381");
     }
 }
