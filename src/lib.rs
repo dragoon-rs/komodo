@@ -24,6 +24,57 @@ pub struct Block<E: Pairing> {
     pub m: usize,
 }
 
+impl<E: Pairing> std::fmt::Display for Block<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{{")?;
+        write!(f, "shard: {{")?;
+        write!(f, "k: {},", self.shard.k)?;
+        write!(f, "comb: [")?;
+        for x in &self.shard.linear_combination {
+            if x.is_zero() {
+                write!(f, "0,")?;
+            } else {
+                write!(f, r#""{}","#, x)?;
+            }
+        }
+        write!(f, "]")?;
+        write!(f, ",")?;
+        write!(f, "bytes: [")?;
+        for x in &self.shard.bytes {
+            if x.is_zero() {
+                write!(f, "0,")?;
+            } else {
+                write!(f, r#""{}","#, x)?;
+            }
+        }
+        write!(f, "]")?;
+        write!(f, ",")?;
+        write!(
+            f,
+            "hash: {:?},",
+            self.shard
+                .hash
+                .iter()
+                .map(|x| format!("{:x}", x))
+                .collect::<Vec<_>>()
+                .join("")
+        )?;
+        write!(f, "size: {},", self.shard.size)?;
+        write!(f, "}}")?;
+        write!(f, ",")?;
+        write!(f, "commits: [")?;
+        for commit in &self.commit {
+            write!(f, r#""{}","#, commit.0)?;
+        }
+        write!(f, "]")?;
+        write!(f, ",")?;
+        write!(f, "m: {}", self.m)?;
+        write!(f, "}}")?;
+
+        Ok(())
+    }
+}
+
 #[allow(clippy::type_complexity)]
 pub fn commit<E, P>(
     powers: &Powers<E>,
@@ -129,7 +180,7 @@ where
 
     debug!("creating the {} evaluation points", n);
     let points: Vec<E::ScalarField> = (0..n)
-        .map(|i| E::ScalarField::from_le_bytes_mod_order(&[i as u8]))
+        .map(|i| E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes()))
         .collect();
 
     debug!("hashing the {} bytes with SHA-256", bytes.len());
@@ -175,7 +226,10 @@ where
         .iter()
         .enumerate()
         .map(|(i, w)| {
-            let alpha = E::ScalarField::from_le_bytes_mod_order(&[i as u8]);
+            // NOTE: this is where we implicitely compute the Vandermonde matrix
+            // hence, the sum of commits is indeed the sum of the encoded n shards
+            // and not the original k source shards.
+            let alpha = E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes());
 
             let f: E::G1 = block
                 .commit
@@ -228,12 +282,16 @@ mod tests {
 
     type UniPoly381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;
 
-    fn bytes<E: Pairing>(k: usize, nb_polynomials: usize) -> Vec<u8> {
-        let nb_bytes = k * nb_polynomials * (E::ScalarField::MODULUS_BIT_SIZE as usize / 8);
-        include_bytes!("../tests/dragoon_133x133.png")[0..nb_bytes].to_vec()
+    fn bytes() -> Vec<u8> {
+        include_bytes!("../tests/dragoon_133x133.png").to_vec()
     }
 
-    fn verify_template<E, P>(bytes: &[u8], k: usize, n: usize) -> Result<(), ark_poly_commit::Error>
+    fn verify_template<E, P>(
+        bytes: &[u8],
+        k: usize,
+        n: usize,
+        batch: &[usize],
+    ) -> Result<(), ark_poly_commit::Error>
     where
         E: Pairing,
         P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
@@ -246,60 +304,57 @@ mod tests {
             assert!(verify::<E, P>(block, &powers)?);
         }
 
-        assert!(batch_verify(&blocks[1..3], &powers)?);
+        assert!(batch_verify(
+            &blocks
+                .iter()
+                .enumerate()
+                .filter_map(|(i, b)| if batch.contains(&i) {
+                    Some(b.clone())
+                } else {
+                    None
+                })
+                .collect::<Vec<_>>(),
+            &powers
+        )?);
 
         Ok(())
     }
 
     #[test]
-    fn verify_2() {
-        let bytes = bytes::<Bls12_381>(4, 2);
-        verify_template::<Bls12_381, UniPoly381>(&bytes, 4, 6)
-            .expect("verification failed for bls12-381");
-        verify_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 10)], 4, 6)
-            .expect("verification failed for bls12-381 with padding");
-    }
+    fn verification() {
+        type E = Bls12_381;
+        type P = UniPoly381;
 
-    #[test]
-    fn verify_4() {
-        let bytes = bytes::<Bls12_381>(4, 4);
-        verify_template::<Bls12_381, UniPoly381>(&bytes, 4, 6)
-            .expect("verification failed for bls12-381");
-        verify_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 10)], 4, 6)
-            .expect("verification failed for bls12-381 with padding");
-    }
+        let (k, n) = (4, 6);
+        let batch = [1, 2, 3];
 
-    #[test]
-    fn verify_6() {
-        let bytes = bytes::<Bls12_381>(4, 6);
-        verify_template::<Bls12_381, UniPoly381>(&bytes, 4, 6)
-            .expect("verification failed for bls12-381");
-        verify_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 10)], 4, 6)
-            .expect("verification failed for bls12-381 with padding");
+        let bytes = bytes();
+
+        let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
+
+        verify_template::<E, P>(&bytes, k, n, &batch)
+            .unwrap_or_else(|_| panic!("verification failed for bls12-381\n{test_case}"));
+        verify_template::<E, P>(&bytes[0..(bytes.len() - 10)], k, n, &batch).unwrap_or_else(|_| {
+            panic!("verification failed for bls12-381 with padding\n{test_case}")
+        });
     }
 
     #[ignore = "Semi-AVID-PR does not support large padding"]
     #[test]
-    fn verify_with_large_padding_2() {
-        let bytes = bytes::<Bls12_381>(4, 2);
-        verify_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 33)], 4, 6)
-            .expect("verification failed for bls12-381 with padding");
-    }
+    fn verification_with_large_padding() {
+        type E = Bls12_381;
+        type P = UniPoly381;
 
-    #[ignore = "Semi-AVID-PR does not support large padding"]
-    #[test]
-    fn verify_with_large_padding_4() {
-        let bytes = bytes::<Bls12_381>(4, 4);
-        verify_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 33)], 4, 6)
-            .expect("verification failed for bls12-381 with padding");
-    }
+        let (k, n) = (4, 6);
+        let batch = [1, 2, 3];
 
-    #[ignore = "Semi-AVID-PR does not support large padding"]
-    #[test]
-    fn verify_with_large_padding_6() {
-        let bytes = bytes::<Bls12_381>(4, 6);
-        verify_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 33)], 4, 6)
-            .expect("verification failed for bls12-381 with padding");
+        let bytes = bytes();
+
+        let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
+
+        verify_template::<E, P>(&bytes[0..(bytes.len() - 33)], k, n, &batch).unwrap_or_else(|_| {
+            panic!("verification failed for bls12-381 with padding\n{test_case}")
+        });
     }
 
     fn verify_with_errors_template<E, P>(
@@ -321,7 +376,7 @@ mod tests {
 
         let mut corrupted_block = blocks[0].clone();
         // modify a field in the struct b to corrupt the block proof without corrupting the data serialization
-        let a = E::ScalarField::from_le_bytes_mod_order(&[123]);
+        let a = E::ScalarField::from_le_bytes_mod_order(&123u128.to_le_bytes());
         let mut commits: Vec<E::G1> = corrupted_block.commit.iter().map(|c| c.0.into()).collect();
         commits[0] = commits[0].mul(a.pow([4321_u64]));
         corrupted_block.commit = commits.iter().map(|&c| Commitment(c.into())).collect();
@@ -331,11 +386,11 @@ mod tests {
         // let's build some blocks containing errors
         let mut blocks_with_errors = Vec::new();
 
-        let b3 = blocks.get(3).unwrap();
+        let bk = blocks.get(k).unwrap();
         blocks_with_errors.push(Block {
-            shard: b3.shard.clone(),
-            commit: b3.commit.clone(),
-            m: b3.m,
+            shard: bk.shard.clone(),
+            commit: bk.commit.clone(),
+            m: bk.m,
         });
         assert!(batch_verify(blocks_with_errors.as_slice(), &powers)?);
 
@@ -346,30 +401,21 @@ mod tests {
     }
 
     #[test]
-    fn verify_with_errors_2() {
-        let bytes = bytes::<Bls12_381>(4, 2);
-        verify_with_errors_template::<Bls12_381, UniPoly381>(&bytes, 4, 6)
-            .expect("verification failed for bls12-381");
-        verify_with_errors_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 10)], 4, 6)
-            .expect("verification failed for bls12-381 with padding");
-    }
+    fn verification_with_errors() {
+        type E = Bls12_381;
+        type P = UniPoly381;
 
-    #[test]
-    fn verify_with_errors_4() {
-        let bytes = bytes::<Bls12_381>(4, 4);
-        verify_with_errors_template::<Bls12_381, UniPoly381>(&bytes, 4, 6)
-            .expect("verification failed for bls12-381");
-        verify_with_errors_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 10)], 4, 6)
-            .expect("verification failed for bls12-381 with padding");
-    }
+        let (k, n) = (4, 6);
 
-    #[test]
-    fn verify_with_errors_6() {
-        let bytes = bytes::<Bls12_381>(4, 6);
-        verify_with_errors_template::<Bls12_381, UniPoly381>(&bytes, 4, 6)
-            .expect("verification failed for bls12-381");
-        verify_with_errors_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 10)], 4, 6)
-            .expect("verification failed for bls12-381 with padding");
+        let bytes = bytes();
+
+        let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
+
+        verify_with_errors_template::<E, P>(&bytes, k, n)
+            .unwrap_or_else(|_| panic!("verification failed for bls12-381\n{test_case}"));
+        verify_with_errors_template::<E, P>(&bytes[0..(bytes.len() - 10)], k, n).unwrap_or_else(
+            |_| panic!("verification failed for bls12-381 with padding\n{test_case}"),
+        );
     }
 
     fn verify_recoding_template<E, P>(
@@ -392,12 +438,21 @@ mod tests {
     }
 
     #[test]
-    fn verify_recoding_2() {
-        let bytes = bytes::<Bls12_381>(4, 2);
-        verify_recoding_template::<Bls12_381, UniPoly381>(&bytes, 4, 6)
-            .expect("verification failed for bls12-381");
-        verify_recoding_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 10)], 4, 6)
-            .expect("verification failed for bls12-381 with padding");
+    fn verify_recoding() {
+        type E = Bls12_381;
+        type P = UniPoly381;
+
+        let (k, n) = (4, 6);
+
+        let bytes = bytes();
+
+        let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
+
+        verify_recoding_template::<E, P>(&bytes, k, n)
+            .unwrap_or_else(|_| panic!("verification failed for bls12-381\n{test_case}"));
+        verify_recoding_template::<E, P>(&bytes[0..(bytes.len() - 10)], k, n).unwrap_or_else(
+            |_| panic!("verification failed for bls12-381 with padding\n{test_case}"),
+        );
     }
 
     fn end_to_end_template<E, P>(
@@ -422,30 +477,21 @@ mod tests {
     }
 
     #[test]
-    fn end_to_end_2() {
-        let bytes = bytes::<Bls12_381>(4, 2);
-        end_to_end_template::<Bls12_381, UniPoly381>(&bytes, 4, 6)
-            .expect("end to end failed for bls12-381");
-        end_to_end_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 10)], 4, 6)
-            .expect("end to end failed for bls12-381 with padding");
-    }
+    fn end_to_end() {
+        type E = Bls12_381;
+        type P = UniPoly381;
 
-    #[test]
-    fn end_to_end_4() {
-        let bytes = bytes::<Bls12_381>(4, 4);
-        end_to_end_template::<Bls12_381, UniPoly381>(&bytes, 4, 6)
-            .expect("end to end failed for bls12-381");
-        end_to_end_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 10)], 4, 6)
-            .expect("end to end failed for bls12-381 with padding");
-    }
+        let (k, n) = (4, 6);
 
-    #[test]
-    fn end_to_end_6() {
-        let bytes = bytes::<Bls12_381>(4, 6);
-        end_to_end_template::<Bls12_381, UniPoly381>(&bytes, 4, 6)
-            .expect("end to end failed for bls12-381");
-        end_to_end_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 10)], 4, 6)
-            .expect("end to end failed for bls12-381 with padding");
+        let bytes = bytes();
+
+        let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
+
+        end_to_end_template::<E, P>(&bytes, k, n)
+            .unwrap_or_else(|_| panic!("end to end failed for bls12-381\n{test_case}"));
+        end_to_end_template::<E, P>(&bytes[0..(bytes.len() - 10)], k, n).unwrap_or_else(|_| {
+            panic!("end to end failed for bls12-381 with padding\n{test_case}")
+        });
     }
 
     fn end_to_end_with_recoding_template<E, P>(bytes: &[u8]) -> Result<(), ark_poly_commit::Error>
@@ -488,9 +534,15 @@ mod tests {
     }
 
     #[test]
-    fn end_to_end_with_recoding_2() {
-        let bytes = bytes::<Bls12_381>(4, 2);
-        end_to_end_with_recoding_template::<Bls12_381, UniPoly381>(&bytes)
-            .expect("end to end failed for bls12-381");
+    fn end_to_end_with_recoding() {
+        type E = Bls12_381;
+        type P = UniPoly381;
+
+        let bytes = bytes();
+
+        let test_case = format!("TEST | data: {} bytes", bytes.len());
+
+        end_to_end_with_recoding_template::<E, P>(&bytes)
+            .unwrap_or_else(|_| panic!("end to end failed for bls12-381\n{test_case}"));
     }
 }

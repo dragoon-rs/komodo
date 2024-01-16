@@ -26,12 +26,14 @@ const COMPRESS: Compress = Compress::Yes;
 const VALIDATE: Validate = Validate::Yes;
 const BLOCK_DIR: &str = "blocks/";
 
+#[allow(clippy::type_complexity)]
 fn parse_args() -> (
     Vec<u8>,
     usize,
     usize,
     bool,
     String,
+    bool,
     bool,
     bool,
     bool,
@@ -78,7 +80,12 @@ fn parse_args() -> (
         .expect("expected do_combine_blocks as eigth positional argument")
         .parse()
         .expect("could not parse do_combine_blocks as a bool");
-    let block_files = std::env::args().skip(9).collect::<Vec<_>>();
+    let do_inspect_blocks: bool = std::env::args()
+        .nth(9)
+        .expect("expected do_inspect_blocks as ninth positional argument")
+        .parse()
+        .expect("could not parse do_inspect_blocks as a bool");
+    let block_files = std::env::args().skip(10).collect::<Vec<_>>();
 
     (
         bytes,
@@ -89,6 +96,7 @@ fn parse_args() -> (
         do_reconstruct_data,
         do_verify_blocks,
         do_combine_blocks,
+        do_inspect_blocks,
         block_files,
     )
 }
@@ -199,6 +207,7 @@ fn main() {
         do_reconstruct_data,
         do_verify_blocks,
         do_combine_blocks,
+        do_inspect_blocks,
         block_files,
     ) = parse_args();
 
@@ -227,6 +236,16 @@ fn main() {
 
         dump_blocks(&[recode(&blocks[0].1, &blocks[1].1)]).unwrap();
 
+        exit(0);
+    }
+
+    if do_inspect_blocks {
+        let blocks = read_block::<Bls12_381>(&block_files);
+        eprint!("[");
+        for (_, block) in &blocks {
+            eprint!("{},", block);
+        }
+        eprintln!("]");
         exit(0);
     }
 

@@ -11,7 +11,7 @@ def "nu-complete log-levels" []: nothing -> list<string> {
 }
 
 def run-komodo [
-    args: record<bytes: path, k: int, n: int, do_generate_powers: bool, powers_file: path, do_reconstruct_data: bool, do_verify_blocks: bool, do_combine_blocks: bool, block_files: list<string>>,
+    args: record<bytes: path, k: int, n: int, do_generate_powers: bool, powers_file: path, do_reconstruct_data: bool, do_verify_blocks: bool, do_combine_blocks: bool, do_inspect_blocks: bool, block_files: list<string>>,
     --log-level: string,
 ]: nothing -> any {
     with-env {RUST_LOG: $log_level} {
@@ -25,6 +25,7 @@ def run-komodo [
                 ($args.do_reconstruct_data | into string)
                 ($args.do_verify_blocks | into string)
                 ($args.do_combine_blocks | into string)
+                ($args.do_inspect_blocks | into string)
             ] | append $args.block_files)
         } | complete
 
@@ -33,7 +34,7 @@ def run-komodo [
     }
 }
 
-export def "komodo build" [] {
+export def "komodo build" []: nothing -> nothing {
     ^cargo build --package komodo --release
 }
 
@@ -51,6 +52,7 @@ export def "komodo setup" [
         do_reconstruct_data: false,
         do_verify_blocks: false,
         do_combine_blocks: false,
+        do_inspect_blocks: false,
         block_files: [],
     }
 }
@@ -70,6 +72,7 @@ export def "komodo prove" [
         do_reconstruct_data: false,
         do_verify_blocks: false,
         do_combine_blocks: false,
+        do_inspect_blocks: false,
         block_files: [],
     }
 }
@@ -88,6 +91,7 @@ export def "komodo verify" [
         do_reconstruct_data: false,
         do_verify_blocks: true,
         do_combine_blocks: false,
+        do_inspect_blocks: false,
         block_files: $blocks,
     }
 }
@@ -105,6 +109,7 @@ export def "komodo reconstruct" [
         do_reconstruct_data: true,
         do_verify_blocks: false,
         do_combine_blocks: false,
+        do_inspect_blocks: false,
         block_files: $blocks,
     }
 }
@@ -112,7 +117,7 @@ export def "komodo reconstruct" [
 export def "komodo combine" [
     ...blocks: path,
     --log-level: string@"nu-complete log-levels" = "INFO"
-]: nothing -> list<int> {
+]: nothing -> string {
     run-komodo --log-level $log_level {
         bytes: "",
         k: 0,
@@ -122,6 +127,25 @@ export def "komodo combine" [
         do_reconstruct_data: false,
         do_verify_blocks: false,
         do_combine_blocks: true,
+        do_inspect_blocks: false,
+        block_files: $blocks,
+    } | get 0
+}
+
+export def "komodo inspect" [
+    ...blocks: path,
+    --log-level: string@"nu-complete log-levels" = "INFO"
+]: nothing -> table<shard: record<k: int, comb: list<any>, bytes: list<string>, hash: string, size: int>, commits: list<string>, m: int> {
+    run-komodo --log-level $log_level {
+        bytes: "",
+        k: 0,
+        n: 0,
+        do_generate_powers: false,
+        powers_file: "",
+        do_reconstruct_data: false,
+        do_verify_blocks: false,
+        do_combine_blocks: false,
+        do_inspect_blocks: true,
         block_files: $blocks,
     }
 }

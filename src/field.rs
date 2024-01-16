@@ -29,6 +29,9 @@ pub(crate) fn split_data_into_field_elements<E: Pairing>(
     elements
 }
 
+/// merges elliptic curve elements back into a sequence of bytes
+///
+/// this is the inverse operation of [`split_data_into_field_elements`].
 pub(crate) fn merge_elements_into_bytes<E: Pairing>(elements: &[E::ScalarField]) -> Vec<u8> {
     let mut bytes = vec![];
     for e in elements {
@@ -107,7 +110,7 @@ mod tests {
     use ark_poly::DenseUVPolynomial;
     use ark_std::{test_rng, UniformRand, Zero};
 
-    use crate::field;
+    use crate::field::{self, merge_elements_into_bytes};
 
     type UniPoly381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;
 
@@ -116,24 +119,32 @@ mod tests {
     }
 
     fn split_data_template<E: Pairing>(bytes: &[u8], modulus: usize, exact_length: Option<usize>) {
+        let test_case = format!(
+            "TEST | modulus: {}, exact_length: {:?}",
+            modulus, exact_length
+        );
+
         let elements = field::split_data_into_field_elements::<E>(bytes, modulus);
         assert!(
             elements.len() % modulus == 0,
-            "number of elements should be divisible by {}, found {}",
+            "number of elements should be divisible by {}, found {}\n{test_case}",
             modulus,
-            elements.len()
+            elements.len(),
         );
 
         if let Some(length) = exact_length {
             assert!(
                 elements.len() == length,
-                "number of elements should be exactly {}, found {}",
+                "number of elements should be exactly {}, found {}\n{test_case}",
                 length,
-                elements.len()
+                elements.len(),
             );
         }
 
-        assert!(!elements.iter().any(|&e| e == E::ScalarField::zero()));
+        assert!(
+            !elements.iter().any(|&e| e == E::ScalarField::zero()),
+            "elements should not contain any 0\n{test_case}"
+        );
     }
 
     #[test]
@@ -151,6 +162,21 @@ mod tests {
             11 * (<Bls12_381 as Pairing>::ScalarField::MODULUS_BIT_SIZE as usize / 8) - 10;
         split_data_template::<Bls12_381>(&bytes()[..nb_bytes], 1, Some(11));
         split_data_template::<Bls12_381>(&bytes()[..nb_bytes], 8, Some(16));
+    }
+
+    fn split_and_merge_template<E: Pairing>(bytes: &[u8], modulus: usize) {
+        let elements = field::split_data_into_field_elements::<E>(bytes, modulus);
+        let mut actual = merge_elements_into_bytes::<E>(&elements);
+        actual.resize(bytes.len(), 0);
+        assert_eq!(bytes, actual, "TEST | modulus: {modulus}");
+    }
+
+    #[test]
+    fn split_and_merge() {
+        split_and_merge_template::<Bls12_381>(&bytes(), 1);
+        split_and_merge_template::<Bls12_381>(&bytes(), 8);
+        split_and_merge_template::<Bls12_381>(&bytes(), 64);
+        split_and_merge_template::<Bls12_381>(&bytes(), 4096);
     }
 
     fn build_interleaved_polynomials_template<E, P>(
@@ -178,7 +204,10 @@ mod tests {
                 .collect::<Vec<_>>()
         });
 
-        assert_eq!(actual, expected);
+        assert_eq!(
+            actual, expected,
+            "TEST | nb_elements: {nb_elements}, m: {m}"
+        );
     }
 
     #[test]

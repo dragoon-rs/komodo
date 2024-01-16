@@ -20,20 +20,6 @@ pub struct Shard<E: Pairing> {
 }
 
 impl<E: Pairing> Shard<E> {
-    pub fn mul(&self, alpha: E::ScalarField) -> Self {
-        Self {
-            k: self.k,
-            linear_combination: self
-                .linear_combination
-                .iter()
-                .map(|e| e.mul(alpha))
-                .collect(),
-            hash: self.hash.clone(),
-            bytes: self.bytes.iter().map(|e| e.mul(alpha)).collect(),
-            size: self.size,
-        }
-    }
-
     pub fn combine(&self, alpha: E::ScalarField, other: &Self, beta: E::ScalarField) -> Self {
         if alpha.is_zero() {
             return other.clone();
@@ -92,7 +78,7 @@ pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>, transpose: bool) -> Result<Vec<
         .max()
         .unwrap();
     let points: Vec<E::ScalarField> = (0..n)
-        .map(|i| E::ScalarField::from_le_bytes_mod_order(&[i as u8]))
+        .map(|i| E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes()))
         .collect();
     let encoding_mat = Matrix::vandermonde(&points, k as usize);
 
@@ -142,6 +128,7 @@ mod tests {
     use rs_merkle::Hasher;
 
     use crate::{
+        error::KomodoError,
         fec::{decode, Shard},
         field,
         linalg::Matrix,
@@ -151,13 +138,15 @@ mod tests {
         include_bytes!("../tests/dragoon_32x32.png").to_vec()
     }
 
+    fn to_curve<E: Pairing>(n: u128) -> E::ScalarField {
+        E::ScalarField::from_le_bytes_mod_order(&n.to_le_bytes())
+    }
+
     #[allow(clippy::expect_fun_call)]
-    fn encode<E: Pairing>(data: &[u8], k: usize, n: usize) -> Vec<Shard<E>> {
+    fn encode<E: Pairing>(data: &[u8], k: usize, n: usize) -> Result<Vec<Shard<E>>, KomodoError> {
         let hash = Sha256::hash(data).to_vec();
 
-        let points: Vec<E::ScalarField> = (0..n)
-            .map(|i| E::ScalarField::from_le_bytes_mod_order(&[i as u8]))
-            .collect();
+        let points: Vec<E::ScalarField> = (0..n).map(|i| to_curve::<E>(i as u128)).collect();
         let encoding = Matrix::vandermonde(&points, k);
 
         let source_shards = Matrix::from_vec_vec(
@@ -165,15 +154,10 @@ mod tests {
                 .chunks(k)
                 .map(|c| c.to_vec())
                 .collect(),
-        )
-        .expect(&format!(
-            "could not build source shard matrix ({} bytes)",
-            data.len()
-        ));
+        )?;
 
-        source_shards
-            .mul(&encoding)
-            .expect(&format!("could not encode shards ({} bytes)", data.len()))
+        Ok(source_shards
+            .mul(&encoding)?
             .transpose()
             .elements
             .chunks(source_shards.height)
@@ -191,14 +175,15 @@ mod tests {
                     size: data.len(),
                 }
             })
-            .collect()
+            .collect())
     }
 
     fn decoding_template<E: Pairing>(data: &[u8], k: usize, n: usize) {
+        let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", data.len(), k, n);
         assert_eq!(
             data,
-            decode::<E>(encode(data, k, n), false)
-                .unwrap_or_else(|_| panic!("could not decode shards ({} bytes)", data.len()))
+            decode::<E>(encode(data, k, n).unwrap(), false).unwrap(),
+            "{test_case}"
         );
     }
 
@@ -215,21 +200,16 @@ mod tests {
     }
 
     fn decoding_with_recoding_template<E: Pairing>(data: &[u8], k: usize, n: usize) {
-        let mut shards = encode(data, k, n);
-        shards[1] = shards[2].combine(
-            E::ScalarField::from_le_bytes_mod_order(&[7]),
-            &shards[4],
-            E::ScalarField::from_le_bytes_mod_order(&[6]),
-        );
-        shards[2] = shards[1].combine(
-            E::ScalarField::from_le_bytes_mod_order(&[5]),
-            &shards[3],
-            E::ScalarField::from_le_bytes_mod_order(&[4]),
-        );
+        let mut shards = encode(data, k, n).unwrap();
+        shards[1] = shards[2].combine(to_curve::<E>(7), &shards[4], to_curve::<E>(6));
+        shards[2] = shards[1].combine(to_curve::<E>(5), &shards[3], to_curve::<E>(4));
         assert_eq!(
             data,
-            decode::<E>(shards, false)
-                .unwrap_or_else(|_| panic!("could not decode shards ({} bytes)", data.len()))
+            decode::<E>(shards, false).unwrap(),
+            "TEST | data: {} bytes, k: {}, n: {}",
+            data.len(),
+            k,
+            n
         );
     }
 
@@ -264,41 +244,16 @@ mod tests {
         let b: Shard<E> =
             create_fake_shard(&[E::ScalarField::zero(), E::ScalarField::one()], &[4, 5, 6]);
 
-        assert_eq!(
-            a.mul(E::ScalarField::from_le_bytes_mod_order(&[2])),
-            create_fake_shard(&[E::ScalarField::from_le_bytes_mod_order(&[2])], &[2, 4, 6],)
-        );
-
-        let c = a.combine(
-            E::ScalarField::from_le_bytes_mod_order(&[3]),
-            &b,
-            E::ScalarField::from_le_bytes_mod_order(&[5]),
-        );
+        let c = a.combine(to_curve::<E>(3), &b, to_curve::<E>(5));
 
         assert_eq!(
             c,
-            create_fake_shard(
-                &[
-                    E::ScalarField::from_le_bytes_mod_order(&[3]),
-                    E::ScalarField::from_le_bytes_mod_order(&[5]),
-                ],
-                &[23, 31, 39]
-            )
+            create_fake_shard(&[to_curve::<E>(3), to_curve::<E>(5),], &[23, 31, 39])
         );
 
         assert_eq!(
-            c.combine(
-                E::ScalarField::from_le_bytes_mod_order(&[2]),
-                &a,
-                E::ScalarField::from_le_bytes_mod_order(&[4]),
-            ),
-            create_fake_shard(
-                &[
-                    E::ScalarField::from_le_bytes_mod_order(&[10]),
-                    E::ScalarField::from_le_bytes_mod_order(&[10]),
-                ],
-                &[50, 70, 90],
-            )
+            c.combine(to_curve::<E>(2), &a, to_curve::<E>(4),),
+            create_fake_shard(&[to_curve::<E>(10), to_curve::<E>(10),], &[50, 70, 90],)
         );
     }
 

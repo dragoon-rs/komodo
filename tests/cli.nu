@@ -121,11 +121,15 @@ use math
 const BYTES = "tests/dragoon_32x32.png"
 const FEC_PARAMS = {k: 3, n: 5}
 
-def test [blocks: list<int>] {
+def test [blocks: list<int>, --fail] {
     let actual = try {
         komodo reconstruct ...($blocks | each {|i| ls blocks | get name | get $i}) | bytes decode
     } catch {
-        error make --unspanned { msg: "woopsie" }
+        if not $fail {
+            error make --unspanned { msg: "woopsie" }
+        } else {
+            return
+        }
     }
 
     let expected = open $BYTES | into binary | to text | from json | bytes decode
@@ -138,22 +142,25 @@ def main [] {
     komodo setup $BYTES
     komodo prove $BYTES --fec-params $FEC_PARAMS
 
-    komodo verify (ls blocks).0.name (ls blocks).1.name
+    komodo verify ...(ls blocks).name
 
-    let all_k_choose_n_permutations = seq $FEC_PARAMS.k $FEC_PARAMS.n
+    let all_k_choose_n_permutations = seq 1 $FEC_PARAMS.n
         | each {|ki|
             let p = math perm $ki
             math choose $ki $FEC_PARAMS.n
                 | each {|it|
-                    $p | each { each {|i| $it | get $i} }
+                    {
+                        blocks: ($p | each { each {|i| $it | get $i} }),
+                        fail: ($ki < $FEC_PARAMS.k),
+                    }
                 }
                 | flatten
         }
         | flatten
     let total = $all_k_choose_n_permutations | length
     $all_k_choose_n_permutations | enumerate | each {|it|
-        print $"[($it.index / $total * 100 | into int)%]: ($it.item | str join ', ')"
-        test $it.item
+        print $"[($it.index / $total * 100 | into int)%]: ($it.item.blocks | str join ', ') | ($it.item.fail)"
+        test $it.item.blocks --fail=$it.item.fail
     }
 
     print "reconstruction was successful"
