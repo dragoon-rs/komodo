@@ -85,7 +85,7 @@ fn parse_args() -> (
         .expect("expected do_inspect_blocks as ninth positional argument")
         .parse()
         .expect("could not parse do_inspect_blocks as a bool");
-    let block_files = std::env::args().skip(10).collect::<Vec<_>>();
+    let block_hashes = std::env::args().skip(10).collect::<Vec<_>>();
 
     (
         bytes,
@@ -97,7 +97,7 @@ fn parse_args() -> (
         do_verify_blocks,
         do_combine_blocks,
         do_inspect_blocks,
-        block_files,
+        block_hashes,
     )
 }
 
@@ -120,11 +120,13 @@ fn generate_powers(bytes: &[u8], powers_file: &str) -> Result<(), std::io::Error
     Ok(())
 }
 
-fn read_block<E: Pairing>(block_files: &[String]) -> Vec<(String, Block<E>)> {
-    block_files
+fn read_block<E: Pairing>(block_hashes: &[String]) -> Vec<(String, Block<E>)> {
+    block_hashes
         .iter()
         .map(|f| {
-            let s = std::fs::read(f).unwrap_or_else(|_| panic!("could not read {}", f));
+            let filename = PathBuf::from(BLOCK_DIR).join(format!("{}.bin", f));
+            let s = std::fs::read(&filename)
+                .unwrap_or_else(|_| panic!("could not read {}", filename.to_str().unwrap()));
             (
                 f.clone(),
                 // FIXME: do not unwrap and return an error
@@ -155,12 +157,10 @@ where
 
 fn dump_blocks<E: Pairing>(blocks: &[Block<E>]) -> Result<(), std::io::Error> {
     info!("dumping blocks to `{}`", BLOCK_DIR);
-    let mut block_files = vec![];
+    let mut hashes = vec![];
     for block in blocks {
-        let mut serialized = vec![0; block.shard.linear_combination.serialized_size(COMPRESS)];
+        let mut serialized = vec![0; block.serialized_size(COMPRESS)];
         block
-            .shard
-            .linear_combination
             .serialize_with_mode(&mut serialized[..], COMPRESS)
             .unwrap();
         let repr = Sha256::hash(&serialized)
@@ -183,12 +183,12 @@ fn dump_blocks<E: Pairing>(blocks: &[Block<E>]) -> Result<(), std::io::Error> {
         let mut file = File::create(&filename)?;
         file.write_all(&serialized)?;
 
-        block_files.push(filename);
+        hashes.push(repr);
     }
 
     eprint!("[");
-    for block_file in &block_files {
-        eprint!("{:?},", block_file);
+    for hash in &hashes {
+        eprint!("{:?},", hash);
     }
     eprint!("]");
 
@@ -208,7 +208,7 @@ fn main() {
         do_verify_blocks,
         do_combine_blocks,
         do_inspect_blocks,
-        block_files,
+        block_hashes,
     ) = parse_args();
 
     if do_generate_powers {
@@ -217,7 +217,7 @@ fn main() {
     }
 
     if do_reconstruct_data {
-        let blocks: Vec<Shard<Bls12_381>> = read_block::<Bls12_381>(&block_files)
+        let blocks: Vec<Shard<Bls12_381>> = read_block::<Bls12_381>(&block_hashes)
             .iter()
             .cloned()
             .map(|b| b.1.shard)
@@ -228,7 +228,7 @@ fn main() {
     }
 
     if do_combine_blocks {
-        let blocks = read_block::<Bls12_381>(&block_files);
+        let blocks = read_block::<Bls12_381>(&block_hashes);
         if blocks.len() != 2 {
             eprintln!("expected exactly 2 blocks, found {}", blocks.len());
             exit(1);
@@ -240,7 +240,7 @@ fn main() {
     }
 
     if do_inspect_blocks {
-        let blocks = read_block::<Bls12_381>(&block_files);
+        let blocks = read_block::<Bls12_381>(&block_hashes);
         eprint!("[");
         for (_, block) in &blocks {
             eprint!("{},", block);
@@ -260,7 +260,7 @@ fn main() {
     };
 
     if do_verify_blocks {
-        verify_blocks::<Bls12_381, UniPoly12_381>(&read_block::<Bls12_381>(&block_files), powers);
+        verify_blocks::<Bls12_381, UniPoly12_381>(&read_block::<Bls12_381>(&block_hashes), powers);
         exit(0);
     }
 
