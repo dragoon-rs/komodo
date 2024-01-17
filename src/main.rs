@@ -101,17 +101,23 @@ fn parse_args() -> (
     )
 }
 
+fn throw_error(code: i32, message: &str) {
+    eprint!("{}", message);
+    exit(code);
+}
+
 fn generate_powers(bytes: &[u8], powers_file: &str) -> Result<(), std::io::Error> {
     info!("generating new powers");
-    // FIXME: do not unwrap and return an error with std::io::Error
-    let powers = setup::random::<Bls12_381, UniPoly12_381>(bytes.len()).unwrap();
+    let powers = setup::random::<Bls12_381, UniPoly12_381>(bytes.len()).unwrap_or_else(|_| {
+        throw_error(3, "could not generate random trusted setup");
+        unreachable!()
+    });
 
     info!("serializing powers");
     let mut serialized = vec![0; powers.serialized_size(COMPRESS)];
-    // FIXME: do not unwrap and return an error with std::io::Error
     powers
         .serialize_with_mode(&mut serialized[..], COMPRESS)
-        .unwrap();
+        .unwrap_or_else(|_| throw_error(3, "could not serialize trusted setup"));
 
     info!("dumping powers into `{}`", powers_file);
     let mut file = File::create(powers_file)?;
@@ -125,12 +131,18 @@ fn read_block<E: Pairing>(block_hashes: &[String]) -> Vec<(String, Block<E>)> {
         .iter()
         .map(|f| {
             let filename = PathBuf::from(BLOCK_DIR).join(format!("{}.bin", f));
-            let s = std::fs::read(&filename)
-                .unwrap_or_else(|_| panic!("could not read {}", filename.to_str().unwrap()));
+            let s = std::fs::read(filename).unwrap_or_else(|_| {
+                throw_error(2, &format!("could not read block {}", f));
+                unreachable!()
+            });
             (
                 f.clone(),
-                // FIXME: do not unwrap and return an error
-                Block::<E>::deserialize_with_mode(&s[..], COMPRESS, VALIDATE).unwrap(),
+                Block::<E>::deserialize_with_mode(&s[..], COMPRESS, VALIDATE).unwrap_or_else(
+                    |_| {
+                        throw_error(2, &format!("could not deserialize block {}", f));
+                        unreachable!()
+                    },
+                ),
             )
         })
         .collect::<Vec<_>>()
@@ -144,8 +156,18 @@ where
 {
     let res: Vec<_> = blocks
         .iter()
-        // FIXME: do not unwrap and return an error with std::io::Error
-        .map(|(f, b)| (f, verify::<E, P>(b, &powers).unwrap()))
+        .map(|(f, b)| {
+            (
+                f,
+                verify::<E, P>(b, &powers).unwrap_or_else(|_| {
+                    throw_error(
+                        4,
+                        &format!("verification failed unexpectedly for block {}", f),
+                    );
+                    unreachable!()
+                }),
+            )
+        })
         .collect();
 
     eprint!("[");
@@ -158,11 +180,12 @@ where
 fn dump_blocks<E: Pairing>(blocks: &[Block<E>]) -> Result<(), std::io::Error> {
     info!("dumping blocks to `{}`", BLOCK_DIR);
     let mut hashes = vec![];
-    for block in blocks {
+    for (i, block) in blocks.iter().enumerate() {
+        debug!("serializing block {}", i);
         let mut serialized = vec![0; block.serialized_size(COMPRESS)];
         block
             .serialize_with_mode(&mut serialized[..], COMPRESS)
-            .unwrap();
+            .unwrap_or_else(|_| throw_error(5, &format!("could not serialize block {}", i)));
         let repr = Sha256::hash(&serialized)
             .iter()
             .map(|x| format!("{:x}", x))
@@ -171,13 +194,6 @@ fn dump_blocks<E: Pairing>(blocks: &[Block<E>]) -> Result<(), std::io::Error> {
 
         let filename = PathBuf::from(BLOCK_DIR).join(format!("{}.bin", repr));
         std::fs::create_dir_all(BLOCK_DIR)?;
-
-        debug!("serializing block {}", repr);
-        let mut serialized = vec![0; block.serialized_size(COMPRESS)];
-        // FIXME: do not unwrap and return an error with std::io::Error
-        block
-            .serialize_with_mode(&mut serialized[..], COMPRESS)
-            .unwrap();
 
         debug!("dumping serialized block to `{:?}`", filename);
         let mut file = File::create(&filename)?;
@@ -212,7 +228,9 @@ fn main() {
     ) = parse_args();
 
     if do_generate_powers {
-        generate_powers(&bytes, &powers_file).unwrap();
+        generate_powers(&bytes, &powers_file)
+            .unwrap_or_else(|e| throw_error(1, &format!("could not generate powers: {}", e)));
+
         exit(0);
     }
 
@@ -222,7 +240,13 @@ fn main() {
             .cloned()
             .map(|b| b.1.shard)
             .collect();
-        eprintln!("{:?}", decode::<Bls12_381>(blocks, true).unwrap());
+        eprintln!(
+            "{:?}",
+            decode::<Bls12_381>(blocks, true).unwrap_or_else(|e| {
+                throw_error(1, &format!("could not decode: {}", e));
+                unreachable!()
+            })
+        );
 
         exit(0);
     }
@@ -230,11 +254,14 @@ fn main() {
     if do_combine_blocks {
         let blocks = read_block::<Bls12_381>(&block_hashes);
         if blocks.len() != 2 {
-            eprintln!("expected exactly 2 blocks, found {}", blocks.len());
-            exit(1);
+            throw_error(
+                1,
+                &format!("expected exactly 2 blocks, found {}", blocks.len()),
+            );
         }
 
-        dump_blocks(&[recode(&blocks[0].1, &blocks[1].1)]).unwrap();
+        dump_blocks(&[recode(&blocks[0].1, &blocks[1].1)])
+            .unwrap_or_else(|e| throw_error(1, &format!("could not dump block: {}", e)));
 
         exit(0);
     }
@@ -246,23 +273,41 @@ fn main() {
             eprint!("{},", block);
         }
         eprintln!("]");
+
         exit(0);
     }
 
     info!("reading powers from file `{}`", powers_file);
     let powers = if let Ok(serialized) = std::fs::read(&powers_file) {
         info!("deserializing the powers from `{}`", powers_file);
-        Powers::<Bls12_381>::deserialize_with_mode(&serialized[..], COMPRESS, VALIDATE).unwrap()
+        Powers::<Bls12_381>::deserialize_with_mode(&serialized[..], COMPRESS, VALIDATE)
+            .unwrap_or_else(|e| {
+                throw_error(
+                    1,
+                    &format!("could not deserialize powers from {}: {}", powers_file, e),
+                );
+                unreachable!()
+            })
     } else {
         warn!("could not read powers from `{}`", powers_file);
         info!("regenerating temporary powers");
-        setup::random::<Bls12_381, UniPoly12_381>(bytes.len()).unwrap()
+        setup::random::<Bls12_381, UniPoly12_381>(bytes.len()).unwrap_or_else(|e| {
+            throw_error(1, &format!("could not generate powers: {}", e));
+            unreachable!()
+        })
     };
 
     if do_verify_blocks {
         verify_blocks::<Bls12_381, UniPoly12_381>(&read_block::<Bls12_381>(&block_hashes), powers);
+
         exit(0);
     }
 
-    dump_blocks(&encode::<Bls12_381, UniPoly12_381>(&bytes, k, n, &powers).unwrap()).unwrap();
+    dump_blocks(
+        &encode::<Bls12_381, UniPoly12_381>(&bytes, k, n, &powers).unwrap_or_else(|e| {
+            throw_error(1, &format!("could not encode: {}", e));
+            unreachable!()
+        }),
+    )
+    .unwrap_or_else(|e| throw_error(1, &format!("could not dump blocks: {}", e)));
 }

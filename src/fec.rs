@@ -76,7 +76,7 @@ pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>, transpose: bool) -> Result<Vec<
                 .collect::<Vec<_>>()
         })
         .max()
-        .unwrap();
+        .unwrap_or_default();
     let points: Vec<E::ScalarField> = (0..n)
         .map(|i| E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes()))
         .collect();

@@ -12,25 +12,37 @@ def "nu-complete log-levels" []: nothing -> list<string> {
 }
 
 def run-komodo [
-    args: record<bytes: path, k: int, n: int, do_generate_powers: bool, powers_file: path, do_reconstruct_data: bool, do_verify_blocks: bool, do_combine_blocks: bool, do_inspect_blocks: bool, block_hashes: list<string>>,
+    --bytes: path = "",
+    -k: int = 0,
+    -n: int = 0,
+    --generate-powers,
+    --powers-file: path = "",
+    --reconstruct,
+    --verify,
+    --combine,
+    --inspect,
     --log-level: string,
+    ...block_hashes: string,
 ]: nothing -> any {
     with-env {RUST_LOG: $log_level} {
         let res = do {
             ^$KOMODO_BINARY ...([
-                $args.bytes
-                $args.k
-                $args.n
-                ($args.do_generate_powers | into string)
-                $args.powers_file
-                ($args.do_reconstruct_data | into string)
-                ($args.do_verify_blocks | into string)
-                ($args.do_combine_blocks | into string)
-                ($args.do_inspect_blocks | into string)
-            ] | append $args.block_hashes)
+                $bytes
+                $k
+                $n
+                ($generate_powers | into string)
+                $powers_file
+                ($reconstruct | into string)
+                ($verify | into string)
+                ($combine | into string)
+                ($inspect | into string)
+            ] | append $block_hashes)
         } | complete
 
         print --no-newline $res.stdout
+        if $res.exit_code != 0 {
+            error make --unspanned { msg: $"($res.stderr) \(($res.exit_code)\)" }
+        }
         $res.stderr | from json
     }
 }
@@ -52,18 +64,13 @@ export def "komodo setup" [
     --powers-file: path = "powers.bin",
     --log-level: string@"nu-complete log-levels" = "INFO"
 ]: nothing -> nothing {
-    run-komodo --log-level $log_level {
-        bytes: $bytes,
-        k: 0,
-        n: 0,
-        do_generate_powers: true,
-        powers_file: $powers_file,
-        do_reconstruct_data: false,
-        do_verify_blocks: false,
-        do_combine_blocks: false,
-        do_inspect_blocks: false,
-        block_hashes: [],
-    }
+    (
+        run-komodo
+            --log-level $log_level
+            --bytes $bytes
+            --generate-powers
+            --powers-file $powers_file
+    )
 }
 
 export def "komodo prove" [
@@ -72,18 +79,14 @@ export def "komodo prove" [
     --powers-file: path = "powers.bin",
     --log-level: string@"nu-complete log-levels" = "INFO"
 ]: nothing -> list<string> {
-    run-komodo --log-level $log_level {
-        bytes: $bytes,
-        k: $fec_params.k,
-        n: $fec_params.n,
-        do_generate_powers: false,
-        powers_file: $powers_file,
-        do_reconstruct_data: false,
-        do_verify_blocks: false,
-        do_combine_blocks: false,
-        do_inspect_blocks: false,
-        block_hashes: [],
-    }
+    (
+        run-komodo
+            --log-level $log_level
+            --bytes $bytes
+            -k $fec_params.k
+            -n $fec_params.n
+            --powers-file $powers_file
+    )
 }
 
 export def "komodo verify" [
@@ -91,72 +94,28 @@ export def "komodo verify" [
     --powers-file: path = "powers.bin",
     --log-level: string@"nu-complete log-levels" = "INFO"
 ]: nothing -> table<block: string, status: int> {
-    run-komodo --log-level $log_level {
-        bytes: "",
-        k: 0,
-        n: 0,
-        do_generate_powers: false,
-        powers_file: $powers_file,
-        do_reconstruct_data: false,
-        do_verify_blocks: true,
-        do_combine_blocks: false,
-        do_inspect_blocks: false,
-        block_hashes: $blocks,
-    }
+    run-komodo --log-level $log_level --powers-file $powers_file --verify ...$blocks
 }
 
 export def "komodo reconstruct" [
     ...blocks: string@"list-blocks",
     --log-level: string@"nu-complete log-levels" = "INFO"
 ]: nothing -> list<int> {
-    run-komodo --log-level $log_level {
-        bytes: "",
-        k: 0,
-        n: 0,
-        do_generate_powers: false,
-        powers_file: "",
-        do_reconstruct_data: true,
-        do_verify_blocks: false,
-        do_combine_blocks: false,
-        do_inspect_blocks: false,
-        block_hashes: $blocks,
-    }
+    run-komodo --log-level $log_level --reconstruct ...$blocks
 }
 
 export def "komodo combine" [
     ...blocks: string@"list-blocks",
     --log-level: string@"nu-complete log-levels" = "INFO"
 ]: nothing -> string {
-    run-komodo --log-level $log_level {
-        bytes: "",
-        k: 0,
-        n: 0,
-        do_generate_powers: false,
-        powers_file: "",
-        do_reconstruct_data: false,
-        do_verify_blocks: false,
-        do_combine_blocks: true,
-        do_inspect_blocks: false,
-        block_hashes: $blocks,
-    } | get 0
+    run-komodo --log-level $log_level --combine ...$blocks | get 0
 }
 
 export def "komodo inspect" [
     ...blocks: string@"list-blocks",
     --log-level: string@"nu-complete log-levels" = "INFO"
 ]: nothing -> table<shard: record<k: int, comb: list<any>, bytes: list<string>, hash: string, size: int>, commits: list<string>, m: int> {
-    run-komodo --log-level $log_level {
-        bytes: "",
-        k: 0,
-        n: 0,
-        do_generate_powers: false,
-        powers_file: "",
-        do_reconstruct_data: false,
-        do_verify_blocks: false,
-        do_combine_blocks: false,
-        do_inspect_blocks: true,
-        block_hashes: $blocks,
-    }
+    run-komodo --log-level $log_level --inspect ...$blocks
 }
 
 export def "komodo ls" []: nothing -> list<string> {
