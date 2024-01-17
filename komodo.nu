@@ -12,7 +12,7 @@ def "nu-complete log-levels" []: nothing -> list<string> {
 }
 
 def run-komodo [
-    --bytes: path = "",
+    --input: path = "",
     -k: int = 0,
     -n: int = 0,
     --generate-powers,
@@ -27,7 +27,7 @@ def run-komodo [
     with-env {RUST_LOG: $log_level} {
         let res = do {
             ^$KOMODO_BINARY ...([
-                $bytes
+                $input
                 $k
                 $n
                 ($generate_powers | into string)
@@ -60,21 +60,21 @@ export def "komodo build" []: nothing -> nothing {
 }
 
 export def "komodo setup" [
-    bytes: path,
+    input: path,
     --powers-file: path = "powers.bin",
     --log-level: string@"nu-complete log-levels" = "INFO"
 ]: nothing -> nothing {
     (
         run-komodo
             --log-level $log_level
-            --bytes $bytes
+            --input $input
             --generate-powers
             --powers-file $powers_file
     )
 }
 
 export def "komodo prove" [
-    bytes: path,
+    input: path,
     --fec-params: record<k: int, n: int>,
     --powers-file: path = "powers.bin",
     --log-level: string@"nu-complete log-levels" = "INFO"
@@ -82,7 +82,7 @@ export def "komodo prove" [
     (
         run-komodo
             --log-level $log_level
-            --bytes $bytes
+            --input $input
             -k $fec_params.k
             -n $fec_params.n
             --powers-file $powers_file

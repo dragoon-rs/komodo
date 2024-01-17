@@ -6,7 +6,7 @@ use ../komodo.nu [
     "komodo reconstruct",
     "komodo ls",
 ]
-use ../binary.nu [ "bytes decode" ]
+use ../binary.nu [ "bytes from_int" ]
 
 use std assert
 
@@ -119,12 +119,12 @@ module math {
 
 use math
 
-const BYTES = "tests/dragoon_32x32.png"
+const FILE = "tests/dragoon_32x32.png"
 const FEC_PARAMS = {k: 3, n: 5}
 
 def test [blocks: list<int>, --fail] {
     let actual = try {
-        komodo reconstruct ...(komodo ls) | bytes decode
+        komodo reconstruct ...(komodo ls) | bytes from_int
     } catch {
         if not $fail {
             error make --unspanned { msg: "woopsie" }
@@ -133,15 +133,15 @@ def test [blocks: list<int>, --fail] {
         }
     }
 
-    let expected = open $BYTES | into binary | to text | from json | bytes decode
+    let expected = open $FILE | bytes from_int
     assert equal $actual $expected
 }
 
 def main [] {
     komodo build
 
-    komodo setup $BYTES
-    komodo prove $BYTES --fec-params $FEC_PARAMS
+    komodo setup $FILE
+    komodo prove $FILE --fec-params $FEC_PARAMS
 
     komodo verify ...(komodo ls)
 

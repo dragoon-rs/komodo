@@ -55,3 +55,4 @@ test:
     - cargo clippy --workspace --all-targets -- -D warnings
     - cargo test --workspace --verbose
     - nu tests/cli.nu
+    - nu tests/binary.nu
