@@ -1,5 +1,6 @@
 use std::io::prelude::*;
 use std::ops::Div;
+use std::path::Path;
 use std::process::exit;
 use std::{fs::File, path::PathBuf};
 
@@ -24,7 +25,6 @@ type UniPoly12_381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;
 
 const COMPRESS: Compress = Compress::Yes;
 const VALIDATE: Validate = Validate::Yes;
-const BLOCK_DIR: &str = "blocks/";
 
 #[allow(clippy::type_complexity)]
 fn parse_args() -> (
@@ -37,6 +37,7 @@ fn parse_args() -> (
     bool,
     bool,
     bool,
+    usize,
     Vec<String>,
 ) {
     let bytes_path = std::env::args()
@@ -62,9 +63,9 @@ fn parse_args() -> (
         .expect("expected do_generate_powers as fourth positional argument")
         .parse()
         .expect("could not parse do_generate_powers as a bool");
-    let powers_file = std::env::args()
+    let home_dir = std::env::args()
         .nth(5)
-        .expect("expected powers_file as fifth positional argument");
+        .expect("expected home_dir as fifth positional argument");
     let do_reconstruct_data: bool = std::env::args()
         .nth(6)
         .expect("expected do_reconstruct_data as sixth positional argument")
@@ -85,18 +86,24 @@ fn parse_args() -> (
         .expect("expected do_inspect_blocks as ninth positional argument")
         .parse()
         .expect("could not parse do_inspect_blocks as a bool");
-    let block_hashes = std::env::args().skip(10).collect::<Vec<_>>();
+    let nb_bytes: usize = std::env::args()
+        .nth(10)
+        .expect("expected nb_bytes as 10th positional argument")
+        .parse()
+        .expect("could not parse nb_bytes as a usize");
+    let block_hashes = std::env::args().skip(11).collect::<Vec<_>>();
 
     (
         bytes,
         k,
         n,
         do_generate_powers,
-        powers_file,
+        home_dir,
         do_reconstruct_data,
         do_verify_blocks,
         do_combine_blocks,
         do_inspect_blocks,
+        nb_bytes,
         block_hashes,
     )
 }
@@ -106,9 +113,9 @@ fn throw_error(code: i32, message: &str) {
     exit(code);
 }
 
-fn generate_powers(bytes: &[u8], powers_file: &str) -> Result<(), std::io::Error> {
+fn generate_powers(n: usize, powers_file: &PathBuf) -> Result<(), std::io::Error> {
     info!("generating new powers");
-    let powers = setup::random::<Bls12_381, UniPoly12_381>(bytes.len()).unwrap_or_else(|_| {
+    let powers = setup::random::<Bls12_381, UniPoly12_381>(n).unwrap_or_else(|_| {
         throw_error(3, "could not generate random trusted setup");
         unreachable!()
     });
@@ -119,18 +126,18 @@ fn generate_powers(bytes: &[u8], powers_file: &str) -> Result<(), std::io::Error
         .serialize_with_mode(&mut serialized[..], COMPRESS)
         .unwrap_or_else(|_| throw_error(3, "could not serialize trusted setup"));
 
-    info!("dumping powers into `{}`", powers_file);
+    info!("dumping powers into `{:?}`", powers_file);
     let mut file = File::create(powers_file)?;
     file.write_all(&serialized)?;
 
     Ok(())
 }
 
-fn read_block<E: Pairing>(block_hashes: &[String]) -> Vec<(String, Block<E>)> {
+fn read_block<E: Pairing>(block_hashes: &[String], block_dir: &Path) -> Vec<(String, Block<E>)> {
     block_hashes
         .iter()
         .map(|f| {
-            let filename = PathBuf::from(BLOCK_DIR).join(format!("{}.bin", f));
+            let filename = block_dir.join(format!("{}.bin", f));
             let s = std::fs::read(filename).unwrap_or_else(|_| {
                 throw_error(2, &format!("could not read block {}", f));
                 unreachable!()
@@ -177,8 +184,8 @@ where
     eprint!("]");
 }
 
-fn dump_blocks<E: Pairing>(blocks: &[Block<E>]) -> Result<(), std::io::Error> {
-    info!("dumping blocks to `{}`", BLOCK_DIR);
+fn dump_blocks<E: Pairing>(blocks: &[Block<E>], block_dir: &PathBuf) -> Result<(), std::io::Error> {
+    info!("dumping blocks to `{:?}`", block_dir);
     let mut hashes = vec![];
     for (i, block) in blocks.iter().enumerate() {
         debug!("serializing block {}", i);
@@ -192,8 +199,8 @@ fn dump_blocks<E: Pairing>(blocks: &[Block<E>]) -> Result<(), std::io::Error> {
             .collect::<Vec<_>>()
             .join("");
 
-        let filename = PathBuf::from(BLOCK_DIR).join(format!("{}.bin", repr));
-        std::fs::create_dir_all(BLOCK_DIR)?;
+        let filename = block_dir.join(format!("{}.bin", repr));
+        std::fs::create_dir_all(block_dir)?;
 
         debug!("dumping serialized block to `{:?}`", filename);
         let mut file = File::create(&filename)?;
@@ -219,23 +226,28 @@ fn main() {
         k,
         n,
         do_generate_powers,
-        powers_file,
+        home_dir,
         do_reconstruct_data,
         do_verify_blocks,
         do_combine_blocks,
         do_inspect_blocks,
+        nb_bytes,
         block_hashes,
     ) = parse_args();
 
+    let home_dir = PathBuf::from(&home_dir);
+    let block_dir = home_dir.join("blocks/");
+    let powers_file = home_dir.join("powers.bin");
+
     if do_generate_powers {
-        generate_powers(&bytes, &powers_file)
+        generate_powers(nb_bytes, &powers_file)
             .unwrap_or_else(|e| throw_error(1, &format!("could not generate powers: {}", e)));
 
         exit(0);
     }
 
     if do_reconstruct_data {
-        let blocks: Vec<Shard<Bls12_381>> = read_block::<Bls12_381>(&block_hashes)
+        let blocks: Vec<Shard<Bls12_381>> = read_block::<Bls12_381>(&block_hashes, &block_dir)
             .iter()
             .cloned()
             .map(|b| b.1.shard)
@@ -252,7 +264,7 @@ fn main() {
     }
 
     if do_combine_blocks {
-        let blocks = read_block::<Bls12_381>(&block_hashes);
+        let blocks = read_block::<Bls12_381>(&block_hashes, &block_dir);
         if blocks.len() != 2 {
             throw_error(
                 1,
@@ -260,14 +272,14 @@ fn main() {
             );
         }
 
-        dump_blocks(&[recode(&blocks[0].1, &blocks[1].1)])
+        dump_blocks(&[recode(&blocks[0].1, &blocks[1].1)], &block_dir)
             .unwrap_or_else(|e| throw_error(1, &format!("could not dump block: {}", e)));
 
         exit(0);
     }
 
     if do_inspect_blocks {
-        let blocks = read_block::<Bls12_381>(&block_hashes);
+        let blocks = read_block::<Bls12_381>(&block_hashes, &block_dir);
         eprint!("[");
         for (_, block) in &blocks {
             eprint!("{},", block);
@@ -277,28 +289,31 @@ fn main() {
         exit(0);
     }
 
-    info!("reading powers from file `{}`", powers_file);
+    info!("reading powers from file `{:?}`", powers_file);
     let powers = if let Ok(serialized) = std::fs::read(&powers_file) {
-        info!("deserializing the powers from `{}`", powers_file);
+        info!("deserializing the powers from `{:?}`", powers_file);
         Powers::<Bls12_381>::deserialize_with_mode(&serialized[..], COMPRESS, VALIDATE)
             .unwrap_or_else(|e| {
                 throw_error(
                     1,
-                    &format!("could not deserialize powers from {}: {}", powers_file, e),
+                    &format!("could not deserialize powers from {:?}: {}", powers_file, e),
                 );
                 unreachable!()
             })
     } else {
-        warn!("could not read powers from `{}`", powers_file);
+        warn!("could not read powers from `{:?}`", powers_file);
         info!("regenerating temporary powers");
-        setup::random::<Bls12_381, UniPoly12_381>(bytes.len()).unwrap_or_else(|e| {
+        setup::random::<Bls12_381, UniPoly12_381>(nb_bytes).unwrap_or_else(|e| {
             throw_error(1, &format!("could not generate powers: {}", e));
             unreachable!()
         })
     };
 
     if do_verify_blocks {
-        verify_blocks::<Bls12_381, UniPoly12_381>(&read_block::<Bls12_381>(&block_hashes), powers);
+        verify_blocks::<Bls12_381, UniPoly12_381>(
+            &read_block::<Bls12_381>(&block_hashes, &block_dir),
+            powers,
+        );
 
         exit(0);
     }
@@ -308,6 +323,7 @@ fn main() {
             throw_error(1, &format!("could not encode: {}", e));
             unreachable!()
         }),
+        &block_dir,
     )
     .unwrap_or_else(|e| throw_error(1, &format!("could not dump blocks: {}", e)));
 }

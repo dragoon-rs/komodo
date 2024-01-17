@@ -140,7 +140,7 @@ def test [blocks: list<int>, --fail] {
 def main [] {
     komodo build
 
-    komodo setup $FILE
+    komodo setup (open $FILE | into binary | bytes length)
     komodo prove $FILE --fec-params $FEC_PARAMS
 
     komodo verify ...(komodo ls)
