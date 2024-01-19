@@ -30,7 +30,6 @@ impl<T: Field> Matrix<T> {
         Self::from_diagonal(vec![T::one(); size])
     }
 
-    #[allow(dead_code)]
     pub(super) fn vandermonde(points: &[T], height: usize) -> Self {
         let width = points.len();
 

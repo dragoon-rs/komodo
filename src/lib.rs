@@ -1,14 +1,11 @@
-use std::ops::{Div, Mul};
+use std::ops::Div;
 
 use ark_ec::pairing::Pairing;
-use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
 use ark_poly_commit::kzg10::{Commitment, Powers, Randomness, KZG10};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::UniformRand;
-use ark_std::{One, Zero};
-use rs_merkle::algorithms::Sha256;
-use rs_merkle::Hasher;
+use ark_std::Zero;
 use tracing::{debug, info};
 
 mod error;
@@ -98,49 +95,6 @@ where
     Ok((commits, randomnesses))
 }
 
-pub fn prove<E, P>(
-    commits: Vec<Commitment<E>>,
-    hash: [u8; 32],
-    nb_bytes: usize,
-    polynomials: Vec<P>,
-    points: &[E::ScalarField],
-) -> Result<Vec<Block<E>>, ark_poly_commit::Error>
-where
-    E: Pairing,
-    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
-    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
-{
-    let k = polynomials[0].coeffs().len();
-
-    Ok(points
-        .iter()
-        .map(|point| {
-            let eval = polynomials
-                .iter()
-                .map(|p| p.evaluate(point))
-                .collect::<Vec<_>>();
-
-            let mut linear_combination = Vec::new();
-            linear_combination.push(E::ScalarField::one());
-            for i in 1..k {
-                linear_combination.push(linear_combination[i - 1].mul(point));
-            }
-
-            Block {
-                shard: fec::Shard {
-                    k: k as u32,
-                    linear_combination,
-                    hash: hash.to_vec(),
-                    bytes: eval.clone(),
-                    size: nb_bytes,
-                },
-                commit: commits.clone(),
-                m: polynomials.len(),
-            }
-        })
-        .collect::<Vec<_>>())
-}
-
 pub fn encode<E, P>(
     bytes: &[u8],
     k: usize,
@@ -156,18 +110,10 @@ where
 
     debug!("splitting bytes into polynomials");
     let elements = field::split_data_into_field_elements::<E>(bytes, k);
-    let nb_polynomials = elements.len() / k;
-    let polynomials = match field::build_interleaved_polynomials::<E, P>(&elements, nb_polynomials)
-    {
-        Some(polynomials) => polynomials,
-        None => return Err(ark_poly_commit::Error::IncorrectInputLength(
-            format!(
-                "padding_not_supported: vector of elements ({}) should be divisible by the desired number of polynomials ({})",
-                elements.len(),
-                nb_polynomials
-            )
-        )),
-    };
+    let polynomials = elements
+        .chunks(k)
+        .map(|c| P::from_coefficients_vec(c.to_vec()))
+        .collect::<Vec<_>>();
     info!(
         "data is composed of {} polynomials and {} elements",
         polynomials.len(),
@@ -182,20 +128,15 @@ where
     debug!("committing the polynomials");
     let (commits, _) = commit(powers, &polynomials_to_commit)?;
 
-    debug!("creating the {} evaluation points", n);
-    let points: Vec<E::ScalarField> = (0..n)
-        .map(|i| E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes()))
-        .collect();
-
-    debug!("hashing the {} bytes with SHA-256", bytes.len());
-    let hash = Sha256::hash(bytes);
-
-    debug!(
-        "proving the {} bytes and the {} polynomials",
-        bytes.len(),
-        polynomials.len()
-    );
-    prove::<E, P>(commits, hash, bytes.len(), polynomials, &points)
+    Ok(fec::encode(bytes, k, n)
+        .unwrap() // TODO: don't unwrap here
+        .iter()
+        .map(|s| Block {
+            shard: s.clone(),
+            commit: commits.clone(),
+            m: polynomials.len(),
+        })
+        .collect::<Vec<_>>())
 }
 
 pub fn recode<E: Pairing>(b1: &Block<E>, b2: &Block<E>) -> Result<Block<E>, KomodoError> {
@@ -496,7 +437,7 @@ mod tests {
             .map(|b| b.shard.clone())
             .collect();
 
-        assert_eq!(bytes, decode::<E>(blocks, true).unwrap());
+        assert_eq!(bytes, decode::<E>(blocks).unwrap());
 
         Ok(())
     }
@@ -534,7 +475,7 @@ mod tests {
             blocks[2].shard.clone(),
             blocks[3].shard.clone(),
         ];
-        assert_eq!(bytes, decode::<E>(shards, true).unwrap());
+        assert_eq!(bytes, decode::<E>(shards).unwrap());
 
         let b_0_1 = recode(&blocks[0], &blocks[1]).unwrap();
         let shards = vec![
@@ -542,13 +483,13 @@ mod tests {
             blocks[1].shard.clone(),
             b_0_1.shard,
         ];
-        assert!(decode::<E>(shards, true).is_err());
+        assert!(decode::<E>(shards).is_err());
 
         let b_0_1 = recode(&blocks[0], &blocks[1]).unwrap();
         let b_2_3 = recode(&blocks[2], &blocks[3]).unwrap();
         let b_1_4 = recode(&blocks[1], &blocks[4]).unwrap();
         let shards = vec![b_0_1.shard, b_2_3.shard, b_1_4.shard];
-        assert_eq!(bytes, decode::<E>(shards, true).unwrap());
+        assert_eq!(bytes, decode::<E>(shards).unwrap());
 
         let fully_recoded_shards = (0..3)
             .map(|_| {
@@ -557,7 +498,7 @@ mod tests {
                     .shard
             })
             .collect();
-        assert_eq!(bytes, decode::<E>(fully_recoded_shards, true).unwrap());
+        assert_eq!(bytes, decode::<E>(fully_recoded_shards).unwrap());
 
         Ok(())
     }

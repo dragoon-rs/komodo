@@ -1,8 +1,11 @@
 use std::ops::{Add, Mul};
 
 use ark_ec::pairing::Pairing;
+use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::Zero;
+use ark_std::{One, Zero};
+use rs_merkle::algorithms::Sha256;
+use rs_merkle::Hasher;
 
 use crate::error::KomodoError;
 use crate::field;
@@ -45,7 +48,47 @@ impl<E: Pairing> Shard<E> {
     }
 }
 
-pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>, transpose: bool) -> Result<Vec<u8>, KomodoError> {
+pub fn encode<E: Pairing>(data: &[u8], k: usize, n: usize) -> Result<Vec<Shard<E>>, KomodoError> {
+    let hash = Sha256::hash(data).to_vec();
+
+    let points: Vec<E::ScalarField> = (0..n)
+        .map(|i| E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes()))
+        .collect();
+    let encoding = Matrix::vandermonde(&points, k);
+
+    let source_shards = Matrix::from_vec_vec(
+        field::split_data_into_field_elements::<E>(data, k)
+            .chunks(k)
+            .map(|c| c.to_vec())
+            .collect(),
+    )?;
+
+    Ok(source_shards
+        .mul(&encoding)?
+        .transpose()
+        .elements
+        .chunks(source_shards.height)
+        .enumerate()
+        .map(|(i, s)| {
+            let alpha = E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes());
+            let mut linear_combination = Vec::new();
+            linear_combination.push(E::ScalarField::one());
+            for i in 1..k {
+                linear_combination.push(linear_combination[i - 1].mul(alpha));
+            }
+
+            Shard {
+                k: k as u32,
+                linear_combination,
+                hash: hash.clone(),
+                bytes: s.to_vec(),
+                size: data.len(),
+            }
+        })
+        .collect())
+}
+
+pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>) -> Result<Vec<u8>, KomodoError> {
     let k = blocks[0].k;
     let np = blocks.len();
 
@@ -59,8 +102,7 @@ pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>, transpose: bool) -> Result<Vec<
             .map(|b| b.linear_combination.clone())
             .collect(),
     )?
-    .transpose()
-    .truncate(None, Some(np - k as usize));
+    .truncate(Some(np - k as usize), None);
 
     let shards = Matrix::from_vec_vec(
         blocks
@@ -68,15 +110,9 @@ pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>, transpose: bool) -> Result<Vec<
             .take(k as usize)
             .map(|b| b.bytes.clone())
             .collect(),
-    )?
-    .transpose();
+    )?;
 
-    let source_shards = shards.mul(&encoding_mat.invert()?)?;
-    let source_shards = if transpose {
-        source_shards.transpose().elements
-    } else {
-        source_shards.elements
-    };
+    let source_shards = encoding_mat.invert()?.mul(&shards)?.transpose().elements;
 
     let mut bytes = field::merge_elements_into_bytes::<E>(&source_shards);
     bytes.resize(blocks[0].size, 0);
@@ -85,20 +121,14 @@ pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>, transpose: bool) -> Result<Vec<
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Mul;
-
     use ark_bls12_381::Bls12_381;
     use ark_ec::pairing::Pairing;
     use ark_ff::PrimeField;
     use ark_std::{One, Zero};
-    use rs_merkle::algorithms::Sha256;
-    use rs_merkle::Hasher;
 
     use crate::{
-        error::KomodoError,
-        fec::{decode, Shard},
+        fec::{decode, encode, Shard},
         field,
-        linalg::Matrix,
     };
 
     fn bytes() -> Vec<u8> {
@@ -109,50 +139,11 @@ mod tests {
         E::ScalarField::from_le_bytes_mod_order(&n.to_le_bytes())
     }
 
-    #[allow(clippy::expect_fun_call)]
-    fn encode<E: Pairing>(data: &[u8], k: usize, n: usize) -> Result<Vec<Shard<E>>, KomodoError> {
-        let hash = Sha256::hash(data).to_vec();
-
-        let points: Vec<E::ScalarField> = (0..n).map(|i| to_curve::<E>(i as u128)).collect();
-        let encoding = Matrix::vandermonde(&points, k);
-
-        let source_shards = Matrix::from_vec_vec(
-            field::split_data_into_field_elements::<E>(data, k)
-                .chunks(k)
-                .map(|c| c.to_vec())
-                .collect(),
-        )?;
-
-        Ok(source_shards
-            .mul(&encoding)?
-            .transpose()
-            .elements
-            .chunks(source_shards.height)
-            .enumerate()
-            .map(|(i, s)| {
-                let alpha = E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes());
-                let mut linear_combination = Vec::new();
-                linear_combination.push(E::ScalarField::one());
-                for i in 1..k {
-                    linear_combination.push(linear_combination[i - 1].mul(alpha));
-                }
-
-                Shard {
-                    k: k as u32,
-                    linear_combination,
-                    hash: hash.clone(),
-                    bytes: s.to_vec(),
-                    size: data.len(),
-                }
-            })
-            .collect())
-    }
-
     fn decoding_template<E: Pairing>(data: &[u8], k: usize, n: usize) {
         let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", data.len(), k, n);
         assert_eq!(
             data,
-            decode::<E>(encode(data, k, n).unwrap(), false).unwrap(),
+            decode::<E>(encode(data, k, n).unwrap()).unwrap(),
             "{test_case}"
         );
     }
@@ -175,7 +166,7 @@ mod tests {
         shards[2] = shards[1].combine(to_curve::<E>(5), &shards[3], to_curve::<E>(4));
         assert_eq!(
             data,
-            decode::<E>(shards, false).unwrap(),
+            decode::<E>(shards).unwrap(),
             "TEST | data: {} bytes, k: {}, n: {}",
             data.len(),
             k,

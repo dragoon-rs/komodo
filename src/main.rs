@@ -254,7 +254,7 @@ fn main() {
             .collect();
         eprintln!(
             "{:?}",
-            decode::<Bls12_381>(blocks, true).unwrap_or_else(|e| {
+            decode::<Bls12_381>(blocks).unwrap_or_else(|e| {
                 throw_error(1, &format!("could not decode: {}", e));
                 unreachable!()
             })
