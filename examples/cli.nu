@@ -5,8 +5,9 @@ use ../komodo.nu [
     "komodo prove",
     "komodo verify",
     "komodo reconstruct",
+    "komodo ls",
 ]
-use ../binary.nu [ "bytes decode" ]
+use ../binary.nu [ "bytes from_int" ]
 
 use std assert
 
@@ -19,14 +20,16 @@ const BLOCKS_TO_RECONSTRUCT = [0, 2, 3]
 def main [] {
     komodo build
 
-    komodo setup $BYTES
+    komodo setup (open $BYTES | into binary | bytes length)
     komodo prove $BYTES --fec-params $FEC_PARAMS
 
-    komodo verify ...($BLOCKS_TO_VERIFY | each { $"blocks/($in).bin" })
+    let blocks = komodo ls
 
-    let actual = komodo reconstruct ...($BLOCKS_TO_RECONSTRUCT | each { $"blocks/($in).bin" })
-        | bytes decode
-    let expected = open $BYTES | into binary | to text | from json | bytes decode
+    komodo verify ...($BLOCKS_TO_VERIFY | each {|i| $blocks | get $i })
+
+    let actual = komodo reconstruct ...($BLOCKS_TO_RECONSTRUCT | each {|i| $blocks | get $i })
+        | bytes from_int
+    let expected = open $BYTES | bytes from_int
     assert equal $actual $expected
 
     print "reconstruction was successful"

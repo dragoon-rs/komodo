@@ -56,3 +56,4 @@ test:
     - cargo test --workspace --verbose
     - nu tests/cli.nu
     - nu tests/binary.nu
+    - nu examples/cli.nu
