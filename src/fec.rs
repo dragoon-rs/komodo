@@ -1,8 +1,6 @@
-use std::cmp::max;
 use std::ops::{Add, Mul};
 
 use ark_ec::pairing::Pairing;
-use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::Zero;
 
@@ -27,24 +25,14 @@ impl<E: Pairing> Shard<E> {
             return self.clone();
         }
 
-        let mut linear_combination = Vec::new();
-        linear_combination.resize(
-            max(
-                self.linear_combination.len(),
-                other.linear_combination.len(),
-            ),
-            E::ScalarField::zero(),
-        );
-        for (i, l) in self.linear_combination.iter().enumerate() {
-            linear_combination[i] += l.mul(alpha);
-        }
-        for (i, l) in other.linear_combination.iter().enumerate() {
-            linear_combination[i] += l.mul(beta);
-        }
-
         Shard {
             k: self.k,
-            linear_combination,
+            linear_combination: self
+                .linear_combination
+                .iter()
+                .zip(other.linear_combination.iter())
+                .map(|(l, r)| l.mul(alpha) + r.mul(beta))
+                .collect(),
             hash: self.hash.clone(),
             bytes: self
                 .bytes
@@ -65,33 +53,14 @@ pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>, transpose: bool) -> Result<Vec<
         return Err(KomodoError::TooFewShards(np, k as usize));
     }
 
-    let n = 1 + blocks
-        .iter()
-        .flat_map(|b| {
-            b.linear_combination
-                .iter()
-                .enumerate()
-                .filter(|(_, l)| !l.is_zero())
-                .map(|(i, _)| i)
-                .collect::<Vec<_>>()
-        })
-        .max()
-        .unwrap_or_default();
-    let points: Vec<E::ScalarField> = (0..n)
-        .map(|i| E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes()))
-        .collect();
-    let encoding_mat = Matrix::vandermonde(&points, k as usize);
-
-    let lin_comb_mat = Matrix::from_vec_vec(
+    let encoding_mat = Matrix::from_vec_vec(
         blocks
             .iter()
-            .map(|b| {
-                let mut comb = b.linear_combination.clone();
-                comb.resize(n, E::ScalarField::zero());
-                comb
-            })
+            .map(|b| b.linear_combination.clone())
             .collect(),
-    )?;
+    )?
+    .transpose()
+    .truncate(None, Some(np - k as usize));
 
     let shards = Matrix::from_vec_vec(
         blocks
@@ -102,11 +71,7 @@ pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>, transpose: bool) -> Result<Vec<
     )?
     .transpose();
 
-    let ra = encoding_mat
-        .mul(&lin_comb_mat.transpose())?
-        .truncate(None, Some(np - k as usize));
-
-    let source_shards = shards.mul(&ra.invert()?)?;
+    let source_shards = shards.mul(&encoding_mat.invert()?)?;
     let source_shards = if transpose {
         source_shards.transpose().elements
     } else {
@@ -120,6 +85,8 @@ pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>, transpose: bool) -> Result<Vec<
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Mul;
+
     use ark_bls12_381::Bls12_381;
     use ark_ec::pairing::Pairing;
     use ark_ff::PrimeField;
@@ -163,9 +130,12 @@ mod tests {
             .chunks(source_shards.height)
             .enumerate()
             .map(|(i, s)| {
+                let alpha = E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes());
                 let mut linear_combination = Vec::new();
-                linear_combination.resize(i + 1, E::ScalarField::zero());
-                linear_combination[i] = E::ScalarField::one();
+                linear_combination.push(E::ScalarField::one());
+                for i in 1..k {
+                    linear_combination.push(linear_combination[i - 1].mul(alpha));
+                }
 
                 Shard {
                     k: k as u32,
@@ -231,7 +201,7 @@ mod tests {
     ) -> Shard<E> {
         let bytes = field::split_data_into_field_elements::<E>(bytes, 1);
         Shard {
-            k: 0,
+            k: 2,
             linear_combination: linear_combination.to_vec(),
             hash: vec![],
             bytes,
@@ -240,7 +210,8 @@ mod tests {
     }
 
     fn recoding_template<E: Pairing>() {
-        let a: Shard<E> = create_fake_shard(&[E::ScalarField::one()], &[1, 2, 3]);
+        let a: Shard<E> =
+            create_fake_shard(&[E::ScalarField::one(), E::ScalarField::zero()], &[1, 2, 3]);
         let b: Shard<E> =
             create_fake_shard(&[E::ScalarField::zero(), E::ScalarField::one()], &[4, 5, 6]);
 

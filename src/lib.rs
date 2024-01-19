@@ -1,7 +1,7 @@
 use std::ops::{Div, Mul};
 
 use ark_ec::pairing::Pairing;
-use ark_ff::{Field, PrimeField};
+use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
 use ark_poly_commit::kzg10::{Commitment, Powers, Randomness, KZG10};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -112,31 +112,33 @@ where
 {
     let k = polynomials[0].coeffs().len();
 
-    let evaluations = points
+    Ok(points
         .iter()
-        .map(|point| polynomials.iter().map(|p| p.evaluate(point)).collect())
-        .collect::<Vec<Vec<E::ScalarField>>>();
+        .map(|point| {
+            let eval = polynomials
+                .iter()
+                .map(|p| p.evaluate(point))
+                .collect::<Vec<_>>();
 
-    let mut proofs = Vec::new();
-    for (i, row) in evaluations.iter().enumerate() {
-        let mut linear_combination = Vec::new();
-        linear_combination.resize(i + 1, E::ScalarField::zero());
-        linear_combination[i] = E::ScalarField::one();
+            let mut linear_combination = Vec::new();
+            linear_combination.push(E::ScalarField::one());
+            for i in 1..k {
+                linear_combination.push(linear_combination[i - 1].mul(point));
+            }
 
-        proofs.push(Block {
-            shard: fec::Shard {
-                k: k as u32,
-                linear_combination,
-                hash: hash.to_vec(),
-                bytes: row.clone(),
-                size: nb_bytes,
-            },
-            commit: commits.clone(),
-            m: polynomials.len(),
+            Block {
+                shard: fec::Shard {
+                    k: k as u32,
+                    linear_combination,
+                    hash: hash.to_vec(),
+                    bytes: eval.clone(),
+                    size: nb_bytes,
+                },
+                commit: commits.clone(),
+                m: polynomials.len(),
+            }
         })
-    }
-
-    Ok(proofs)
+        .collect::<Vec<_>>())
 }
 
 pub fn encode<E, P>(
@@ -258,23 +260,7 @@ where
         .linear_combination
         .iter()
         .enumerate()
-        .map(|(i, w)| {
-            // NOTE: this is where we implicitely compute the Vandermonde matrix
-            // hence, the sum of commits is indeed the sum of the encoded n shards
-            // and not the original k source shards.
-            let alpha = E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes());
-
-            let f: E::G1 = block
-                .commit
-                .iter()
-                .enumerate()
-                .map(|(j, c)| {
-                    let commit: E::G1 = c.0.into();
-                    commit.mul(alpha.pow([j as u64]))
-                })
-                .sum();
-            f * w
-        })
+        .map(|(i, w)| Into::<E::G1>::into(block.commit[i].0) * w)
         .sum();
     Ok(Into::<E::G1>::into(commit.0) == rhs)
 }
