@@ -12,6 +12,8 @@ pub enum KomodoError {
     IncompatibleMatrixShapes(usize, usize, usize, usize),
     #[error("Expected at least {1}, got {0}")]
     TooFewShards(usize, usize),
+    #[error("Blocks are incompatible: {0}")]
+    IncompatibleBlocks(String),
     #[error("Another error: {0}")]
     Other(String),
 }

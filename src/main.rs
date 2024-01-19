@@ -272,8 +272,14 @@ fn main() {
             );
         }
 
-        dump_blocks(&[recode(&blocks[0].1, &blocks[1].1)], &block_dir)
-            .unwrap_or_else(|e| throw_error(1, &format!("could not dump block: {}", e)));
+        dump_blocks(
+            &[recode(&blocks[0].1, &blocks[1].1).unwrap_or_else(|e| {
+                throw_error(1, &format!("could not encode block: {}", e));
+                unreachable!()
+            })],
+            &block_dir,
+        )
+        .unwrap_or_else(|e| throw_error(1, &format!("could not dump block: {}", e)));
 
         exit(0);
     }
