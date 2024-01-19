@@ -5,6 +5,7 @@ use ../komodo.nu [
     "komodo verify",
     "komodo reconstruct",
     "komodo ls",
+    "komodo clean",
 ]
 use ../binary.nu [ "bytes from_int" ]
 
@@ -139,6 +140,8 @@ def test [blocks: list<int>, --fail] {
 
 def main [] {
     komodo build
+
+    komodo clean
 
     komodo setup (open $FILE | into binary | bytes length)
     komodo prove $FILE --fec-params $FEC_PARAMS
