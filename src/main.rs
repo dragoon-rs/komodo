@@ -137,7 +137,7 @@ fn read_block<E: Pairing>(block_hashes: &[String], block_dir: &Path) -> Vec<(Str
     block_hashes
         .iter()
         .map(|f| {
-            let filename = block_dir.join(format!("{}.bin", f));
+            let filename = block_dir.join(f);
             let s = std::fs::read(filename).unwrap_or_else(|_| {
                 throw_error(2, &format!("could not read block {}", f));
                 unreachable!()
@@ -199,7 +199,7 @@ fn dump_blocks<E: Pairing>(blocks: &[Block<E>], block_dir: &PathBuf) -> Result<(
             .collect::<Vec<_>>()
             .join("");
 
-        let filename = block_dir.join(format!("{}.bin", repr));
+        let filename = block_dir.join(&repr);
         std::fs::create_dir_all(block_dir)?;
 
         debug!("dumping serialized block to `{:?}`", filename);
@@ -237,7 +237,7 @@ fn main() {
 
     let home_dir = PathBuf::from(&home_dir);
     let block_dir = home_dir.join("blocks/");
-    let powers_file = home_dir.join("powers.bin");
+    let powers_file = home_dir.join("powers");
 
     if do_generate_powers {
         generate_powers(nb_bytes, &powers_file)
