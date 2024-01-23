@@ -1,12 +1,14 @@
 use ark_ff::Field;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use rand::Rng;
 
 use crate::error::KomodoError;
 
-#[derive(Clone, PartialEq, Default, Debug)]
-pub(super) struct Matrix<T: Field> {
+#[derive(Clone, PartialEq, Default, Debug, CanonicalSerialize, CanonicalDeserialize)]
+pub struct Matrix<T: Field> {
     pub elements: Vec<T>,
     pub height: usize,
-    width: usize,
+    pub width: usize,
 }
 
 impl<T: Field> Matrix<T> {
@@ -30,15 +32,17 @@ impl<T: Field> Matrix<T> {
         Self::from_diagonal(vec![T::one(); size])
     }
 
-    pub(super) fn vandermonde(points: &[T], height: usize) -> Self {
+    pub fn vandermonde(points: &[T], height: usize) -> Self {
         let width = points.len();
 
         let mut elements = Vec::new();
         elements.resize(height * width, T::zero());
 
         for (j, pj) in points.iter().enumerate() {
+            let mut el = T::one();
             for i in 0..height {
-                elements[i * width + j] = pj.pow([i as u64]);
+                elements[i * width + j] = el;
+                el *= pj;
             }
         }
 
@@ -47,6 +51,24 @@ impl<T: Field> Matrix<T> {
             height,
             width,
         }
+    }
+
+    pub fn random(n: usize, m: usize) -> Self {
+        let mut rng = rand::thread_rng();
+
+        Matrix::from_vec_vec(
+            (0..n)
+                .map(|_| {
+                    (0..m)
+                        .map(|_| {
+                            let element: u128 = rng.gen();
+                            T::from(element)
+                        })
+                        .collect()
+                })
+                .collect::<Vec<Vec<T>>>(),
+        )
+        .unwrap()
     }
 
     pub(super) fn from_vec_vec(matrix: Vec<Vec<T>>) -> Result<Self, KomodoError> {
@@ -85,6 +107,14 @@ impl<T: Field> Matrix<T> {
 
     fn set(&mut self, i: usize, j: usize, value: T) {
         self.elements[i * self.width + j] = value;
+    }
+
+    pub(super) fn get_col(&self, j: usize) -> Option<Vec<T>> {
+        if j >= self.width {
+            return None;
+        }
+
+        Some((0..self.height).map(|i| self.get(i, j)).collect())
     }
 
     // compute _row / value_
@@ -217,17 +247,9 @@ impl<T: Field> Matrix<T> {
 #[cfg(test)]
 mod tests {
     use ark_bls12_381::Fr;
-    use ark_ff::Field;
     use ark_std::{One, Zero};
-    use rand::Rng;
 
     use super::{KomodoError, Matrix};
-
-    fn random_field_element<T: Field>() -> T {
-        let mut rng = rand::thread_rng();
-        let element: u128 = rng.gen();
-        T::from(element)
-    }
 
     #[test]
     fn from_vec_vec() {
@@ -332,12 +354,7 @@ mod tests {
         assert_eq!(inverse.mul(&matrix).unwrap(), Matrix::<Fr>::identity(3));
 
         let n = 20;
-        let matrix = Matrix::from_vec_vec(
-            (0..n)
-                .map(|_| (0..n).map(|_| random_field_element()).collect())
-                .collect::<Vec<Vec<Fr>>>(),
-        )
-        .unwrap();
+        let matrix = Matrix::random(n, n);
         let inverse = matrix.invert().unwrap();
         assert_eq!(matrix.mul(&inverse).unwrap(), Matrix::<Fr>::identity(n));
         assert_eq!(inverse.mul(&matrix).unwrap(), Matrix::<Fr>::identity(n));
@@ -438,5 +455,26 @@ mod tests {
         ])
         .unwrap();
         assert_eq!(matrix.truncate(Some(1), Some(2)), truncated);
+    }
+
+    #[test]
+    fn get_cols() {
+        let matrix = Matrix::from_vec_vec(vec![
+            vec![Fr::from(1), Fr::from(2), Fr::from(3), Fr::from(10)],
+            vec![Fr::from(4), Fr::from(5), Fr::from(6), Fr::from(11)],
+            vec![Fr::from(7), Fr::from(8), Fr::from(9), Fr::from(12)],
+        ])
+        .unwrap();
+
+        assert!(matrix.get_col(10).is_none());
+
+        assert_eq!(
+            matrix.get_col(0),
+            Some(vec![Fr::from(1), Fr::from(4), Fr::from(7)])
+        );
+        assert_eq!(
+            matrix.get_col(3),
+            Some(vec![Fr::from(10), Fr::from(11), Fr::from(12)])
+        );
     }
 }

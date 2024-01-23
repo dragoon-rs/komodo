@@ -21,6 +21,13 @@ def "nu-complete log-levels" []: nothing -> list<string> {
     ]
 }
 
+def "nu-complete encoding-methods" []: nothing -> list<string> {
+    [
+        "vandermonde"
+        "random",
+    ]
+}
+
 def run-komodo [
     --input: path = "",
     --nb-bytes: int = 0,
@@ -31,6 +38,7 @@ def run-komodo [
     --verify,
     --combine,
     --inspect,
+    --encoding-method: string = "",
     --log-level: string,
     ...block_hashes: string,
 ]: nothing -> any {
@@ -56,6 +64,7 @@ def run-komodo [
                 ($combine | into string)
                 ($inspect | into string)
                 $nb_bytes
+                $encoding_method
             ] | append $block_hashes)
         } | complete
 
@@ -94,6 +103,7 @@ export def "komodo setup" [
 export def "komodo prove" [
     input: path,
     --fec-params: record<k: int, n: int>,
+    --encoding-method: string@"nu-complete encoding-methods" = "random",
     --log-level: string@"nu-complete log-levels" = $DEFAULT_LOG_LEVEL
 ]: nothing -> list<string> {
     (
@@ -102,6 +112,7 @@ export def "komodo prove" [
             --input $input
             -k $fec_params.k
             -n $fec_params.n
+            --encoding-method $encoding_method
     )
 }
 

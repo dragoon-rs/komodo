@@ -6,10 +6,12 @@ use std::{fs::File, path::PathBuf};
 
 use ark_bls12_381::Bls12_381;
 use ark_ec::pairing::Pairing;
+use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::DenseUVPolynomial;
 use ark_poly_commit::kzg10::Powers;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
+use komodo::linalg::Matrix;
 use komodo::recode;
 use rs_merkle::algorithms::Sha256;
 use rs_merkle::Hasher;
@@ -38,6 +40,7 @@ fn parse_args() -> (
     bool,
     bool,
     usize,
+    String,
     Vec<String>,
 ) {
     let bytes_path = std::env::args()
@@ -91,7 +94,10 @@ fn parse_args() -> (
         .expect("expected nb_bytes as 10th positional argument")
         .parse()
         .expect("could not parse nb_bytes as a usize");
-    let block_hashes = std::env::args().skip(11).collect::<Vec<_>>();
+    let encoding_method = std::env::args()
+        .nth(11)
+        .expect("expected encoding_method as 11th positional argument");
+    let block_hashes = std::env::args().skip(12).collect::<Vec<_>>();
 
     (
         bytes,
@@ -104,6 +110,7 @@ fn parse_args() -> (
         do_combine_blocks,
         do_inspect_blocks,
         nb_bytes,
+        encoding_method,
         block_hashes,
     )
 }
@@ -232,6 +239,7 @@ fn main() {
         do_combine_blocks,
         do_inspect_blocks,
         nb_bytes,
+        encoding_method,
         block_hashes,
     ) = parse_args();
 
@@ -324,8 +332,24 @@ fn main() {
         exit(0);
     }
 
+    let encoding_mat = match encoding_method.as_str() {
+        "vandermonde" => {
+            let points: Vec<<Bls12_381 as Pairing>::ScalarField> = (0..n)
+                .map(|i| {
+                    <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes())
+                })
+                .collect();
+            Matrix::vandermonde(&points, k)
+        }
+        "random" => Matrix::random(k, n),
+        m => {
+            throw_error(1, &format!("invalid encoding method: {}", m));
+            unreachable!()
+        }
+    };
+
     dump_blocks(
-        &encode::<Bls12_381, UniPoly12_381>(&bytes, k, n, &powers).unwrap_or_else(|e| {
+        &encode::<Bls12_381, UniPoly12_381>(&bytes, &encoding_mat, &powers).unwrap_or_else(|e| {
             throw_error(1, &format!("could not encode: {}", e));
             unreachable!()
         }),

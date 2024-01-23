@@ -11,10 +11,12 @@ use tracing::{debug, info};
 mod error;
 pub mod fec;
 mod field;
-mod linalg;
+pub mod linalg;
 pub mod setup;
 
 use error::KomodoError;
+
+use crate::linalg::Matrix;
 
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Block<E: Pairing> {
@@ -97,8 +99,7 @@ where
 
 pub fn encode<E, P>(
     bytes: &[u8],
-    k: usize,
-    n: usize,
+    encoding_mat: &Matrix<E::ScalarField>,
     powers: &Powers<E>,
 ) -> Result<Vec<Block<E>>, ark_poly_commit::Error>
 where
@@ -107,6 +108,8 @@ where
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     info!("encoding and proving {} bytes", bytes.len());
+
+    let k = encoding_mat.height;
 
     debug!("splitting bytes into polynomials");
     let elements = field::split_data_into_field_elements::<E>(bytes, k);
@@ -128,7 +131,7 @@ where
     debug!("committing the polynomials");
     let (commits, _) = commit(powers, &polynomials_to_commit)?;
 
-    Ok(fec::encode(bytes, k, n)
+    Ok(fec::encode(bytes, encoding_mat)
         .unwrap() // TODO: don't unwrap here
         .iter()
         .map(|s| Block {
@@ -237,6 +240,7 @@ mod tests {
     use crate::{
         batch_verify, encode,
         fec::{decode, Shard},
+        linalg::Matrix,
         recode, setup, verify, Block,
     };
 
@@ -248,8 +252,7 @@ mod tests {
 
     fn verify_template<E, P>(
         bytes: &[u8],
-        k: usize,
-        n: usize,
+        encoding_mat: &Matrix<E::ScalarField>,
         batch: &[usize],
     ) -> Result<(), ark_poly_commit::Error>
     where
@@ -258,7 +261,7 @@ mod tests {
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
         let powers = setup::random(bytes.len())?;
-        let blocks = encode::<E, P>(bytes, k, n, &powers)?;
+        let blocks = encode::<E, P>(bytes, encoding_mat, &powers)?;
 
         for block in &blocks {
             assert!(verify::<E, P>(block, &powers)?);
@@ -289,14 +292,16 @@ mod tests {
         let batch = [1, 2, 3];
 
         let bytes = bytes();
+        let encoding_mat = Matrix::random(k, n);
 
         let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
 
-        verify_template::<E, P>(&bytes, k, n, &batch)
+        verify_template::<E, P>(&bytes, &encoding_mat, &batch)
             .unwrap_or_else(|_| panic!("verification failed for bls12-381\n{test_case}"));
-        verify_template::<E, P>(&bytes[0..(bytes.len() - 10)], k, n, &batch).unwrap_or_else(|_| {
-            panic!("verification failed for bls12-381 with padding\n{test_case}")
-        });
+        verify_template::<E, P>(&bytes[0..(bytes.len() - 10)], &encoding_mat, &batch)
+            .unwrap_or_else(|_| {
+                panic!("verification failed for bls12-381 with padding\n{test_case}")
+            });
     }
 
     #[ignore = "Semi-AVID-PR does not support large padding"]
@@ -309,26 +314,29 @@ mod tests {
         let batch = [1, 2, 3];
 
         let bytes = bytes();
+        let encoding_mat = Matrix::random(k, n);
 
         let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
 
-        verify_template::<E, P>(&bytes[0..(bytes.len() - 33)], k, n, &batch).unwrap_or_else(|_| {
-            panic!("verification failed for bls12-381 with padding\n{test_case}")
-        });
+        verify_template::<E, P>(&bytes[0..(bytes.len() - 33)], &encoding_mat, &batch)
+            .unwrap_or_else(|_| {
+                panic!("verification failed for bls12-381 with padding\n{test_case}")
+            });
     }
 
     fn verify_with_errors_template<E, P>(
         bytes: &[u8],
-        k: usize,
-        n: usize,
+        encoding_mat: &Matrix<E::ScalarField>,
     ) -> Result<(), ark_poly_commit::Error>
     where
         E: Pairing,
         P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
+        let k = encoding_mat.height;
+
         let powers = setup::random(bytes.len())?;
-        let blocks = encode::<E, P>(bytes, k, n, &powers)?;
+        let blocks = encode::<E, P>(bytes, encoding_mat, &powers)?;
 
         for block in &blocks {
             assert!(verify::<E, P>(block, &powers)?);
@@ -368,20 +376,21 @@ mod tests {
         let (k, n) = (4, 6);
 
         let bytes = bytes();
+        let encoding_mat = Matrix::random(k, n);
 
         let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
 
-        verify_with_errors_template::<E, P>(&bytes, k, n)
+        verify_with_errors_template::<E, P>(&bytes, &encoding_mat)
             .unwrap_or_else(|_| panic!("verification failed for bls12-381\n{test_case}"));
-        verify_with_errors_template::<E, P>(&bytes[0..(bytes.len() - 10)], k, n).unwrap_or_else(
-            |_| panic!("verification failed for bls12-381 with padding\n{test_case}"),
-        );
+        verify_with_errors_template::<E, P>(&bytes[0..(bytes.len() - 10)], &encoding_mat)
+            .unwrap_or_else(|_| {
+                panic!("verification failed for bls12-381 with padding\n{test_case}")
+            });
     }
 
     fn verify_recoding_template<E, P>(
         bytes: &[u8],
-        k: usize,
-        n: usize,
+        encoding_mat: &Matrix<E::ScalarField>,
     ) -> Result<(), ark_poly_commit::Error>
     where
         E: Pairing,
@@ -389,7 +398,7 @@ mod tests {
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
         let powers = setup::random(bytes.len())?;
-        let blocks = encode::<E, P>(bytes, k, n, &powers)?;
+        let blocks = encode::<E, P>(bytes, encoding_mat, &powers)?;
 
         assert!(verify::<E, P>(
             &recode(&blocks[2], &blocks[3]).unwrap(),
@@ -411,20 +420,21 @@ mod tests {
         let (k, n) = (4, 6);
 
         let bytes = bytes();
+        let encoding_mat = Matrix::random(k, n);
 
         let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
 
-        verify_recoding_template::<E, P>(&bytes, k, n)
+        verify_recoding_template::<E, P>(&bytes, &encoding_mat)
             .unwrap_or_else(|_| panic!("verification failed for bls12-381\n{test_case}"));
-        verify_recoding_template::<E, P>(&bytes[0..(bytes.len() - 10)], k, n).unwrap_or_else(
-            |_| panic!("verification failed for bls12-381 with padding\n{test_case}"),
-        );
+        verify_recoding_template::<E, P>(&bytes[0..(bytes.len() - 10)], &encoding_mat)
+            .unwrap_or_else(|_| {
+                panic!("verification failed for bls12-381 with padding\n{test_case}")
+            });
     }
 
     fn end_to_end_template<E, P>(
         bytes: &[u8],
-        k: usize,
-        n: usize,
+        encoding_mat: &Matrix<E::ScalarField>,
     ) -> Result<(), ark_poly_commit::Error>
     where
         E: Pairing,
@@ -432,7 +442,7 @@ mod tests {
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
         let powers = setup::random(bytes.len())?;
-        let blocks: Vec<Shard<E>> = encode::<E, P>(bytes, k, n, &powers)?
+        let blocks: Vec<Shard<E>> = encode::<E, P>(bytes, encoding_mat, &powers)?
             .iter()
             .map(|b| b.shard.clone())
             .collect();
@@ -450,14 +460,15 @@ mod tests {
         let (k, n) = (4, 6);
 
         let bytes = bytes();
+        let encoding_mat = Matrix::random(k, n);
 
         let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
 
-        end_to_end_template::<E, P>(&bytes, k, n)
+        end_to_end_template::<E, P>(&bytes, &encoding_mat)
             .unwrap_or_else(|_| panic!("end to end failed for bls12-381\n{test_case}"));
-        end_to_end_template::<E, P>(&bytes[0..(bytes.len() - 10)], k, n).unwrap_or_else(|_| {
-            panic!("end to end failed for bls12-381 with padding\n{test_case}")
-        });
+        end_to_end_template::<E, P>(&bytes[0..(bytes.len() - 10)], &encoding_mat).unwrap_or_else(
+            |_| panic!("end to end failed for bls12-381 with padding\n{test_case}"),
+        );
     }
 
     fn end_to_end_with_recoding_template<E, P>(bytes: &[u8]) -> Result<(), ark_poly_commit::Error>
@@ -467,7 +478,7 @@ mod tests {
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
         let powers = setup::random(bytes.len())?;
-        let blocks = encode::<E, P>(bytes, 3, 5, &powers)?;
+        let blocks = encode::<E, P>(bytes, &Matrix::random(3, 5), &powers)?;
 
         let b_0_1 = recode(&blocks[0], &blocks[1]).unwrap();
         let shards = vec![
