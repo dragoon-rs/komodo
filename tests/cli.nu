@@ -125,7 +125,7 @@ const FEC_PARAMS = {k: 3, n: 5}
 
 def test [blocks: list<int>, --fail] {
     let actual = try {
-        komodo reconstruct ...(komodo ls) | bytes from_int
+        komodo reconstruct ...(komodo ls)
     } catch {
         if not $fail {
             error make --unspanned { msg: "woopsie" }

@@ -11,8 +11,6 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly::DenseUVPolynomial;
 use ark_poly_commit::kzg10::Powers;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
-use komodo::linalg::Matrix;
-use komodo::recode;
 use rs_merkle::algorithms::Sha256;
 use rs_merkle::Hasher;
 use tracing::{debug, info, warn};
@@ -20,7 +18,8 @@ use tracing::{debug, info, warn};
 use komodo::{
     encode,
     fec::{decode, Shard},
-    setup, verify, Block,
+    linalg::Matrix,
+    recode, setup, verify, Block,
 };
 
 type UniPoly12_381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;

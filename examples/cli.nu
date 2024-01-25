@@ -28,7 +28,6 @@ def main [] {
     komodo verify ...($BLOCKS_TO_VERIFY | each {|i| $blocks | get $i })
 
     let actual = komodo reconstruct ...($BLOCKS_TO_RECONSTRUCT | each {|i| $blocks | get $i })
-        | bytes from_int
     let expected = open $BYTES | bytes from_int
     assert equal $actual $expected
 
