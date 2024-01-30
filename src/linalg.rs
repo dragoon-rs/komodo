@@ -164,6 +164,38 @@ impl<T: Field> Matrix<T> {
         Ok(inverse)
     }
 
+    #[allow(dead_code)]
+    pub(super) fn rank(&self) -> usize {
+        let mut matrix = self.clone();
+
+        for i in 0..matrix.height.min(matrix.width) {
+            let pivot = matrix.get(i, i);
+            if pivot.is_zero() {
+                continue;
+            }
+
+            matrix.divide_row_by(i, pivot);
+
+            for k in 0..matrix.height {
+                if k != i {
+                    let factor = matrix.get(k, i);
+                    matrix.multiply_row_by_and_add_to_row(i, -factor, k);
+                }
+            }
+        }
+
+        matrix.height
+            - (0..matrix.height)
+                .map(|i| {
+                    let row =
+                        matrix.elements[(i * matrix.width)..((i + 1) * matrix.width)].to_vec();
+                    row.iter().all(|&x| x.is_zero())
+                })
+                .filter(|&r| r)
+                .collect::<Vec<_>>()
+                .len()
+    }
+
     pub(super) fn mul(&self, rhs: &Self) -> Result<Self, KomodoError> {
         if self.width != rhs.height {
             return Err(KomodoError::IncompatibleMatrixShapes(
@@ -450,5 +482,45 @@ mod tests {
 
         assert_eq!(matrix.get_col(0), Some(vec_to_elements(vec![1, 4, 7])));
         assert_eq!(matrix.get_col(3), Some(vec_to_elements(vec![10, 11, 12])));
+    }
+
+    #[test]
+    fn rank() {
+        for n in 1..=20 {
+            assert_eq!(Matrix::<Fr>::identity(n).rank(), n);
+        }
+
+        let m = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+            vec![1, 0, 0],
+            vec![0, 2, 0],
+            vec![0, 0, 3],
+        ]))
+        .unwrap();
+        assert_eq!(m.rank(), 3);
+
+        let m = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+            vec![1, 0, 0],
+            vec![0, 2, 0],
+            vec![0, 0, 3],
+            vec![0, 0, 3],
+        ]))
+        .unwrap();
+        assert_eq!(m.rank(), 3);
+
+        let m = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+            vec![1, 0, 0],
+            vec![0, 2, 0],
+            vec![0, 0, 0],
+        ]))
+        .unwrap();
+        assert_eq!(m.rank(), 2);
+
+        let m = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+            vec![0, 0, 0],
+            vec![0, 0, 0],
+            vec![0, 0, 0],
+        ]))
+        .unwrap();
+        assert_eq!(m.rank(), 0);
     }
 }
