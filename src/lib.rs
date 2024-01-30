@@ -6,6 +6,7 @@ use ark_poly_commit::kzg10::{Commitment, Powers, Randomness, KZG10};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::UniformRand;
 use ark_std::Zero;
+use fec::combine;
 use tracing::{debug, info};
 
 mod error;
@@ -142,48 +143,59 @@ where
         .collect::<Vec<_>>())
 }
 
-pub fn recode<E: Pairing>(b1: &Block<E>, b2: &Block<E>) -> Result<Block<E>, KomodoError> {
+pub fn recode<E: Pairing>(blocks: &[Block<E>]) -> Result<Option<Block<E>>, KomodoError> {
     let mut rng = rand::thread_rng();
 
-    let alpha = E::ScalarField::rand(&mut rng);
-    let beta = E::ScalarField::rand(&mut rng);
+    let coeffs = blocks
+        .iter()
+        .map(|_| E::ScalarField::rand(&mut rng))
+        .collect::<Vec<_>>();
 
-    if b1.shard.k != b2.shard.k {
-        return Err(KomodoError::IncompatibleBlocks(format!(
-            "k is not the same: {} vs {}",
-            b1.shard.k, b2.shard.k
-        )));
+    for (i, (b1, b2)) in blocks.iter().zip(blocks.iter().skip(1)).enumerate() {
+        if b1.shard.k != b2.shard.k {
+            return Err(KomodoError::IncompatibleBlocks(format!(
+                "k is not the same at {}: {} vs {}",
+                i, b1.shard.k, b2.shard.k
+            )));
+        }
+        if b1.shard.hash != b2.shard.hash {
+            return Err(KomodoError::IncompatibleBlocks(format!(
+                "hash is not the same at {}: {:?} vs {:?}",
+                i, b1.shard.hash, b2.shard.hash
+            )));
+        }
+        if b1.shard.size != b2.shard.size {
+            return Err(KomodoError::IncompatibleBlocks(format!(
+                "size is not the same at {}: {} vs {}",
+                i, b1.shard.size, b2.shard.size
+            )));
+        }
+        if b1.m != b2.m {
+            return Err(KomodoError::IncompatibleBlocks(format!(
+                "m is not the same at {}: {} vs {}",
+                i, b1.m, b2.m
+            )));
+        }
+        if b1.commit != b2.commit {
+            return Err(KomodoError::IncompatibleBlocks(format!(
+                "commits are not the same at {}: {:?} vs {:?}",
+                i, b1.commit, b2.commit
+            )));
+        }
     }
-    if b1.shard.hash != b2.shard.hash {
-        return Err(KomodoError::IncompatibleBlocks(format!(
-            "hash is not the same: {:?} vs {:?}",
-            b1.shard.hash, b2.shard.hash
-        )));
-    }
-    if b1.shard.size != b2.shard.size {
-        return Err(KomodoError::IncompatibleBlocks(format!(
-            "size is not the same: {} vs {}",
-            b1.shard.size, b2.shard.size
-        )));
-    }
-    if b1.m != b2.m {
-        return Err(KomodoError::IncompatibleBlocks(format!(
-            "m is not the same: {} vs {}",
-            b1.m, b2.m
-        )));
-    }
-    if b1.commit != b2.commit {
-        return Err(KomodoError::IncompatibleBlocks(format!(
-            "commits are not the same: {:?} vs {:?}",
-            b1.commit, b2.commit
-        )));
-    }
+    let shard = match combine(
+        &blocks.iter().map(|b| b.shard.clone()).collect::<Vec<_>>(),
+        &coeffs,
+    ) {
+        Some(s) => s,
+        None => return Ok(None),
+    };
 
-    Ok(Block {
-        shard: b1.shard.combine(alpha, &b2.shard, beta),
-        commit: b1.commit.clone(),
-        m: b1.m,
-    })
+    Ok(Some(Block {
+        shard,
+        commit: blocks[0].commit.clone(),
+        m: blocks[0].m,
+    }))
 }
 
 pub fn verify<E, P>(
@@ -401,11 +413,13 @@ mod tests {
         let blocks = encode::<E, P>(bytes, encoding_mat, &powers)?;
 
         assert!(verify::<E, P>(
-            &recode(&blocks[2], &blocks[3]).unwrap(),
+            &recode(&blocks[2..=3]).unwrap().unwrap(),
             &powers
         )?);
         assert!(verify::<E, P>(
-            &recode(&blocks[3], &blocks[5]).unwrap(),
+            &recode(&[blocks[3].clone(), blocks[5].clone()])
+                .unwrap()
+                .unwrap(),
             &powers
         )?);
 
@@ -480,7 +494,7 @@ mod tests {
         let powers = setup::random(bytes.len())?;
         let blocks = encode::<E, P>(bytes, &Matrix::random(3, 5), &powers)?;
 
-        let b_0_1 = recode(&blocks[0], &blocks[1]).unwrap();
+        let b_0_1 = recode(&blocks[0..=1]).unwrap().unwrap();
         let shards = vec![
             b_0_1.shard,
             blocks[2].shard.clone(),
@@ -488,7 +502,9 @@ mod tests {
         ];
         assert_eq!(bytes, decode::<E>(shards).unwrap());
 
-        let b_0_1 = recode(&blocks[0], &blocks[1]).unwrap();
+        let b_0_1 = recode(&[blocks[0].clone(), blocks[1].clone()])
+            .unwrap()
+            .unwrap();
         let shards = vec![
             blocks[0].shard.clone(),
             blocks[1].shard.clone(),
@@ -496,18 +512,16 @@ mod tests {
         ];
         assert!(decode::<E>(shards).is_err());
 
-        let b_0_1 = recode(&blocks[0], &blocks[1]).unwrap();
-        let b_2_3 = recode(&blocks[2], &blocks[3]).unwrap();
-        let b_1_4 = recode(&blocks[1], &blocks[4]).unwrap();
+        let b_0_1 = recode(&blocks[0..=1]).unwrap().unwrap();
+        let b_2_3 = recode(&blocks[2..=3]).unwrap().unwrap();
+        let b_1_4 = recode(&[blocks[1].clone(), blocks[4].clone()])
+            .unwrap()
+            .unwrap();
         let shards = vec![b_0_1.shard, b_2_3.shard, b_1_4.shard];
         assert_eq!(bytes, decode::<E>(shards).unwrap());
 
         let fully_recoded_shards = (0..3)
-            .map(|_| {
-                recode(&recode(&blocks[0], &blocks[1]).unwrap(), &blocks[2])
-                    .unwrap()
-                    .shard
-            })
+            .map(|_| recode(&blocks[0..=2]).unwrap().unwrap().shard)
             .collect();
         assert_eq!(bytes, decode::<E>(fully_recoded_shards).unwrap());
 

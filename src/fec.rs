@@ -2,7 +2,7 @@ use std::ops::{Add, Mul};
 
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::Zero;
+use ark_std::{One, Zero};
 use rs_merkle::algorithms::Sha256;
 use rs_merkle::Hasher;
 
@@ -45,6 +45,27 @@ impl<E: Pairing> Shard<E> {
             size: self.size,
         }
     }
+}
+
+pub(super) fn combine<E: Pairing>(
+    shards: &[Shard<E>],
+    coeffs: &[E::ScalarField],
+) -> Option<Shard<E>> {
+    if shards.len() != coeffs.len() {
+        return None;
+    }
+    if shards.is_empty() {
+        return None;
+    }
+
+    let (s, _) = shards
+        .iter()
+        .zip(coeffs.iter())
+        .skip(1)
+        .fold((shards[0].clone(), coeffs[0]), |(acc_s, acc_c), (s, c)| {
+            (acc_s.combine(acc_c, s, *c), E::ScalarField::one())
+        });
+    Some(s)
 }
 
 pub fn encode<E: Pairing>(
@@ -121,6 +142,8 @@ mod tests {
         field,
         linalg::Matrix,
     };
+
+    use super::combine;
 
     fn bytes() -> Vec<u8> {
         include_bytes!("../tests/dragoon_32x32.png").to_vec()
@@ -213,5 +236,33 @@ mod tests {
     #[test]
     fn recoding() {
         recoding_template::<Bls12_381>();
+    }
+
+    fn combine_shards_template<E: Pairing>() {
+        let a = create_fake_shard::<E>(&[to_curve::<E>(1), to_curve::<E>(0)], &[1, 4, 7]);
+        let b = create_fake_shard::<E>(&[to_curve::<E>(0), to_curve::<E>(2)], &[2, 5, 8]);
+        let c = create_fake_shard::<E>(&[to_curve::<E>(3), to_curve::<E>(5)], &[3, 6, 9]);
+
+        assert!(combine::<E>(&[], &[]).is_none());
+        assert!(combine::<E>(
+            &[a.clone(), b.clone(), c.clone()],
+            &[to_curve::<E>(1), to_curve::<E>(2)]
+        )
+        .is_none());
+        assert_eq!(
+            combine::<E>(
+                &[a, b, c],
+                &[to_curve::<E>(1), to_curve::<E>(2), to_curve::<E>(3)]
+            ),
+            Some(create_fake_shard::<E>(
+                &[to_curve::<E>(10), to_curve::<E>(19)],
+                &[14, 32, 50]
+            ))
+        );
+    }
+
+    #[test]
+    fn combine_shards() {
+        combine_shards_template::<Bls12_381>();
     }
 }

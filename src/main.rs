@@ -272,18 +272,19 @@ fn main() {
 
     if do_combine_blocks {
         let blocks = read_block::<Bls12_381>(&block_hashes, &block_dir);
-        if blocks.len() != 2 {
-            throw_error(
-                1,
-                &format!("expected exactly 2 blocks, found {}", blocks.len()),
-            );
-        }
 
         dump_blocks(
-            &[recode(&blocks[0].1, &blocks[1].1).unwrap_or_else(|e| {
-                throw_error(1, &format!("could not encode block: {}", e));
-                unreachable!()
-            })],
+            &[
+                recode(&blocks.iter().map(|(_, b)| b).cloned().collect::<Vec<_>>())
+                    .unwrap_or_else(|e| {
+                        throw_error(1, &format!("could not encode block: {}", e));
+                        unreachable!()
+                    })
+                    .unwrap_or_else(|| {
+                        throw_error(1, "could not recode block (list of blocks is likely empty)");
+                        unreachable!()
+                    }),
+            ],
             &block_dir,
         )
         .unwrap_or_else(|e| throw_error(1, &format!("could not dump block: {}", e)));
