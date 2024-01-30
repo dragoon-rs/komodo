@@ -71,7 +71,7 @@ impl<T: Field> Matrix<T> {
         .unwrap()
     }
 
-    pub(super) fn from_vec_vec(matrix: Vec<Vec<T>>) -> Result<Self, KomodoError> {
+    pub fn from_vec_vec(matrix: Vec<Vec<T>>) -> Result<Self, KomodoError> {
         let height = matrix.len();
         let width = matrix[0].len();
 
@@ -164,8 +164,7 @@ impl<T: Field> Matrix<T> {
         Ok(inverse)
     }
 
-    #[allow(dead_code)]
-    pub(super) fn rank(&self) -> usize {
+    pub fn rank(&self) -> usize {
         let mut matrix = self.clone();
 
         for i in 0..matrix.height.min(matrix.width) {
@@ -273,6 +272,44 @@ impl<T: Field> Matrix<T> {
             height,
             width,
         }
+    }
+}
+
+impl<T: Field> std::fmt::Display for Matrix<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for i in 0..self.height {
+            let start = if i == 0 {
+                "/"
+            } else if i == self.height - 1 {
+                "\\"
+            } else {
+                "|"
+            };
+
+            let row = self.elements[(i * self.width)..((i + 1) * self.width)]
+                .iter()
+                .map(|x| {
+                    if x.is_zero() {
+                        "0".to_string()
+                    } else {
+                        format!("{}", x)
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            let end = if i == 0 {
+                "\\"
+            } else if i == self.height - 1 {
+                "/"
+            } else {
+                "|"
+            };
+
+            writeln!(f, "{}{}{}", start, row, end)?;
+        }
+
+        Ok(())
     }
 }
 
