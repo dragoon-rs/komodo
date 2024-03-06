@@ -23,7 +23,6 @@ use crate::linalg::Matrix;
 pub struct Block<E: Pairing> {
     pub shard: fec::Shard<E>,
     pub commit: Vec<Commitment<E>>,
-    pub m: usize,
 }
 
 impl<E: Pairing> std::fmt::Display for Block<E> {
@@ -69,8 +68,6 @@ impl<E: Pairing> std::fmt::Display for Block<E> {
             write!(f, r#""{}","#, commit.0)?;
         }
         write!(f, "]")?;
-        write!(f, ",")?;
-        write!(f, "m: {}", self.m)?;
         write!(f, "}}")?;
 
         Ok(())
@@ -138,7 +135,6 @@ where
         .map(|s| Block {
             shard: s.clone(),
             commit: commits.clone(),
-            m: polynomials.len(),
         })
         .collect::<Vec<_>>())
 }
@@ -170,12 +166,6 @@ pub fn recode<E: Pairing>(blocks: &[Block<E>]) -> Result<Option<Block<E>>, Komod
                 i, b1.shard.size, b2.shard.size
             )));
         }
-        if b1.m != b2.m {
-            return Err(KomodoError::IncompatibleBlocks(format!(
-                "m is not the same at {}: {} vs {}",
-                i, b1.m, b2.m
-            )));
-        }
         if b1.commit != b2.commit {
             return Err(KomodoError::IncompatibleBlocks(format!(
                 "commits are not the same at {}: {:?} vs {:?}",
@@ -194,7 +184,6 @@ pub fn recode<E: Pairing>(blocks: &[Block<E>]) -> Result<Option<Block<E>>, Komod
     Ok(Some(Block {
         shard,
         commit: blocks[0].commit.clone(),
-        m: blocks[0].m,
     }))
 }
 
@@ -370,7 +359,6 @@ mod tests {
         blocks_with_errors.push(Block {
             shard: bk.shard.clone(),
             commit: bk.commit.clone(),
-            m: bk.m,
         });
         assert!(batch_verify(blocks_with_errors.as_slice(), &powers)?);
 
