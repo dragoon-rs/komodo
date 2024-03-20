@@ -164,35 +164,49 @@ impl<T: Field> Matrix<T> {
         Ok(inverse)
     }
 
-    pub fn rank(&self) -> usize {
-        let mut matrix = self.clone();
+    fn swap_rows(&mut self, i: usize, j: usize) {
+        for k in 0..self.width {
+            self.elements.swap(i * self.width + k, j * self.width + k);
+        }
+    }
 
-        for i in 0..matrix.height.min(matrix.width) {
-            let pivot = matrix.get(i, i);
-            if pivot.is_zero() {
-                continue;
+    pub fn rank(&self) -> usize {
+        let mut mat = self.clone();
+        let mut i = 0;
+
+        for j in 0..self.width {
+            let mut found = false;
+            // look for the first non-zero pivot in the j-th column
+            for k in i..self.height {
+                if !mat.get(k, j).is_zero() {
+                    mat.swap_rows(i, k); // move the non-zero element to the diagonal
+                    found = true;
+                    break;
+                }
             }
 
-            matrix.divide_row_by(i, pivot);
-
-            for k in 0..matrix.height {
-                if k != i {
-                    let factor = matrix.get(k, i);
-                    matrix.multiply_row_by_and_add_to_row(i, -factor, k);
+            if found {
+                // update the bottom-right part of the matrix
+                for k in (i + 1)..self.height {
+                    let ratio = mat.get(k, j) / mat.get(i, j);
+                    for l in j..self.width {
+                        let el = mat.get(i, l);
+                        mat.set(k, l, mat.get(k, l) - ratio * el);
+                    }
                 }
+                i += 1;
             }
         }
 
-        matrix.height
-            - (0..matrix.height)
-                .map(|i| {
-                    let row =
-                        matrix.elements[(i * matrix.width)..((i + 1) * matrix.width)].to_vec();
-                    row.iter().all(|&x| x.is_zero())
-                })
-                .filter(|&r| r)
-                .collect::<Vec<_>>()
-                .len()
+        let nb_non_zero_rows = (0..self.height)
+            .filter(|i| {
+                let row = mat.elements[(i * self.width)..((i + 1) * self.width)].to_vec();
+                row.iter().any(|&x| !x.is_zero())
+            })
+            .collect::<Vec<_>>()
+            .len();
+
+        nb_non_zero_rows
     }
 
     pub(super) fn mul(&self, rhs: &Self) -> Result<Self, KomodoError> {
@@ -527,6 +541,11 @@ mod tests {
             assert_eq!(Matrix::<Fr>::identity(n).rank(), n);
         }
 
+        for _ in 0..20 {
+            let m = Matrix::<Fr>::random(7, 13);
+            assert_eq!(m.rank(), m.transpose().rank());
+        }
+
         let m = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
             vec![1, 0, 0],
             vec![0, 2, 0],
@@ -559,5 +578,21 @@ mod tests {
         ]))
         .unwrap();
         assert_eq!(m.rank(), 0);
+
+        let m = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+            vec![0, 0, 1, 0],
+            vec![1, 0, 0, 1],
+            vec![0, 1, 0, 1],
+            vec![0, 1, 1, 0],
+            vec![1, 0, 0, 0],
+        ]))
+        .unwrap();
+        let rank = m.rank();
+        assert!(
+            rank <= m.height.min(m.width),
+            "rank should be less than {}, got {}",
+            m.height.min(m.width),
+            rank
+        );
     }
 }

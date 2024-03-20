@@ -30,8 +30,5 @@ fn main() {
 
     let m = Matrix::from_vec_vec(elements).unwrap();
 
-    eprintln!("{}", m);
-    eprintln!("m: {}", m.height);
-    eprintln!("n: {}", m.width);
-    eprintln!("r: {}", m.rank());
+    println!("{}", m.rank());
 }
