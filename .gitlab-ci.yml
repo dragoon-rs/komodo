@@ -5,7 +5,7 @@ stages:
   - test
 
 variables:
-  RUSTUP_CHANNEL: "1.72.1"
+  RUSTUP_CHANNEL: "1.75"
   NUSHELL_ARCH: "x86_64-unknown-linux-musl"
   NUSHELL_VERSION: "0.89.0"
 
