@@ -5,7 +5,6 @@ stages:
   - test
 
 variables:
-  RUSTUP_CHANNEL: "1.75"
   NUSHELL_ARCH: "x86_64-unknown-linux-musl"
   NUSHELL_VERSION: "0.89.0"
 
@@ -21,10 +20,7 @@ workflow:
 fmt:
   stage: fmt
   before_script:
-    - rustup install "$RUSTUP_CHANNEL"
-    - rustup component add rustfmt --toolchain "$RUSTUP_CHANNEL"
-
-    - rustup default "$RUSTUP_CHANNEL"
+    - rustup component add rustfmt
 
   script:
     - cargo fmt --all -- --check
@@ -38,10 +34,7 @@ test:
     - apt upgrade --yes
     - apt install protobuf-compiler --yes
 
-    - rustup install "$RUSTUP_CHANNEL"
-    - rustup component add clippy --toolchain "$RUSTUP_CHANNEL"
-
-    - rustup default "$RUSTUP_CHANNEL"
+    - rustup component add clippy
 
     - rustup --version
     - rustup show --verbose
