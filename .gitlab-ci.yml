@@ -23,7 +23,7 @@ fmt:
     - rustup component add rustfmt
 
   script:
-    - cargo fmt --all -- --check
+    - make fmt
 
 test:
   stage: test
@@ -36,12 +36,6 @@ test:
 
     - rustup component add clippy
 
-    - rustup --version
-    - rustup show --verbose
-    - rustc --version
-    - cargo --version
-    - cargo clippy --version
-
     - export NUSHELL_BUILD="nu-$NUSHELL_VERSION-$NUSHELL_ARCH"
     - export PATH="/tmp/:$PATH"
 
@@ -50,12 +44,7 @@ test:
     - tar xvf /tmp/nu.tar.gz --directory /tmp
     - cp "/tmp/$NUSHELL_BUILD/nu" /tmp/nu
 
-    - nu --version
+    - make show
 
   script:
-    - cargo check --workspace --all-targets
-    - cargo clippy --workspace --all-targets -- -D warnings
-    - cargo test --workspace --verbose
-    - nu tests/cli.nu
-    - nu tests/binary.nu
-    - nu examples/cli.nu
+    - make check clippy test example
