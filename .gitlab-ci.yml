@@ -19,8 +19,6 @@ workflow:
 
 fmt:
   stage: fmt
-  before_script:
-    - rustup component add rustfmt
 
   script:
     - make fmt
@@ -33,8 +31,6 @@ test:
     - apt update --yes
     - apt upgrade --yes
     - apt install protobuf-compiler --yes
-
-    - rustup component add clippy
 
     - export NUSHELL_BUILD="nu-$NUSHELL_VERSION-$NUSHELL_ARCH"
     - export PATH="/tmp/:$PATH"
