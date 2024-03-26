@@ -47,10 +47,7 @@ impl<E: Pairing> Shard<E> {
     }
 }
 
-pub(super) fn combine<E: Pairing>(
-    shards: &[Shard<E>],
-    coeffs: &[E::ScalarField],
-) -> Option<Shard<E>> {
+pub fn combine<E: Pairing>(shards: &[Shard<E>], coeffs: &[E::ScalarField]) -> Option<Shard<E>> {
     if shards.len() != coeffs.len() {
         return None;
     }

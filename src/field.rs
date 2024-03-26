@@ -6,7 +6,7 @@ use ark_std::One;
 ///
 /// [`split_data_into_field_elements`] supports padding the output vector of
 /// elements by giving a number that needs to divide the length of the vector.
-pub(crate) fn split_data_into_field_elements<E: Pairing>(
+pub fn split_data_into_field_elements<E: Pairing>(
     bytes: &[u8],
     modulus: usize,
 ) -> Vec<E::ScalarField> {

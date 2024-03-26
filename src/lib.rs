@@ -11,7 +11,7 @@ use tracing::{debug, info};
 
 mod error;
 pub mod fec;
-mod field;
+pub mod field;
 pub mod linalg;
 pub mod setup;
 
