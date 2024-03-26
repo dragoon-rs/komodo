@@ -290,6 +290,48 @@ impl<T: Field> Matrix<T> {
 }
 
 impl<T: Field> std::fmt::Display for Matrix<T> {
+    /// an example matrix with the identity of order 3
+    /// ```text
+    /// /1 0 0\
+    /// |0 1 0|
+    /// \0 0 1/
+    /// ```
+    ///
+    /// - zero elements will show as "0" instead of a blank string
+    /// - elements that are bigger than the format size will be cropped, i.e.
+    ///     - by default, the format size is undefined an thus elements won't be cropped
+    ///     - if the format looks like `{:5}`, any element whose representation is bigger than 5
+    ///     characters will be cropped
+    /// - the default cropping is done with `...` but adding `#` to the format string will use `*`
+    /// instead
+    ///
+    /// a few examples of a matrix with some random elements that are too big to be shown in 5
+    /// characters
+    ///
+    /// - when the format is `{:5}`
+    /// ```text
+    /// /1     0     20... 0    \
+    /// |0     1     32... 0    |
+    /// |0     0     0     0    |
+    /// |0     0     0     11...|
+    /// \0     0     0     17.../
+    /// ```
+    /// - when the format is `{:#}` or `{:#1}`
+    /// ```text
+    /// /1 0 * 0\
+    /// |0 1 * 0|
+    /// |0 0 0 0|
+    /// |0 0 0 *|
+    /// \0 0 0 */
+    /// ```
+    /// - when the format is `{:#5}`
+    /// ```text
+    /// /1     0     *     0    \
+    /// |0     1     *     0    |
+    /// |0     0     0     0    |
+    /// |0     0     0     *    |
+    /// \0     0     0     *    /
+    /// ```
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for i in 0..self.height {
             let start = if i == 0 {
@@ -299,18 +341,42 @@ impl<T: Field> std::fmt::Display for Matrix<T> {
             } else {
                 "|"
             };
+            write!(f, "{}", start)?;
 
-            let row = self.elements[(i * self.width)..((i + 1) * self.width)]
-                .iter()
-                .map(|x| {
-                    if x.is_zero() {
-                        "0".to_string()
+            for j in 0..self.width {
+                let x = self.get(i, j);
+                let y = if x.is_zero() {
+                    "0".to_string()
+                } else {
+                    format!("{}", x)
+                };
+
+                if let Some(w) = f.width() {
+                    if y.len() > w {
+                        if f.alternate() {
+                            write!(f, "{:width$}", "*", width = w)?;
+                        } else {
+                            let t = if w > 3 { w - 3 } else { 0 };
+                            write!(
+                                f,
+                                "{:width$}",
+                                format!("{}{}", y.chars().take(t).collect::<String>(), "..."),
+                                width = w
+                            )?;
+                        }
                     } else {
-                        format!("{}", x)
+                        write!(f, "{:width$}", format!("{}", y), width = w)?;
                     }
-                })
-                .collect::<Vec<_>>()
-                .join(" ");
+                } else if f.alternate() && y.len() > 1 {
+                    write!(f, "*")?;
+                } else {
+                    write!(f, "{}", y)?;
+                }
+
+                if j < self.width - 1 {
+                    write!(f, " ")?;
+                }
+            }
 
             let end = if i == 0 {
                 "\\"
@@ -319,8 +385,7 @@ impl<T: Field> std::fmt::Display for Matrix<T> {
             } else {
                 "|"
             };
-
-            writeln!(f, "{}{}{}", start, row, end)?;
+            writeln!(f, "{}", end)?;
         }
 
         Ok(())
