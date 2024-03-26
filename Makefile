@@ -1,9 +1,12 @@
-.PHONY: fmt check clippy test example show
+.PHONY: fmt fmt-check check clippy test example show
 
-DEFAULT_GOAL: fmt check clippy test
+DEFAULT_GOAL: fmt-check check clippy test
+
+fmt-check:
+	cargo fmt --all -- --check
 
 fmt:
-	cargo fmt --all -- --check
+	cargo fmt --all
 
 check:
 	cargo check --workspace --all-targets
