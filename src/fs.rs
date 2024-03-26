@@ -1,3 +1,4 @@
+//! interact with the filesystem, read from and write to it
 use std::{
     fs::File,
     io::prelude::*,
@@ -16,11 +17,20 @@ use crate::Block;
 const COMPRESS: Compress = Compress::Yes;
 const VALIDATE: Validate = Validate::Yes;
 
+/// dump any serializable object to the disk
+///
+/// - `dumpable` can be anything that is _serializable_
+/// - if `filename` is provided, then it will be used as the filename as is
+/// - otherwise, the hash of the _dumpable_ will be computed and used as the
+///   filename
+///
+/// this function will return the name of the file the _dumpable_ has been
+/// dumped to.
 pub fn dump(
     dumpable: &impl CanonicalSerialize,
     dump_dir: &Path,
     filename: Option<&str>,
-) -> Result<PathBuf> {
+) -> Result<String> {
     info!("serializing the dumpable");
     let mut serialized = vec![0; dumpable.serialized_size(COMPRESS)];
     dumpable.serialize_with_mode(&mut serialized[..], COMPRESS)?;
@@ -34,33 +44,36 @@ pub fn dump(
             .join(""),
     };
 
-    let dump_path = dump_dir.join(filename);
+    let dump_path = dump_dir.join(&filename);
 
     info!("dumping dumpable into `{:?}`", dump_path);
     let mut file = File::create(&dump_path)?;
     file.write_all(&serialized)?;
 
-    Ok(dump_path)
+    Ok(filename)
 }
 
+/// dump a bunch of blocks to the disk and return a JSON / NUON compatible table
+/// of all the hashes that have been dumped
 pub fn dump_blocks<E: Pairing>(blocks: &[Block<E>], block_dir: &PathBuf) -> Result<String> {
     info!("dumping blocks to `{:?}`", block_dir);
     let mut hashes = vec![];
     std::fs::create_dir_all(block_dir)?;
     for block in blocks.iter() {
-        let filename = dump(block, block_dir, None)?;
-        hashes.push(filename);
+        let hash = dump(block, block_dir, None)?;
+        hashes.push(hash);
     }
 
     let mut formatted_output = String::from("[");
     for hash in &hashes {
-        formatted_output = format!("{}{:?},", formatted_output, hash);
+        formatted_output.push_str(&format!("{:?},", hash));
     }
-    formatted_output = format!("{}{}", formatted_output, "]");
+    formatted_output.push(']');
 
     Ok(formatted_output)
 }
 
+/// read blocks from a list of block hashes
 pub fn read_blocks<E: Pairing>(
     block_hashes: &[String],
     block_dir: &Path,

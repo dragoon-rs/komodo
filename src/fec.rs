@@ -1,3 +1,4 @@
+//! a module to encode, recode and decode shards of data with FEC methods
 use std::ops::{Add, Mul};
 
 use ark_ec::pairing::Pairing;
@@ -10,16 +11,24 @@ use crate::error::KomodoError;
 use crate::field;
 use crate::linalg::Matrix;
 
+/// representation of a FEC shard of data
+///
+/// - `k` is the code parameter, required to decode
+/// - the _linear combination_ tells the decoded how the shard was constructed,
+///   with respect to the original source shards => this effectively allows
+///   support for _recoding_
+/// - the hash and the size represent the original data
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Shard<E: Pairing> {
     pub k: u32,
     pub linear_combination: Vec<E::ScalarField>,
     pub hash: Vec<u8>,
-    pub bytes: Vec<E::ScalarField>,
+    pub data: Vec<E::ScalarField>,
     pub size: usize,
 }
 
 impl<E: Pairing> Shard<E> {
+    /// compute the linear combination between two [`Shard`]s
     pub fn combine(&self, alpha: E::ScalarField, other: &Self, beta: E::ScalarField) -> Self {
         if alpha.is_zero() {
             return other.clone();
@@ -36,10 +45,10 @@ impl<E: Pairing> Shard<E> {
                 .map(|(l, r)| l.mul(alpha) + r.mul(beta))
                 .collect(),
             hash: self.hash.clone(),
-            bytes: self
-                .bytes
+            data: self
+                .data
                 .iter()
-                .zip(other.bytes.iter())
+                .zip(other.data.iter())
                 .map(|(es, eo)| es.mul(alpha).add(eo.mul(beta)))
                 .collect::<Vec<_>>(),
             size: self.size,
@@ -47,6 +56,13 @@ impl<E: Pairing> Shard<E> {
     }
 }
 
+/// compute the linear combination between an arbitrary number of [`Shard`]s
+///
+/// > **Note**
+/// > this is basically a multi-[`Shard`] wrapper around [`Shard::combine`]
+/// >
+/// > returns [`None`] if number of shards is not the same as the number of
+/// > coefficients or if no shards are provided.
 pub fn combine<E: Pairing>(shards: &[Shard<E>], coeffs: &[E::ScalarField]) -> Option<Shard<E>> {
     if shards.len() != coeffs.len() {
         return None;
@@ -65,6 +81,11 @@ pub fn combine<E: Pairing>(shards: &[Shard<E>], coeffs: &[E::ScalarField]) -> Op
     Some(s)
 }
 
+/// applies a given encoding matrix to some data to generate encoded shards
+///
+/// > **Note**
+/// > the input data and the encoding matrix should have compatible shapes,
+/// > otherwise, an error might be thrown to the caller.
 pub fn encode<E: Pairing>(
     data: &[u8],
     encoding_mat: &Matrix<E::ScalarField>,
@@ -90,40 +111,47 @@ pub fn encode<E: Pairing>(
             k: k as u32,
             linear_combination: encoding_mat.get_col(j).unwrap(),
             hash: hash.clone(),
-            bytes: s.to_vec(),
+            data: s.to_vec(),
             size: data.len(),
         })
         .collect())
 }
 
-pub fn decode<E: Pairing>(blocks: Vec<Shard<E>>) -> Result<Vec<u8>, KomodoError> {
-    let k = blocks[0].k;
-    let np = blocks.len();
+/// reconstruct the original data from a set of encoded, possibly recoded,
+/// shards
+///
+/// > **Note**
+/// > this function might fail in a variety of cases
+/// > - if there are too few shards
+/// > - if there are linear dependencies between shards
+pub fn decode<E: Pairing>(shards: Vec<Shard<E>>) -> Result<Vec<u8>, KomodoError> {
+    let k = shards[0].k;
+    let np = shards.len();
 
     if np < k as usize {
         return Err(KomodoError::TooFewShards(np, k as usize));
     }
 
     let encoding_mat = Matrix::from_vec_vec(
-        blocks
+        shards
             .iter()
             .map(|b| b.linear_combination.clone())
             .collect(),
     )?
     .truncate(Some(np - k as usize), None);
 
-    let shards = Matrix::from_vec_vec(
-        blocks
+    let shard_mat = Matrix::from_vec_vec(
+        shards
             .iter()
             .take(k as usize)
-            .map(|b| b.bytes.clone())
+            .map(|b| b.data.clone())
             .collect(),
     )?;
 
-    let source_shards = encoding_mat.invert()?.mul(&shards)?.transpose().elements;
+    let source_shards = encoding_mat.invert()?.mul(&shard_mat)?.transpose().elements;
 
     let mut bytes = field::merge_elements_into_bytes::<E>(&source_shards);
-    bytes.resize(blocks[0].size, 0);
+    bytes.resize(shards[0].size, 0);
     Ok(bytes)
 }
 
@@ -150,7 +178,7 @@ mod tests {
         E::ScalarField::from_le_bytes_mod_order(&n.to_le_bytes())
     }
 
-    fn decoding_template<E: Pairing>(data: &[u8], k: usize, n: usize) {
+    fn end_to_end_template<E: Pairing>(data: &[u8], k: usize, n: usize) {
         let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", data.len(), k, n);
         assert_eq!(
             data,
@@ -159,19 +187,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn decoding() {
-        let bytes = bytes();
-        let (k, n) = (3, 5);
-
-        let modulus_byte_size = <Bls12_381 as Pairing>::ScalarField::MODULUS_BIT_SIZE as usize / 8;
-        // NOTE: starting at `modulus_byte_size * (k - 1) + 1` to include at least _k_ elements
-        for b in (modulus_byte_size * (k - 1) + 1)..bytes.len() {
-            decoding_template::<Bls12_381>(&bytes[..b], k, n);
-        }
-    }
-
-    fn decoding_with_recoding_template<E: Pairing>(data: &[u8], k: usize, n: usize) {
+    /// k should be at least 5
+    fn end_to_end_with_recoding_template<E: Pairing>(data: &[u8], k: usize, n: usize) {
         let mut shards = encode(data, &Matrix::random(k, n)).unwrap();
         shards[1] = shards[2].combine(to_curve::<E>(7), &shards[4], to_curve::<E>(6));
         shards[2] = shards[1].combine(to_curve::<E>(5), &shards[3], to_curve::<E>(4));
@@ -185,28 +202,42 @@ mod tests {
         );
     }
 
-    #[test]
-    fn decoding_with_recoding() {
+    // NOTE: this is part of an experiment, to be honest, to be able to see how
+    // much these tests could be refactored and simplified
+    fn run_template<E, F>(test: F)
+    where
+        E: Pairing,
+        F: Fn(&[u8], usize, usize),
+    {
         let bytes = bytes();
         let (k, n) = (3, 5);
 
-        let modulus_byte_size = <Bls12_381 as Pairing>::ScalarField::MODULUS_BIT_SIZE as usize / 8;
+        let modulus_byte_size = E::ScalarField::MODULUS_BIT_SIZE as usize / 8;
         // NOTE: starting at `modulus_byte_size * (k - 1) + 1` to include at least _k_ elements
         for b in (modulus_byte_size * (k - 1) + 1)..bytes.len() {
-            decoding_with_recoding_template::<Bls12_381>(&bytes[..b], k, n);
+            test(&bytes[..b], k, n);
         }
+    }
+
+    #[test]
+    fn end_to_end() {
+        run_template::<Bls12_381, _>(end_to_end_template::<Bls12_381>);
+    }
+
+    #[test]
+    fn end_to_end_with_recoding() {
+        run_template::<Bls12_381, _>(end_to_end_with_recoding_template::<Bls12_381>);
     }
 
     fn create_fake_shard<E: Pairing>(
         linear_combination: &[E::ScalarField],
         bytes: &[u8],
     ) -> Shard<E> {
-        let bytes = field::split_data_into_field_elements::<E>(bytes, 1);
         Shard {
             k: 2,
             linear_combination: linear_combination.to_vec(),
             hash: vec![],
-            bytes,
+            data: field::split_data_into_field_elements::<E>(bytes, 1),
             size: 0,
         }
     }

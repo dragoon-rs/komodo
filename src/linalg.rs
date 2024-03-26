@@ -1,9 +1,18 @@
+//! some linear algebra fun
+//!
+//! this module mainly contains an implementation of matrices over a finite
+//! field.
 use ark_ff::Field;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::Rng;
 
 use crate::error::KomodoError;
 
+/// a matrix defined over a finite field
+///
+/// internally, a matrix is just a vector of field elements that whose length is
+/// exactly the width times the height and where elements are organized row by
+/// row.
 #[derive(Clone, PartialEq, Default, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Matrix<T: Field> {
     pub elements: Vec<T>,
@@ -12,6 +21,18 @@ pub struct Matrix<T: Field> {
 }
 
 impl<T: Field> Matrix<T> {
+    /// build a matrix from a diagonal of elements
+    ///
+    /// # Example
+    /// building a diagonal matrix from the diagonal $[1, 2, 3, 4]$ will give
+    /// ```text
+    /// [
+    ///     [1, 0, 0, 0],
+    ///     [0, 2, 0, 0],
+    ///     [0, 0, 3, 0],
+    ///     [0, 0, 0, 4],
+    /// ]
+    /// ```
     fn from_diagonal(diagonal: Vec<T>) -> Self {
         let size = diagonal.len();
 
@@ -28,10 +49,44 @@ impl<T: Field> Matrix<T> {
         }
     }
 
+    /// build the identity matrix of a given size
+    ///
+    /// # Example
+    /// the identity of size 3 is
+    /// ```text
+    /// [
+    ///     [1, 0, 0],
+    ///     [0, 1, 0],
+    ///     [0, 0, 1],
+    /// ]
+    /// ```
     fn identity(size: usize) -> Self {
         Self::from_diagonal(vec![T::one(); size])
     }
 
+    /// build a Vandermonde matrix for some seed points
+    ///
+    /// actually, this is the tranpose of the Vandermonde matrix defined in the
+    /// [Wikipedia article][article], i.e. there are as many columns as there
+    /// are seed points and there are as many rows as there are powers of the
+    /// seed points.
+    ///
+    /// > **Note**
+    /// > the points need to be distinct.
+    /// > no runtime check will be performed to ensure that condition.
+    ///
+    /// # Example
+    /// a Vandermonde matrix of height 4 with seed points $[0, 1, 2, 3, 4]$ is
+    /// ```text
+    /// [
+    ///     [1, 1, 1,  1,  1],
+    ///     [0, 1, 2,  3,  4],
+    ///     [0, 1, 4,  9, 16],
+    ///     [0, 1, 8, 27, 64],
+    /// ]
+    /// ```
+    ///
+    /// [article]: https://en.wikipedia.org/wiki/Vandermonde_matrix
     pub fn vandermonde(points: &[T], height: usize) -> Self {
         let width = points.len();
 
@@ -53,24 +108,21 @@ impl<T: Field> Matrix<T> {
         }
     }
 
+    /// build a completely random matrix of shape $n \times m$
     pub fn random(n: usize, m: usize) -> Self {
         let mut rng = rand::thread_rng();
 
-        Matrix::from_vec_vec(
-            (0..n)
-                .map(|_| {
-                    (0..m)
-                        .map(|_| {
-                            let element: u128 = rng.gen();
-                            T::from(element)
-                        })
-                        .collect()
-                })
-                .collect::<Vec<Vec<T>>>(),
-        )
-        .unwrap()
+        Self {
+            elements: (0..(n * m)).map(|_| T::from(rng.gen::<u128>())).collect(),
+            height: n,
+            width: m,
+        }
     }
 
+    /// build a matrix from a "_matrix_" of elements
+    ///
+    /// > **Note**
+    /// > each row should have the same length
     pub fn from_vec_vec(matrix: Vec<Vec<T>>) -> Result<Self, KomodoError> {
         let height = matrix.len();
         let width = matrix[0].len();
@@ -109,6 +161,10 @@ impl<T: Field> Matrix<T> {
         self.elements[i * self.width + j] = value;
     }
 
+    /// extract a single column from the matrix
+    ///
+    /// > **Note**
+    /// > returns `None` if the provided index is out of bounds
     pub(super) fn get_col(&self, j: usize) -> Option<Vec<T>> {
         if j >= self.width {
             return None;
@@ -135,6 +191,12 @@ impl<T: Field> Matrix<T> {
         }
     }
 
+    /// compute the inverse of the matrix
+    ///
+    /// > **None**
+    /// > the matrix should be
+    /// > - square
+    /// > - invertible
     pub fn invert(&self) -> Result<Self, KomodoError> {
         if self.height != self.width {
             return Err(KomodoError::NonSquareMatrix(self.height, self.width));
@@ -164,12 +226,27 @@ impl<T: Field> Matrix<T> {
         Ok(inverse)
     }
 
+    /// swap rows `i` and `j`, inplace
+    ///
+    /// > **Note**
+    /// > this function assumes both `i` and `j` are in bounds, unexpected
+    /// > results are expected if `i` or `j` are out of bounds.
     fn swap_rows(&mut self, i: usize, j: usize) {
         for k in 0..self.width {
             self.elements.swap(i * self.width + k, j * self.width + k);
         }
     }
 
+    /// compute the rank of the matrix
+    ///
+    /// > **None**
+    /// > see the [_Wikipedia article_](https://en.wikipedia.org/wiki/Rank_(linear_algebra))
+    /// > for more information
+    /// >
+    /// > - the rank is always smaller than the min between the height and the
+    /// >   width of any matrix.
+    /// > - a square and invertible matrix will have _full rank_, i.e. it will
+    /// >   be equal to its size.
     pub fn rank(&self) -> usize {
         let mut mat = self.clone();
         let mut i = 0;
@@ -209,6 +286,14 @@ impl<T: Field> Matrix<T> {
         nb_non_zero_rows
     }
 
+    /// compute the matrix multiplication with another matrix
+    ///
+    /// if `mat` represents a matrix $A$ and `rhs` is the representation of
+    /// another matrix $B$, then `mat.mul(rhs)` will compute $A \times B$
+    ///
+    /// > **Note**
+    /// > both matrices should have compatible shapes, i.e. if `self` has shape
+    /// > `(n, m)` and `rhs` has shape `(p, q)`, then `m == p`.
     pub fn mul(&self, rhs: &Self) -> Result<Self, KomodoError> {
         if self.width != rhs.height {
             return Err(KomodoError::IncompatibleMatrixShapes(
@@ -239,6 +324,10 @@ impl<T: Field> Matrix<T> {
         })
     }
 
+    /// compute the transpose of the matrix
+    ///
+    /// > **Note**
+    /// > see the [_Wikipedia article_](https://en.wikipedia.org/wiki/Transpose)
     pub fn transpose(&self) -> Self {
         let height = self.width;
         let width = self.height;
@@ -259,6 +348,11 @@ impl<T: Field> Matrix<T> {
         }
     }
 
+    /// truncate the matrix to the provided shape, from right and bottom
+    ///
+    /// # Example
+    /// if a matrix has shape `(10, 11)` and is truncated to `(5, 7)`, the 5
+    /// bottom rows and 4 right columns will be removed.
     pub(super) fn truncate(&self, rows: Option<usize>, cols: Option<usize>) -> Self {
         let width = if let Some(w) = cols {
             self.width - w
@@ -399,6 +493,8 @@ mod tests {
 
     use super::{KomodoError, Matrix};
 
+    // two wrapped functions to make the tests more readable
+
     fn vec_to_elements<T: Field>(elements: Vec<u128>) -> Vec<T> {
         elements.iter().map(|&x| T::from(x)).collect()
     }
@@ -538,9 +634,9 @@ mod tests {
         let actual = Matrix::<Fr>::vandermonde(&mat_to_elements(vec![vec![0, 1, 2, 3, 4]])[0], 4);
         #[rustfmt::skip]
         let expected = Matrix::from_vec_vec(mat_to_elements(vec![
-            vec![1, 1, 1, 1, 1],
-            vec![0, 1, 2, 3, 4],
-            vec![0, 1, 4, 9, 16],
+            vec![1, 1, 1,  1,  1],
+            vec![0, 1, 2,  3,  4],
+            vec![0, 1, 4,  9, 16],
             vec![0, 1, 8, 27, 64],
         ]))
         .unwrap();

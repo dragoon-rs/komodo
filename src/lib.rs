@@ -1,3 +1,4 @@
+//! Komodo: Cryptographically-proven Erasure Coding
 use std::ops::Div;
 
 use ark_ec::pairing::Pairing;
@@ -19,6 +20,10 @@ use error::KomodoError;
 
 use crate::linalg::Matrix;
 
+/// representation of a block of proven data.
+///
+/// this is a wrapper around a [`fec::Shard`] with some additional cryptographic
+/// information that allows to prove the integrity of said shard.
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Block<E: Pairing> {
     pub shard: fec::Shard<E>,
@@ -41,7 +46,7 @@ impl<E: Pairing> std::fmt::Display for Block<E> {
         write!(f, "]")?;
         write!(f, ",")?;
         write!(f, "bytes: [")?;
-        for x in &self.shard.bytes {
+        for x in &self.shard.data {
             if x.is_zero() {
                 write!(f, "0,")?;
             } else {
@@ -74,6 +79,14 @@ impl<E: Pairing> std::fmt::Display for Block<E> {
     }
 }
 
+/// compute the commitments and randomnesses of a set of polynomials
+///
+/// this function uses the commit scheme of KZG.
+///
+/// > **Note**
+/// > - `powers` can be generated with functions like [`setup::random`]
+/// > - if `polynomials` has length `n`, then [`commit`] will generate `n`
+/// >   commits and `n` randomnesses.
 #[allow(clippy::type_complexity)]
 pub fn commit<E, P>(
     powers: &Powers<E>,
@@ -95,6 +108,11 @@ where
     Ok((commits, randomnesses))
 }
 
+/// compute encoded and proven blocks of data from some data and an encoding
+/// method
+///
+/// > **Note**
+/// > this is a wrapper around [`fec::encode`].
 pub fn encode<E, P>(
     bytes: &[u8],
     encoding_mat: &Matrix<E::ScalarField>,
@@ -139,6 +157,15 @@ where
         .collect::<Vec<_>>())
 }
 
+/// compute a recoded block from an arbitrary set of blocks
+///
+/// coefficients will be drawn at random, one for each block.
+///
+/// if the blocks appear to come from different data, e.g. if `k` is not the
+/// same or the hash of the data is different, an error will be returned.
+///
+/// > **Note**
+/// > this is a wrapper around [`fec::combine`].
 pub fn recode<E: Pairing>(blocks: &[Block<E>]) -> Result<Option<Block<E>>, KomodoError> {
     let mut rng = rand::thread_rng();
 
@@ -187,6 +214,7 @@ pub fn recode<E: Pairing>(blocks: &[Block<E>]) -> Result<Option<Block<E>>, Komod
     }))
 }
 
+/// verify that a single block of encoded and proven data is valid
 pub fn verify<E, P>(
     block: &Block<E>,
     verifier_key: &Powers<E>,
@@ -196,7 +224,7 @@ where
     P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
-    let elements = block.shard.bytes.clone();
+    let elements = block.shard.data.clone();
     let polynomial = P::from_coefficients_vec(elements);
     let (commit, _) = KZG10::<E, P>::commit(verifier_key, &polynomial, None, None)?;
 
@@ -210,24 +238,6 @@ where
     Ok(Into::<E::G1>::into(commit.0) == rhs)
 }
 
-pub fn batch_verify<E, P>(
-    blocks: &[Block<E>],
-    verifier_key: &Powers<E>,
-) -> Result<bool, ark_poly_commit::Error>
-where
-    E: Pairing,
-    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
-    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
-{
-    for block in blocks {
-        if !verify(block, verifier_key)? {
-            return Ok(false);
-        }
-    }
-
-    Ok(true)
-}
-
 #[cfg(test)]
 mod tests {
     use std::ops::{Div, Mul};
@@ -239,10 +249,10 @@ mod tests {
     use ark_poly_commit::kzg10::Commitment;
 
     use crate::{
-        batch_verify, encode,
+        encode,
         fec::{decode, Shard},
         linalg::Matrix,
-        recode, setup, verify, Block,
+        recode, setup, verify,
     };
 
     type UniPoly381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;
@@ -254,7 +264,6 @@ mod tests {
     fn verify_template<E, P>(
         bytes: &[u8],
         encoding_mat: &Matrix<E::ScalarField>,
-        batch: &[usize],
     ) -> Result<(), ark_poly_commit::Error>
     where
         E: Pairing,
@@ -268,61 +277,7 @@ mod tests {
             assert!(verify::<E, P>(block, &powers)?);
         }
 
-        assert!(batch_verify(
-            &blocks
-                .iter()
-                .enumerate()
-                .filter_map(|(i, b)| if batch.contains(&i) {
-                    Some(b.clone())
-                } else {
-                    None
-                })
-                .collect::<Vec<_>>(),
-            &powers
-        )?);
-
         Ok(())
-    }
-
-    #[test]
-    fn verification() {
-        type E = Bls12_381;
-        type P = UniPoly381;
-
-        let (k, n) = (4, 6);
-        let batch = [1, 2, 3];
-
-        let bytes = bytes();
-        let encoding_mat = Matrix::random(k, n);
-
-        let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
-
-        verify_template::<E, P>(&bytes, &encoding_mat, &batch)
-            .unwrap_or_else(|_| panic!("verification failed for bls12-381\n{test_case}"));
-        verify_template::<E, P>(&bytes[0..(bytes.len() - 10)], &encoding_mat, &batch)
-            .unwrap_or_else(|_| {
-                panic!("verification failed for bls12-381 with padding\n{test_case}")
-            });
-    }
-
-    #[ignore = "Semi-AVID-PR does not support large padding"]
-    #[test]
-    fn verification_with_large_padding() {
-        type E = Bls12_381;
-        type P = UniPoly381;
-
-        let (k, n) = (4, 6);
-        let batch = [1, 2, 3];
-
-        let bytes = bytes();
-        let encoding_mat = Matrix::random(k, n);
-
-        let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
-
-        verify_template::<E, P>(&bytes[0..(bytes.len() - 33)], &encoding_mat, &batch)
-            .unwrap_or_else(|_| {
-                panic!("verification failed for bls12-381 with padding\n{test_case}")
-            });
     }
 
     fn verify_with_errors_template<E, P>(
@@ -334,8 +289,6 @@ mod tests {
         P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
-        let k = encoding_mat.height;
-
         let powers = setup::random(bytes.len())?;
         let blocks = encode::<E, P>(bytes, encoding_mat, &powers)?;
 
@@ -352,40 +305,7 @@ mod tests {
 
         assert!(!verify::<E, P>(&corrupted_block, &powers)?);
 
-        // let's build some blocks containing errors
-        let mut blocks_with_errors = Vec::new();
-
-        let bk = blocks.get(k).unwrap();
-        blocks_with_errors.push(Block {
-            shard: bk.shard.clone(),
-            commit: bk.commit.clone(),
-        });
-        assert!(batch_verify(blocks_with_errors.as_slice(), &powers)?);
-
-        blocks_with_errors.push(corrupted_block);
-        assert!(!batch_verify(blocks_with_errors.as_slice(), &powers)?);
-
         Ok(())
-    }
-
-    #[test]
-    fn verification_with_errors() {
-        type E = Bls12_381;
-        type P = UniPoly381;
-
-        let (k, n) = (4, 6);
-
-        let bytes = bytes();
-        let encoding_mat = Matrix::random(k, n);
-
-        let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
-
-        verify_with_errors_template::<E, P>(&bytes, &encoding_mat)
-            .unwrap_or_else(|_| panic!("verification failed for bls12-381\n{test_case}"));
-        verify_with_errors_template::<E, P>(&bytes[0..(bytes.len() - 10)], &encoding_mat)
-            .unwrap_or_else(|_| {
-                panic!("verification failed for bls12-381 with padding\n{test_case}")
-            });
     }
 
     fn verify_recoding_template<E, P>(
@@ -414,26 +334,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn verify_recoding() {
-        type E = Bls12_381;
-        type P = UniPoly381;
-
-        let (k, n) = (4, 6);
-
-        let bytes = bytes();
-        let encoding_mat = Matrix::random(k, n);
-
-        let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
-
-        verify_recoding_template::<E, P>(&bytes, &encoding_mat)
-            .unwrap_or_else(|_| panic!("verification failed for bls12-381\n{test_case}"));
-        verify_recoding_template::<E, P>(&bytes[0..(bytes.len() - 10)], &encoding_mat)
-            .unwrap_or_else(|_| {
-                panic!("verification failed for bls12-381 with padding\n{test_case}")
-            });
-    }
-
     fn end_to_end_template<E, P>(
         bytes: &[u8],
         encoding_mat: &Matrix<E::ScalarField>,
@@ -454,33 +354,17 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn end_to_end() {
-        type E = Bls12_381;
-        type P = UniPoly381;
-
-        let (k, n) = (4, 6);
-
-        let bytes = bytes();
-        let encoding_mat = Matrix::random(k, n);
-
-        let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
-
-        end_to_end_template::<E, P>(&bytes, &encoding_mat)
-            .unwrap_or_else(|_| panic!("end to end failed for bls12-381\n{test_case}"));
-        end_to_end_template::<E, P>(&bytes[0..(bytes.len() - 10)], &encoding_mat).unwrap_or_else(
-            |_| panic!("end to end failed for bls12-381 with padding\n{test_case}"),
-        );
-    }
-
-    fn end_to_end_with_recoding_template<E, P>(bytes: &[u8]) -> Result<(), ark_poly_commit::Error>
+    fn end_to_end_with_recoding_template<E, P>(
+        bytes: &[u8],
+        encoding_mat: &Matrix<E::ScalarField>,
+    ) -> Result<(), ark_poly_commit::Error>
     where
         E: Pairing,
         P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
         let powers = setup::random(bytes.len())?;
-        let blocks = encode::<E, P>(bytes, &Matrix::random(3, 5), &powers)?;
+        let blocks = encode::<E, P>(bytes, encoding_mat, &powers)?;
 
         let b_0_1 = recode(&blocks[0..=1]).unwrap().unwrap();
         let shards = vec![
@@ -516,16 +400,55 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn end_to_end_with_recoding() {
-        type E = Bls12_381;
-        type P = UniPoly381;
+    // NOTE: this is part of an experiment, to be honest, to be able to see how
+    // much these tests could be refactored and simplified
+    fn run_template<E, T, P, F>(test: F)
+    where
+        E: Pairing,
+        T: Field,
+        F: Fn(&[u8], &Matrix<T>) -> Result<(), ark_poly_commit::Error>,
+        P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+        for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+    {
+        let (k, n) = (3, 6);
 
         let bytes = bytes();
+        let encoding_mat = Matrix::random(k, n);
 
-        let test_case = format!("TEST | data: {} bytes", bytes.len());
+        let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
 
-        end_to_end_with_recoding_template::<E, P>(&bytes)
-            .unwrap_or_else(|_| panic!("end to end failed for bls12-381\n{test_case}"));
+        test(&bytes, &encoding_mat)
+            .unwrap_or_else(|_| panic!("verification failed for bls12-381\n{test_case}"));
+    }
+
+    #[test]
+    fn verification() {
+        run_template::<Bls12_381, _, UniPoly381, _>(verify_template::<Bls12_381, UniPoly381>);
+    }
+
+    #[test]
+    fn verify_with_errors() {
+        run_template::<Bls12_381, _, UniPoly381, _>(
+            verify_with_errors_template::<Bls12_381, UniPoly381>,
+        );
+    }
+
+    #[test]
+    fn verify_recoding() {
+        run_template::<Bls12_381, _, UniPoly381, _>(
+            verify_recoding_template::<Bls12_381, UniPoly381>,
+        );
+    }
+
+    #[test]
+    fn end_to_end() {
+        run_template::<Bls12_381, _, UniPoly381, _>(end_to_end_template::<Bls12_381, UniPoly381>);
+    }
+
+    #[test]
+    fn end_to_end_with_recoding() {
+        run_template::<Bls12_381, _, UniPoly381, _>(
+            end_to_end_with_recoding_template::<Bls12_381, UniPoly381>,
+        );
     }
 }

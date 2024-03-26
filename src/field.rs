@@ -1,3 +1,4 @@
+//! manipulate finite field elements
 use ark_ec::pairing::Pairing;
 use ark_ff::{BigInteger, PrimeField};
 use ark_std::One;

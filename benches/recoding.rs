@@ -26,7 +26,7 @@ fn create_fake_shard<E: Pairing>(nb_bytes: usize, k: usize) -> Shard<E> {
         k: k as u32,
         linear_combination,
         hash: vec![],
-        bytes: field::split_data_into_field_elements::<E>(&bytes, 1),
+        data: field::split_data_into_field_elements::<E>(&bytes, 1),
         size: 0,
     }
 }
