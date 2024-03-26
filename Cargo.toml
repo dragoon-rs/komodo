@@ -26,3 +26,7 @@ criterion = "0.3"
 [[bench]]
 name = "recoding"
 harness = false
+
+[[bench]]
+name = "linalg"
+harness = false

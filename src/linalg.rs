@@ -135,7 +135,7 @@ impl<T: Field> Matrix<T> {
         }
     }
 
-    pub(super) fn invert(&self) -> Result<Self, KomodoError> {
+    pub fn invert(&self) -> Result<Self, KomodoError> {
         if self.height != self.width {
             return Err(KomodoError::NonSquareMatrix(self.height, self.width));
         }
@@ -209,7 +209,7 @@ impl<T: Field> Matrix<T> {
         nb_non_zero_rows
     }
 
-    pub(super) fn mul(&self, rhs: &Self) -> Result<Self, KomodoError> {
+    pub fn mul(&self, rhs: &Self) -> Result<Self, KomodoError> {
         if self.width != rhs.height {
             return Err(KomodoError::IncompatibleMatrixShapes(
                 self.height,
@@ -239,7 +239,7 @@ impl<T: Field> Matrix<T> {
         })
     }
 
-    pub(super) fn transpose(&self) -> Self {
+    pub fn transpose(&self) -> Self {
         let height = self.width;
         let width = self.height;
 
