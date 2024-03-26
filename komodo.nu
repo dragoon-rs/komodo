@@ -141,6 +141,26 @@ export def "komodo prove" [
     --encoding-method: string@"nu-complete encoding-methods" = "random", # the encoding method, e.g. _random_ or _vandermonde_
     --log-level: string@"nu-complete log-levels" = $DEFAULT_LOG_LEVEL # change the log level
 ]: nothing -> list<string> {
+    # NOTE: the next two runtime checks on the type of `--fec-params` might be
+    # a bug on the Nushell side
+    if $fec_params == null {
+        error make --unspanned {
+            msg: "`komodo prove` requires `--fec-params` to be given"
+        }
+    }
+
+    let type = $fec_params | describe --detailed | update columns { sort }
+    let expected = { type: record, lazy: false, columns: { k: int, n: int } }
+    if $type != $expected {
+        error make {
+            msg: $"(ansi red_bold)invalid `--fec-params`(ansi reset)",
+            label: {
+                text: $"expected ($expected) got ($type)",
+                span: (metadata $fec_params).span,
+            }
+        }
+    }
+
     (
         run-komodo
             --log-level $log_level
