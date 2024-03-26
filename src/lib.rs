@@ -4,14 +4,14 @@ use ark_ec::pairing::Pairing;
 use ark_poly::DenseUVPolynomial;
 use ark_poly_commit::kzg10::{Commitment, Powers, Randomness, KZG10};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::UniformRand;
-use ark_std::Zero;
+use ark_std::{UniformRand, Zero};
 use fec::combine;
 use tracing::{debug, info};
 
 mod error;
 pub mod fec;
 pub mod field;
+pub mod fs;
 pub mod linalg;
 pub mod setup;
 

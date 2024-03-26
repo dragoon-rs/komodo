@@ -1,8 +1,8 @@
-use std::io::prelude::*;
 use std::ops::Div;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::exit;
-use std::{fs::File, path::PathBuf};
+
+use anyhow::Result;
 
 use ark_bls12_381::Bls12_381;
 use ark_ec::pairing::Pairing;
@@ -10,14 +10,13 @@ use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::DenseUVPolynomial;
 use ark_poly_commit::kzg10::Powers;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
-use rs_merkle::algorithms::Sha256;
-use rs_merkle::Hasher;
-use tracing::{debug, info, warn};
+use ark_serialize::{CanonicalDeserialize, Compress, Validate};
+use tracing::{info, warn};
 
 use komodo::{
     encode,
     fec::{decode, Shard},
+    fs,
     linalg::Matrix,
     recode, setup, verify, Block,
 };
@@ -119,108 +118,43 @@ fn throw_error(code: i32, message: &str) {
     exit(code);
 }
 
-fn generate_powers(n: usize, powers_file: &PathBuf) -> Result<(), std::io::Error> {
-    info!("generating new powers");
-    let powers = setup::random::<Bls12_381, UniPoly12_381>(n).unwrap_or_else(|_| {
-        throw_error(3, "could not generate random trusted setup");
-        unreachable!()
-    });
-
-    info!("serializing powers");
-    let mut serialized = vec![0; powers.serialized_size(COMPRESS)];
-    powers
-        .serialize_with_mode(&mut serialized[..], COMPRESS)
-        .unwrap_or_else(|_| throw_error(3, "could not serialize trusted setup"));
-
-    info!("dumping powers into `{:?}`", powers_file);
-    let mut file = File::create(powers_file)?;
-    file.write_all(&serialized)?;
-
-    Ok(())
-}
-
-fn read_block<E: Pairing>(block_hashes: &[String], block_dir: &Path) -> Vec<(String, Block<E>)> {
-    block_hashes
-        .iter()
-        .map(|f| {
-            let filename = block_dir.join(f);
-            let s = std::fs::read(filename).unwrap_or_else(|_| {
-                throw_error(2, &format!("could not read block {}", f));
-                unreachable!()
-            });
-            (
-                f.clone(),
-                Block::<E>::deserialize_with_mode(&s[..], COMPRESS, VALIDATE).unwrap_or_else(
-                    |_| {
-                        throw_error(2, &format!("could not deserialize block {}", f));
-                        unreachable!()
-                    },
-                ),
-            )
-        })
-        .collect::<Vec<_>>()
-}
-
-fn verify_blocks<E, P>(blocks: &[(String, Block<E>)], powers: Powers<E>)
+pub fn generate_random_powers<E, P>(
+    n: usize,
+    powers_dir: &Path,
+    powers_filename: Option<&str>,
+) -> Result<()>
 where
     E: Pairing,
     P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
-    let res: Vec<_> = blocks
+    info!("generating new powers");
+    let powers = setup::random::<E, P>(n)?;
+
+    fs::dump(&powers, powers_dir, powers_filename)?;
+
+    Ok(())
+}
+
+pub fn verify_blocks<E, P>(
+    blocks: &[(String, Block<E>)],
+    powers: Powers<E>,
+) -> Result<(), ark_poly_commit::Error>
+where
+    E: Pairing,
+    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    let res = blocks
         .iter()
-        .map(|(f, b)| {
-            (
-                f,
-                verify::<E, P>(b, &powers).unwrap_or_else(|_| {
-                    throw_error(
-                        4,
-                        &format!("verification failed unexpectedly for block {}", f),
-                    );
-                    unreachable!()
-                }),
-            )
-        })
-        .collect();
+        .map(|(f, b)| Ok((f, verify::<E, P>(b, &powers)?)))
+        .collect::<Result<Vec<(&String, bool)>, ark_poly_commit::Error>>()?;
 
     eprint!("[");
     for (f, v) in res {
         eprint!("{{block: {:?}, status: {}}}", f, v);
     }
     eprint!("]");
-}
-
-fn dump_blocks<E: Pairing>(blocks: &[Block<E>], block_dir: &PathBuf) -> Result<(), std::io::Error> {
-    info!("dumping blocks to `{:?}`", block_dir);
-    let mut hashes = vec![];
-    for (i, block) in blocks.iter().enumerate() {
-        debug!("serializing block {}", i);
-        let mut serialized = vec![0; block.serialized_size(COMPRESS)];
-        block
-            .serialize_with_mode(&mut serialized[..], COMPRESS)
-            .unwrap_or_else(|_| throw_error(5, &format!("could not serialize block {}", i)));
-        let repr = Sha256::hash(&serialized)
-            .iter()
-            .map(|x| format!("{:x}", x))
-            .collect::<Vec<_>>()
-            .join("");
-
-        let filename = block_dir.join(&repr);
-        std::fs::create_dir_all(block_dir)?;
-
-        debug!("dumping serialized block to `{:?}`", filename);
-        let mut file = File::create(&filename)?;
-        file.write_all(&serialized)?;
-
-        hashes.push(repr);
-    }
-
-    eprint!("[");
-    for hash in &hashes {
-        eprint!("{:?},", hash);
-    }
-    eprint!("]");
-
     Ok(())
 }
 
@@ -244,17 +178,27 @@ fn main() {
 
     let home_dir = PathBuf::from(&home_dir);
     let block_dir = home_dir.join("blocks/");
-    let powers_file = home_dir.join("powers");
+    let powers_dir = home_dir;
+    let powers_filename = "powers";
+    let powers_file = powers_dir.join(powers_filename);
 
     if do_generate_powers {
-        generate_powers(nb_bytes, &powers_file)
-            .unwrap_or_else(|e| throw_error(1, &format!("could not generate powers: {}", e)));
+        generate_random_powers::<Bls12_381, UniPoly12_381>(
+            nb_bytes,
+            &powers_dir,
+            Some(powers_filename),
+        )
+        .unwrap_or_else(|e| throw_error(1, &format!("could not generate powers: {}", e)));
 
         exit(0);
     }
 
     if do_reconstruct_data {
-        let blocks: Vec<Shard<Bls12_381>> = read_block::<Bls12_381>(&block_hashes, &block_dir)
+        let blocks: Vec<Shard<Bls12_381>> = fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir)
+            .unwrap_or_else(|e| {
+                throw_error(1, &format!("could not read blocks: {}", e));
+                unreachable!()
+            })
             .iter()
             .cloned()
             .map(|b| b.1.shard)
@@ -271,9 +215,12 @@ fn main() {
     }
 
     if do_combine_blocks {
-        let blocks = read_block::<Bls12_381>(&block_hashes, &block_dir);
+        let blocks = fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir).unwrap_or_else(|e| {
+            throw_error(1, &format!("could not read blocks: {}", e));
+            unreachable!()
+        });
 
-        dump_blocks(
+        let formatted_output = fs::dump_blocks(
             &[
                 recode(&blocks.iter().map(|(_, b)| b).cloned().collect::<Vec<_>>())
                     .unwrap_or_else(|e| {
@@ -287,13 +234,21 @@ fn main() {
             ],
             &block_dir,
         )
-        .unwrap_or_else(|e| throw_error(1, &format!("could not dump block: {}", e)));
+        .unwrap_or_else(|e| {
+            throw_error(1, &format!("could not dump block: {}", e));
+            unreachable!()
+        });
+
+        eprint!("{}", formatted_output);
 
         exit(0);
     }
 
     if do_inspect_blocks {
-        let blocks = read_block::<Bls12_381>(&block_hashes, &block_dir);
+        let blocks = fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir).unwrap_or_else(|e| {
+            throw_error(1, &format!("could not read blocks: {}", e));
+            unreachable!()
+        });
         eprint!("[");
         for (_, block) in &blocks {
             eprint!("{},", block);
@@ -325,9 +280,16 @@ fn main() {
 
     if do_verify_blocks {
         verify_blocks::<Bls12_381, UniPoly12_381>(
-            &read_block::<Bls12_381>(&block_hashes, &block_dir),
+            &fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir).unwrap_or_else(|e| {
+                throw_error(1, &format!("could not read blocks: {}", e));
+                unreachable!()
+            }),
             powers,
-        );
+        )
+        .unwrap_or_else(|e| {
+            throw_error(1, &format!("Failed to verify blocks: {}", e));
+            unreachable!()
+        });
 
         exit(0);
     }
@@ -348,12 +310,17 @@ fn main() {
         }
     };
 
-    dump_blocks(
+    let formatted_output = fs::dump_blocks(
         &encode::<Bls12_381, UniPoly12_381>(&bytes, &encoding_mat, &powers).unwrap_or_else(|e| {
             throw_error(1, &format!("could not encode: {}", e));
             unreachable!()
         }),
         &block_dir,
     )
-    .unwrap_or_else(|e| throw_error(1, &format!("could not dump blocks: {}", e)));
+    .unwrap_or_else(|e| {
+        throw_error(1, &format!("could not dump blocks: {}", e));
+        unreachable!()
+    });
+
+    eprint!("{}", formatted_output);
 }
