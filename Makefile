@@ -28,3 +28,4 @@ show:
 	rustc --version
 	cargo --version
 	cargo clippy --version
+	nu --version
