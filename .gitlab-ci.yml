@@ -21,7 +21,7 @@ fmt:
   stage: fmt
 
   script:
-    - make fmt
+    - make fmt-check
 
 test:
   stage: test
