@@ -31,3 +31,7 @@ harness = false
 [[bench]]
 name = "linalg"
 harness = false
+
+[[bench]]
+name = "setup"
+harness = false
