@@ -14,9 +14,6 @@ use tracing::info;
 
 use crate::Block;
 
-const COMPRESS: Compress = Compress::Yes;
-const VALIDATE: Validate = Validate::Yes;
-
 /// dump any serializable object to the disk
 ///
 /// - `dumpable` can be anything that is _serializable_
@@ -30,10 +27,11 @@ pub fn dump(
     dumpable: &impl CanonicalSerialize,
     dump_dir: &Path,
     filename: Option<&str>,
+    compress: Compress,
 ) -> Result<String> {
     info!("serializing the dumpable");
-    let mut serialized = vec![0; dumpable.serialized_size(COMPRESS)];
-    dumpable.serialize_with_mode(&mut serialized[..], COMPRESS)?;
+    let mut serialized = vec![0; dumpable.serialized_size(compress)];
+    dumpable.serialize_with_mode(&mut serialized[..], compress)?;
 
     let filename = match filename {
         Some(filename) => filename.to_string(),
@@ -55,12 +53,16 @@ pub fn dump(
 
 /// dump a bunch of blocks to the disk and return a JSON / NUON compatible table
 /// of all the hashes that have been dumped
-pub fn dump_blocks<E: Pairing>(blocks: &[Block<E>], block_dir: &PathBuf) -> Result<String> {
+pub fn dump_blocks<E: Pairing>(
+    blocks: &[Block<E>],
+    block_dir: &PathBuf,
+    compress: Compress,
+) -> Result<String> {
     info!("dumping blocks to `{:?}`", block_dir);
     let mut hashes = vec![];
     std::fs::create_dir_all(block_dir)?;
     for block in blocks.iter() {
-        let hash = dump(block, block_dir, None)?;
+        let hash = dump(block, block_dir, None, compress)?;
         hashes.push(hash);
     }
 
@@ -77,6 +79,8 @@ pub fn dump_blocks<E: Pairing>(blocks: &[Block<E>], block_dir: &PathBuf) -> Resu
 pub fn read_blocks<E: Pairing>(
     block_hashes: &[String],
     block_dir: &Path,
+    compress: Compress,
+    validate: Validate,
 ) -> Result<Vec<(String, Block<E>)>> {
     block_hashes
         .iter()
@@ -85,7 +89,7 @@ pub fn read_blocks<E: Pairing>(
             let s = std::fs::read(filename)?;
             Ok((
                 f.clone(),
-                Block::<E>::deserialize_with_mode(&s[..], COMPRESS, VALIDATE)?,
+                Block::<E>::deserialize_with_mode(&s[..], compress, validate)?,
             ))
         })
         .collect()

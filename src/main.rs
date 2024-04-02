@@ -131,7 +131,7 @@ where
     info!("generating new powers");
     let powers = setup::random::<E, P>(n)?;
 
-    fs::dump(&powers, powers_dir, powers_filename)?;
+    fs::dump(&powers, powers_dir, powers_filename, COMPRESS)?;
 
     Ok(())
 }
@@ -194,15 +194,16 @@ fn main() {
     }
 
     if do_reconstruct_data {
-        let blocks: Vec<Shard<Bls12_381>> = fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir)
-            .unwrap_or_else(|e| {
-                throw_error(1, &format!("could not read blocks: {}", e));
-                unreachable!()
-            })
-            .iter()
-            .cloned()
-            .map(|b| b.1.shard)
-            .collect();
+        let blocks: Vec<Shard<Bls12_381>> =
+            fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir, COMPRESS, VALIDATE)
+                .unwrap_or_else(|e| {
+                    throw_error(1, &format!("could not read blocks: {}", e));
+                    unreachable!()
+                })
+                .iter()
+                .cloned()
+                .map(|b| b.1.shard)
+                .collect();
         eprintln!(
             "{:?}",
             decode::<Bls12_381>(blocks).unwrap_or_else(|e| {
@@ -215,10 +216,11 @@ fn main() {
     }
 
     if do_combine_blocks {
-        let blocks = fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir).unwrap_or_else(|e| {
-            throw_error(1, &format!("could not read blocks: {}", e));
-            unreachable!()
-        });
+        let blocks = fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir, COMPRESS, VALIDATE)
+            .unwrap_or_else(|e| {
+                throw_error(1, &format!("could not read blocks: {}", e));
+                unreachable!()
+            });
 
         let formatted_output = fs::dump_blocks(
             &[
@@ -233,6 +235,7 @@ fn main() {
                     }),
             ],
             &block_dir,
+            COMPRESS,
         )
         .unwrap_or_else(|e| {
             throw_error(1, &format!("could not dump block: {}", e));
@@ -245,10 +248,11 @@ fn main() {
     }
 
     if do_inspect_blocks {
-        let blocks = fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir).unwrap_or_else(|e| {
-            throw_error(1, &format!("could not read blocks: {}", e));
-            unreachable!()
-        });
+        let blocks = fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir, COMPRESS, VALIDATE)
+            .unwrap_or_else(|e| {
+                throw_error(1, &format!("could not read blocks: {}", e));
+                unreachable!()
+            });
         eprint!("[");
         for (_, block) in &blocks {
             eprint!("{},", block);
@@ -280,10 +284,11 @@ fn main() {
 
     if do_verify_blocks {
         verify_blocks::<Bls12_381, UniPoly12_381>(
-            &fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir).unwrap_or_else(|e| {
-                throw_error(1, &format!("could not read blocks: {}", e));
-                unreachable!()
-            }),
+            &fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir, COMPRESS, VALIDATE)
+                .unwrap_or_else(|e| {
+                    throw_error(1, &format!("could not read blocks: {}", e));
+                    unreachable!()
+                }),
             powers,
         )
         .unwrap_or_else(|e| {
@@ -316,6 +321,7 @@ fn main() {
             unreachable!()
         }),
         &block_dir,
+        COMPRESS,
     )
     .unwrap_or_else(|e| {
         throw_error(1, &format!("could not dump blocks: {}", e));
