@@ -7,7 +7,8 @@ use std::{
 
 use anyhow::Result;
 
-use ark_ec::pairing::Pairing;
+use ark_ec::CurveGroup;
+use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use rs_merkle::{algorithms::Sha256, Hasher};
 use tracing::info;
@@ -53,8 +54,8 @@ pub fn dump(
 
 /// dump a bunch of blocks to the disk and return a JSON / NUON compatible table
 /// of all the hashes that have been dumped
-pub fn dump_blocks<E: Pairing>(
-    blocks: &[Block<E>],
+pub fn dump_blocks<F: PrimeField, G: CurveGroup<ScalarField = F>>(
+    blocks: &[Block<F, G>],
     block_dir: &PathBuf,
     compress: Compress,
 ) -> Result<String> {
@@ -76,12 +77,12 @@ pub fn dump_blocks<E: Pairing>(
 }
 
 /// read blocks from a list of block hashes
-pub fn read_blocks<E: Pairing>(
+pub fn read_blocks<F: PrimeField, G: CurveGroup<ScalarField = F>>(
     block_hashes: &[String],
     block_dir: &Path,
     compress: Compress,
     validate: Validate,
-) -> Result<Vec<(String, Block<E>)>> {
+) -> Result<Vec<(String, Block<F, G>)>> {
     block_hashes
         .iter()
         .map(|f| {
@@ -89,7 +90,7 @@ pub fn read_blocks<E: Pairing>(
             let s = std::fs::read(filename)?;
             Ok((
                 f.clone(),
-                Block::<E>::deserialize_with_mode(&s[..], compress, validate)?,
+                Block::<F, G>::deserialize_with_mode(&s[..], compress, validate)?,
             ))
         })
         .collect()

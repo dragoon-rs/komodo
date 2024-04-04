@@ -1,21 +1,27 @@
 use std::ops::Div;
 
-use ark_bls12_381::Bls12_381;
-use ark_ec::pairing::Pairing;
+use ark_bls12_381::{Fr, G1Projective};
+use ark_ec::CurveGroup;
+use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::DenseUVPolynomial;
 
 use ark_serialize::{CanonicalSerialize, Compress, Validate};
+use ark_std::test_rng;
+use komodo::zk;
 
-type UniPoly12_381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;
+type UniPoly12_381 = DensePolynomial<Fr>;
 
-fn setup_template<E, P>(nb_bytes: usize)
+fn setup_template<F, G, P>(nb_bytes: usize)
 where
-    E: Pairing,
-    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    F: PrimeField,
+    G: CurveGroup<ScalarField = F>,
+    P: DenseUVPolynomial<F, Point = F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
-    let setup = komodo::setup::random::<E, P>(nb_bytes).unwrap();
+    let rng = &mut test_rng();
+
+    let setup = zk::setup::<_, F, G>(nb_bytes, rng).unwrap();
 
     for (compress, validate) in [
         (Compress::Yes, Validate::Yes),
@@ -39,7 +45,7 @@ where
                 Validate::No => "no validation",
             },
             nb_bytes,
-            std::any::type_name::<E>(),
+            std::any::type_name::<F>(),
             serialized.len(),
         );
     }
@@ -47,6 +53,6 @@ where
 
 fn main() {
     for n in [1, 2, 4, 8, 16] {
-        setup_template::<Bls12_381, UniPoly12_381>(n * 1024);
+        setup_template::<Fr, G1Projective, UniPoly12_381>(n * 1024);
     }
 }

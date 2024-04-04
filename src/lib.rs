@@ -1,36 +1,37 @@
 //! Komodo: Cryptographically-proven Erasure Coding
 use std::ops::Div;
 
-use ark_ec::pairing::Pairing;
+use ark_ec::CurveGroup;
+use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
-use ark_poly_commit::kzg10::{Commitment, Powers, Randomness, KZG10};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{UniformRand, Zero};
-use fec::combine;
 use tracing::{debug, info};
 
-mod error;
+pub mod error;
 pub mod fec;
 pub mod field;
 pub mod fs;
 pub mod linalg;
-pub mod setup;
+pub mod zk;
 
-use error::KomodoError;
-
-use crate::linalg::Matrix;
+use crate::{
+    error::KomodoError,
+    fec::combine,
+    linalg::Matrix,
+    zk::{Commitment, Powers},
+};
 
 /// representation of a block of proven data.
 ///
 /// this is a wrapper around a [`fec::Shard`] with some additional cryptographic
 /// information that allows to prove the integrity of said shard.
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
-pub struct Block<E: Pairing> {
-    pub shard: fec::Shard<E>,
-    pub commit: Vec<Commitment<E>>,
+pub struct Block<F: PrimeField, G: CurveGroup<ScalarField = F>> {
+    pub shard: fec::Shard<F>,
+    pub commit: Vec<Commitment<F, G>>,
 }
 
-impl<E: Pairing> std::fmt::Display for Block<E> {
+impl<F: PrimeField, G: CurveGroup<ScalarField = F>> std::fmt::Display for Block<F, G> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{{")?;
         write!(f, "shard: {{")?;
@@ -79,33 +80,32 @@ impl<E: Pairing> std::fmt::Display for Block<E> {
     }
 }
 
-/// compute the commitments and randomnesses of a set of polynomials
+/// compute the commitments of a set of polynomials
 ///
 /// this function uses the commit scheme of KZG.
 ///
 /// > **Note**
-/// > - `powers` can be generated with functions like [`setup::random`]
+/// > - `powers` can be generated with functions like [`setup::setup`]
 /// > - if `polynomials` has length `n`, then [`commit`] will generate `n`
-/// >   commits and `n` randomnesses.
+/// >   commits.
 #[allow(clippy::type_complexity)]
-pub fn commit<E, P>(
-    powers: &Powers<E>,
+pub fn commit<F, G, P>(
+    powers: &Powers<F, G>,
     polynomials: &[P],
-) -> Result<(Vec<Commitment<E>>, Vec<Randomness<E::ScalarField, P>>), ark_poly_commit::Error>
+) -> Result<Vec<Commitment<F, G>>, KomodoError>
 where
-    E: Pairing,
-    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    F: PrimeField,
+    G: CurveGroup<ScalarField = F>,
+    P: DenseUVPolynomial<F, Point = F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     let mut commits = Vec::new();
-    let mut randomnesses = Vec::new();
     for polynomial in polynomials {
-        let (commit, randomness) = KZG10::<E, P>::commit(powers, polynomial, None, None)?;
+        let commit = zk::commit(powers, polynomial)?;
         commits.push(commit);
-        randomnesses.push(randomness);
     }
 
-    Ok((commits, randomnesses))
+    Ok(commits)
 }
 
 /// compute encoded and proven blocks of data from some data and an encoding
@@ -113,14 +113,15 @@ where
 ///
 /// > **Note**
 /// > this is a wrapper around [`fec::encode`].
-pub fn encode<E, P>(
+pub fn encode<F, G, P>(
     bytes: &[u8],
-    encoding_mat: &Matrix<E::ScalarField>,
-    powers: &Powers<E>,
-) -> Result<Vec<Block<E>>, ark_poly_commit::Error>
+    encoding_mat: &Matrix<F>,
+    powers: &Powers<F, G>,
+) -> Result<Vec<Block<F, G>>, KomodoError>
 where
-    E: Pairing,
-    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    F: PrimeField,
+    G: CurveGroup<ScalarField = F>,
+    P: DenseUVPolynomial<F, Point = F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     info!("encoding and proving {} bytes", bytes.len());
@@ -128,7 +129,7 @@ where
     let k = encoding_mat.height;
 
     debug!("splitting bytes into polynomials");
-    let elements = field::split_data_into_field_elements::<E>(bytes, k);
+    let elements = field::split_data_into_field_elements::<F>(bytes, k);
     let polynomials = elements
         .chunks(k)
         .map(|c| P::from_coefficients_vec(c.to_vec()))
@@ -145,7 +146,7 @@ where
         .collect::<Vec<P>>();
 
     debug!("committing the polynomials");
-    let (commits, _) = commit(powers, &polynomials_to_commit)?;
+    let commits = commit(powers, &polynomials_to_commit)?;
 
     Ok(fec::encode(bytes, encoding_mat)
         .unwrap() // TODO: don't unwrap here
@@ -166,13 +167,12 @@ where
 ///
 /// > **Note**
 /// > this is a wrapper around [`fec::combine`].
-pub fn recode<E: Pairing>(blocks: &[Block<E>]) -> Result<Option<Block<E>>, KomodoError> {
+pub fn recode<F: PrimeField, G: CurveGroup<ScalarField = F>>(
+    blocks: &[Block<F, G>],
+) -> Result<Option<Block<F, G>>, KomodoError> {
     let mut rng = rand::thread_rng();
 
-    let coeffs = blocks
-        .iter()
-        .map(|_| E::ScalarField::rand(&mut rng))
-        .collect::<Vec<_>>();
+    let coeffs = blocks.iter().map(|_| F::rand(&mut rng)).collect::<Vec<_>>();
 
     for (i, (b1, b2)) in blocks.iter().zip(blocks.iter().skip(1)).enumerate() {
         if b1.shard.k != b2.shard.k {
@@ -215,116 +215,125 @@ pub fn recode<E: Pairing>(blocks: &[Block<E>]) -> Result<Option<Block<E>>, Komod
 }
 
 /// verify that a single block of encoded and proven data is valid
-pub fn verify<E, P>(
-    block: &Block<E>,
-    verifier_key: &Powers<E>,
-) -> Result<bool, ark_poly_commit::Error>
+pub fn verify<F, G, P>(
+    block: &Block<F, G>,
+    verifier_key: &Powers<F, G>,
+) -> Result<bool, KomodoError>
 where
-    E: Pairing,
-    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    F: PrimeField,
+    G: CurveGroup<ScalarField = F>,
+    P: DenseUVPolynomial<F, Point = F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     let elements = block.shard.data.clone();
     let polynomial = P::from_coefficients_vec(elements);
-    let (commit, _) = KZG10::<E, P>::commit(verifier_key, &polynomial, None, None)?;
+    let commit = zk::commit(verifier_key, &polynomial)?;
 
     let rhs = block
         .shard
         .linear_combination
         .iter()
         .enumerate()
-        .map(|(i, w)| Into::<E::G1>::into(block.commit[i].0) * w)
+        .map(|(i, w)| Into::<G>::into(block.commit[i].0) * w)
         .sum();
-    Ok(Into::<E::G1>::into(commit.0) == rhs)
+    Ok(Into::<G>::into(commit.0) == rhs)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::ops::{Div, Mul};
+    use std::ops::Div;
 
-    use ark_bls12_381::Bls12_381;
-    use ark_ec::pairing::Pairing;
+    use ark_bls12_381::{Fr, G1Projective};
+    use ark_ec::CurveGroup;
     use ark_ff::{Field, PrimeField};
     use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
-    use ark_poly_commit::kzg10::Commitment;
+    use ark_std::test_rng;
 
     use crate::{
         encode,
+        error::KomodoError,
         fec::{decode, Shard},
         linalg::Matrix,
-        recode, setup, verify,
+        recode, verify,
+        zk::{setup, Commitment},
     };
 
-    type UniPoly381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;
+    type UniPoly381 = DensePolynomial<Fr>;
 
     fn bytes() -> Vec<u8> {
         include_bytes!("../tests/dragoon_133x133.png").to_vec()
     }
 
-    fn verify_template<E, P>(
-        bytes: &[u8],
-        encoding_mat: &Matrix<E::ScalarField>,
-    ) -> Result<(), ark_poly_commit::Error>
+    fn verify_template<F, G, P>(bytes: &[u8], encoding_mat: &Matrix<F>) -> Result<(), KomodoError>
     where
-        E: Pairing,
-        P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+        F: PrimeField,
+        G: CurveGroup<ScalarField = F>,
+        P: DenseUVPolynomial<F, Point = F>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
-        let powers = setup::random(bytes.len())?;
-        let blocks = encode::<E, P>(bytes, encoding_mat, &powers)?;
+        let rng = &mut test_rng();
+
+        let powers = setup(bytes.len(), rng)?;
+        let blocks = encode::<F, G, P>(bytes, encoding_mat, &powers)?;
 
         for block in &blocks {
-            assert!(verify::<E, P>(block, &powers)?);
+            assert!(verify::<F, G, P>(block, &powers)?);
         }
 
         Ok(())
     }
 
-    fn verify_with_errors_template<E, P>(
+    fn verify_with_errors_template<F, G, P>(
         bytes: &[u8],
-        encoding_mat: &Matrix<E::ScalarField>,
-    ) -> Result<(), ark_poly_commit::Error>
+        encoding_mat: &Matrix<F>,
+    ) -> Result<(), KomodoError>
     where
-        E: Pairing,
-        P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+        F: PrimeField,
+        G: CurveGroup<ScalarField = F>,
+        P: DenseUVPolynomial<F, Point = F>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
-        let powers = setup::random(bytes.len())?;
-        let blocks = encode::<E, P>(bytes, encoding_mat, &powers)?;
+        let rng = &mut test_rng();
+
+        let powers = setup(bytes.len(), rng)?;
+        let blocks = encode::<F, G, P>(bytes, encoding_mat, &powers)?;
 
         for block in &blocks {
-            assert!(verify::<E, P>(block, &powers)?);
+            assert!(verify::<F, G, P>(block, &powers)?);
         }
 
         let mut corrupted_block = blocks[0].clone();
         // modify a field in the struct b to corrupt the block proof without corrupting the data serialization
-        let a = E::ScalarField::from_le_bytes_mod_order(&123u128.to_le_bytes());
-        let mut commits: Vec<E::G1> = corrupted_block.commit.iter().map(|c| c.0.into()).collect();
+        let a = F::from_le_bytes_mod_order(&123u128.to_le_bytes());
+        let mut commits: Vec<G> = corrupted_block.commit.iter().map(|c| c.0.into()).collect();
         commits[0] = commits[0].mul(a.pow([4321_u64]));
         corrupted_block.commit = commits.iter().map(|&c| Commitment(c.into())).collect();
 
-        assert!(!verify::<E, P>(&corrupted_block, &powers)?);
+        assert!(!verify::<F, G, P>(&corrupted_block, &powers)?);
 
         Ok(())
     }
 
-    fn verify_recoding_template<E, P>(
+    fn verify_recoding_template<F, G, P>(
         bytes: &[u8],
-        encoding_mat: &Matrix<E::ScalarField>,
-    ) -> Result<(), ark_poly_commit::Error>
+        encoding_mat: &Matrix<F>,
+    ) -> Result<(), KomodoError>
     where
-        E: Pairing,
-        P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+        F: PrimeField,
+        G: CurveGroup<ScalarField = F>,
+        P: DenseUVPolynomial<F, Point = F>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
-        let powers = setup::random(bytes.len())?;
-        let blocks = encode::<E, P>(bytes, encoding_mat, &powers)?;
+        let rng = &mut test_rng();
 
-        assert!(verify::<E, P>(
+        let powers = setup(bytes.len(), rng)?;
+        let blocks = encode::<F, G, P>(bytes, encoding_mat, &powers)?;
+
+        assert!(verify::<F, G, P>(
             &recode(&blocks[2..=3]).unwrap().unwrap(),
             &powers
         )?);
-        assert!(verify::<E, P>(
+        assert!(verify::<F, G, P>(
             &recode(&[blocks[3].clone(), blocks[5].clone()])
                 .unwrap()
                 .unwrap(),
@@ -334,37 +343,43 @@ mod tests {
         Ok(())
     }
 
-    fn end_to_end_template<E, P>(
+    fn end_to_end_template<F, G, P>(
         bytes: &[u8],
-        encoding_mat: &Matrix<E::ScalarField>,
-    ) -> Result<(), ark_poly_commit::Error>
+        encoding_mat: &Matrix<F>,
+    ) -> Result<(), KomodoError>
     where
-        E: Pairing,
-        P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+        F: PrimeField,
+        G: CurveGroup<ScalarField = F>,
+        P: DenseUVPolynomial<F, Point = F>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
-        let powers = setup::random(bytes.len())?;
-        let blocks: Vec<Shard<E>> = encode::<E, P>(bytes, encoding_mat, &powers)?
+        let rng = &mut test_rng();
+
+        let powers = setup(bytes.len(), rng)?;
+        let blocks: Vec<Shard<F>> = encode::<F, G, P>(bytes, encoding_mat, &powers)?
             .iter()
             .map(|b| b.shard.clone())
             .collect();
 
-        assert_eq!(bytes, decode::<E>(blocks).unwrap());
+        assert_eq!(bytes, decode::<F>(blocks).unwrap());
 
         Ok(())
     }
 
-    fn end_to_end_with_recoding_template<E, P>(
+    fn end_to_end_with_recoding_template<F, G, P>(
         bytes: &[u8],
-        encoding_mat: &Matrix<E::ScalarField>,
-    ) -> Result<(), ark_poly_commit::Error>
+        encoding_mat: &Matrix<F>,
+    ) -> Result<(), KomodoError>
     where
-        E: Pairing,
-        P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+        F: PrimeField,
+        G: CurveGroup<ScalarField = F>,
+        P: DenseUVPolynomial<F, Point = F>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
-        let powers = setup::random(bytes.len())?;
-        let blocks = encode::<E, P>(bytes, encoding_mat, &powers)?;
+        let rng = &mut test_rng();
+
+        let powers = setup(bytes.len(), rng)?;
+        let blocks = encode::<F, G, P>(bytes, encoding_mat, &powers)?;
 
         let b_0_1 = recode(&blocks[0..=1]).unwrap().unwrap();
         let shards = vec![
@@ -372,7 +387,7 @@ mod tests {
             blocks[2].shard.clone(),
             blocks[3].shard.clone(),
         ];
-        assert_eq!(bytes, decode::<E>(shards).unwrap());
+        assert_eq!(bytes, decode::<F>(shards).unwrap());
 
         let b_0_1 = recode(&[blocks[0].clone(), blocks[1].clone()])
             .unwrap()
@@ -382,7 +397,7 @@ mod tests {
             blocks[1].shard.clone(),
             b_0_1.shard,
         ];
-        assert!(decode::<E>(shards).is_err());
+        assert!(decode::<F>(shards).is_err());
 
         let b_0_1 = recode(&blocks[0..=1]).unwrap().unwrap();
         let b_2_3 = recode(&blocks[2..=3]).unwrap().unwrap();
@@ -390,24 +405,24 @@ mod tests {
             .unwrap()
             .unwrap();
         let shards = vec![b_0_1.shard, b_2_3.shard, b_1_4.shard];
-        assert_eq!(bytes, decode::<E>(shards).unwrap());
+        assert_eq!(bytes, decode::<F>(shards).unwrap());
 
         let fully_recoded_shards = (0..3)
             .map(|_| recode(&blocks[0..=2]).unwrap().unwrap().shard)
             .collect();
-        assert_eq!(bytes, decode::<E>(fully_recoded_shards).unwrap());
+        assert_eq!(bytes, decode::<F>(fully_recoded_shards).unwrap());
 
         Ok(())
     }
 
     // NOTE: this is part of an experiment, to be honest, to be able to see how
     // much these tests could be refactored and simplified
-    fn run_template<E, T, P, F>(test: F)
+    fn run_template<F, T, P, Fun>(test: Fun)
     where
-        E: Pairing,
+        F: PrimeField,
         T: Field,
-        F: Fn(&[u8], &Matrix<T>) -> Result<(), ark_poly_commit::Error>,
-        P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+        Fun: Fn(&[u8], &Matrix<T>) -> Result<(), KomodoError>,
+        P: DenseUVPolynomial<F, Point = F>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
         let (k, n) = (3, 6);
@@ -423,32 +438,32 @@ mod tests {
 
     #[test]
     fn verification() {
-        run_template::<Bls12_381, _, UniPoly381, _>(verify_template::<Bls12_381, UniPoly381>);
+        run_template::<Fr, _, UniPoly381, _>(verify_template::<Fr, G1Projective, UniPoly381>);
     }
 
     #[test]
     fn verify_with_errors() {
-        run_template::<Bls12_381, _, UniPoly381, _>(
-            verify_with_errors_template::<Bls12_381, UniPoly381>,
+        run_template::<Fr, _, UniPoly381, _>(
+            verify_with_errors_template::<Fr, G1Projective, UniPoly381>,
         );
     }
 
     #[test]
     fn verify_recoding() {
-        run_template::<Bls12_381, _, UniPoly381, _>(
-            verify_recoding_template::<Bls12_381, UniPoly381>,
+        run_template::<Fr, _, UniPoly381, _>(
+            verify_recoding_template::<Fr, G1Projective, UniPoly381>,
         );
     }
 
     #[test]
     fn end_to_end() {
-        run_template::<Bls12_381, _, UniPoly381, _>(end_to_end_template::<Bls12_381, UniPoly381>);
+        run_template::<Fr, _, UniPoly381, _>(end_to_end_template::<Fr, G1Projective, UniPoly381>);
     }
 
     #[test]
     fn end_to_end_with_recoding() {
-        run_template::<Bls12_381, _, UniPoly381, _>(
-            end_to_end_with_recoding_template::<Bls12_381, UniPoly381>,
+        run_template::<Fr, _, UniPoly381, _>(
+            end_to_end_with_recoding_template::<Fr, G1Projective, UniPoly381>,
         );
     }
 }

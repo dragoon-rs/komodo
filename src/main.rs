@@ -4,13 +4,15 @@ use std::process::exit;
 
 use anyhow::Result;
 
-use ark_bls12_381::Bls12_381;
-use ark_ec::pairing::Pairing;
+use ark_bls12_381::{Fr, G1Projective};
+use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::DenseUVPolynomial;
-use ark_poly_commit::kzg10::Powers;
 use ark_serialize::{CanonicalDeserialize, Compress, Validate};
+use ark_std::test_rng;
+use komodo::error::KomodoError;
+use komodo::zk::Powers;
 use tracing::{info, warn};
 
 use komodo::{
@@ -18,10 +20,10 @@ use komodo::{
     fec::{decode, Shard},
     fs,
     linalg::Matrix,
-    recode, setup, verify, Block,
+    recode, verify, zk, Block,
 };
 
-type UniPoly12_381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;
+type UniPoly12_381 = DensePolynomial<Fr>;
 
 const COMPRESS: Compress = Compress::Yes;
 const VALIDATE: Validate = Validate::Yes;
@@ -118,37 +120,41 @@ fn throw_error(code: i32, message: &str) {
     exit(code);
 }
 
-pub fn generate_random_powers<E, P>(
+pub fn generate_random_powers<F, G, P>(
     n: usize,
     powers_dir: &Path,
     powers_filename: Option<&str>,
 ) -> Result<()>
 where
-    E: Pairing,
-    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    F: PrimeField,
+    G: CurveGroup<ScalarField = F>,
+    P: DenseUVPolynomial<F, Point = F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
+    let rng = &mut test_rng();
+
     info!("generating new powers");
-    let powers = setup::random::<E, P>(n)?;
+    let powers = zk::setup::<_, F, G>(n, rng)?;
 
     fs::dump(&powers, powers_dir, powers_filename, COMPRESS)?;
 
     Ok(())
 }
 
-pub fn verify_blocks<E, P>(
-    blocks: &[(String, Block<E>)],
-    powers: Powers<E>,
-) -> Result<(), ark_poly_commit::Error>
+pub fn verify_blocks<F, G, P>(
+    blocks: &[(String, Block<F, G>)],
+    powers: Powers<F, G>,
+) -> Result<(), KomodoError>
 where
-    E: Pairing,
-    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    F: PrimeField,
+    G: CurveGroup<ScalarField = F>,
+    P: DenseUVPolynomial<F, Point = F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     let res = blocks
         .iter()
-        .map(|(f, b)| Ok((f, verify::<E, P>(b, &powers)?)))
-        .collect::<Result<Vec<(&String, bool)>, ark_poly_commit::Error>>()?;
+        .map(|(f, b)| Ok((f, verify::<F, G, P>(b, &powers)?)))
+        .collect::<Result<Vec<(&String, bool)>, KomodoError>>()?;
 
     eprint!("[");
     for (f, v) in res {
@@ -183,7 +189,7 @@ fn main() {
     let powers_file = powers_dir.join(powers_filename);
 
     if do_generate_powers {
-        generate_random_powers::<Bls12_381, UniPoly12_381>(
+        generate_random_powers::<Fr, G1Projective, UniPoly12_381>(
             nb_bytes,
             &powers_dir,
             Some(powers_filename),
@@ -194,8 +200,8 @@ fn main() {
     }
 
     if do_reconstruct_data {
-        let blocks: Vec<Shard<Bls12_381>> =
-            fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir, COMPRESS, VALIDATE)
+        let blocks: Vec<Shard<Fr>> =
+            fs::read_blocks::<Fr, G1Projective>(&block_hashes, &block_dir, COMPRESS, VALIDATE)
                 .unwrap_or_else(|e| {
                     throw_error(1, &format!("could not read blocks: {}", e));
                     unreachable!()
@@ -206,7 +212,7 @@ fn main() {
                 .collect();
         eprintln!(
             "{:?}",
-            decode::<Bls12_381>(blocks).unwrap_or_else(|e| {
+            decode::<Fr>(blocks).unwrap_or_else(|e| {
                 throw_error(1, &format!("could not decode: {}", e));
                 unreachable!()
             })
@@ -216,11 +222,12 @@ fn main() {
     }
 
     if do_combine_blocks {
-        let blocks = fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir, COMPRESS, VALIDATE)
-            .unwrap_or_else(|e| {
-                throw_error(1, &format!("could not read blocks: {}", e));
-                unreachable!()
-            });
+        let blocks =
+            fs::read_blocks::<Fr, G1Projective>(&block_hashes, &block_dir, COMPRESS, VALIDATE)
+                .unwrap_or_else(|e| {
+                    throw_error(1, &format!("could not read blocks: {}", e));
+                    unreachable!()
+                });
 
         let formatted_output = fs::dump_blocks(
             &[
@@ -248,11 +255,12 @@ fn main() {
     }
 
     if do_inspect_blocks {
-        let blocks = fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir, COMPRESS, VALIDATE)
-            .unwrap_or_else(|e| {
-                throw_error(1, &format!("could not read blocks: {}", e));
-                unreachable!()
-            });
+        let blocks =
+            fs::read_blocks::<Fr, G1Projective>(&block_hashes, &block_dir, COMPRESS, VALIDATE)
+                .unwrap_or_else(|e| {
+                    throw_error(1, &format!("could not read blocks: {}", e));
+                    unreachable!()
+                });
         eprint!("[");
         for (_, block) in &blocks {
             eprint!("{},", block);
@@ -265,7 +273,7 @@ fn main() {
     info!("reading powers from file `{:?}`", powers_file);
     let powers = if let Ok(serialized) = std::fs::read(&powers_file) {
         info!("deserializing the powers from `{:?}`", powers_file);
-        Powers::<Bls12_381>::deserialize_with_mode(&serialized[..], COMPRESS, VALIDATE)
+        Powers::<Fr, G1Projective>::deserialize_with_mode(&serialized[..], COMPRESS, VALIDATE)
             .unwrap_or_else(|e| {
                 throw_error(
                     1,
@@ -276,15 +284,17 @@ fn main() {
     } else {
         warn!("could not read powers from `{:?}`", powers_file);
         info!("regenerating temporary powers");
-        setup::random::<Bls12_381, UniPoly12_381>(nb_bytes).unwrap_or_else(|e| {
+        let rng = &mut test_rng();
+
+        zk::setup::<_, Fr, G1Projective>(nb_bytes, rng).unwrap_or_else(|e| {
             throw_error(1, &format!("could not generate powers: {}", e));
             unreachable!()
         })
     };
 
     if do_verify_blocks {
-        verify_blocks::<Bls12_381, UniPoly12_381>(
-            &fs::read_blocks::<Bls12_381>(&block_hashes, &block_dir, COMPRESS, VALIDATE)
+        verify_blocks::<Fr, G1Projective, UniPoly12_381>(
+            &fs::read_blocks::<Fr, G1Projective>(&block_hashes, &block_dir, COMPRESS, VALIDATE)
                 .unwrap_or_else(|e| {
                     throw_error(1, &format!("could not read blocks: {}", e));
                     unreachable!()
@@ -301,10 +311,8 @@ fn main() {
 
     let encoding_mat = match encoding_method.as_str() {
         "vandermonde" => {
-            let points: Vec<<Bls12_381 as Pairing>::ScalarField> = (0..n)
-                .map(|i| {
-                    <Bls12_381 as Pairing>::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes())
-                })
+            let points: Vec<Fr> = (0..n)
+                .map(|i| Fr::from_le_bytes_mod_order(&i.to_le_bytes()))
                 .collect();
             Matrix::vandermonde(&points, k)
         }
@@ -316,10 +324,12 @@ fn main() {
     };
 
     let formatted_output = fs::dump_blocks(
-        &encode::<Bls12_381, UniPoly12_381>(&bytes, &encoding_mat, &powers).unwrap_or_else(|e| {
-            throw_error(1, &format!("could not encode: {}", e));
-            unreachable!()
-        }),
+        &encode::<Fr, G1Projective, UniPoly12_381>(&bytes, &encoding_mat, &powers).unwrap_or_else(
+            |e| {
+                throw_error(1, &format!("could not encode: {}", e));
+                unreachable!()
+            },
+        ),
         &block_dir,
         COMPRESS,
     )

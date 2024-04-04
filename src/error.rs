@@ -14,6 +14,10 @@ pub enum KomodoError {
     TooFewShards(usize, usize),
     #[error("Blocks are incompatible: {0}")]
     IncompatibleBlocks(String),
+    #[error("Degree is zero")]
+    DegreeIsZero,
+    #[error("too many coefficients: max is {0}, found {0}")]
+    TooFewPowersInTrustedSetup(usize, usize),
     #[error("Another error: {0}")]
     Other(String),
 }
