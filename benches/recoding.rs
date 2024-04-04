@@ -1,14 +1,13 @@
 use ark_bls12_381::Fr;
 use ark_ff::PrimeField;
 
+use criterion::{criterion_group, criterion_main, Criterion};
 use rand::Rng;
 
 use komodo::{
     fec::{combine, Shard},
     field,
 };
-
-use criterion::{criterion_group, criterion_main, Criterion};
 
 fn to_curve<F: PrimeField>(n: u128) -> F {
     F::from_le_bytes_mod_order(&n.to_le_bytes())

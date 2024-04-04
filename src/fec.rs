@@ -2,12 +2,10 @@
 
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use rs_merkle::algorithms::Sha256;
-use rs_merkle::Hasher;
 
-use crate::error::KomodoError;
-use crate::field;
-use crate::linalg::Matrix;
+use rs_merkle::{algorithms::Sha256, Hasher};
+
+use crate::{error::KomodoError, field, linalg::Matrix};
 
 /// representation of a FEC shard of data
 ///

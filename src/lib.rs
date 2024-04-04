@@ -1,10 +1,10 @@
 //! Komodo: Cryptographically-proven Erasure Coding
-use std::ops::Div;
-
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::ops::Div;
+
 use tracing::{debug, info};
 
 pub mod error;
@@ -241,13 +241,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Div;
-
     use ark_bls12_381::{Fr, G1Projective};
     use ark_ec::CurveGroup;
     use ark_ff::{Field, PrimeField};
     use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
-    use ark_std::test_rng;
+    use ark_std::{ops::Div, test_rng};
 
     use crate::{
         encode,

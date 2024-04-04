@@ -1,7 +1,9 @@
 use ark_bls12_381::Fr;
 use ark_ff::Field;
-use komodo::linalg::Matrix;
+
 use rand::{rngs::ThreadRng, Rng};
+
+use komodo::linalg::Matrix;
 
 fn rand<T: Field>(rng: &mut ThreadRng) -> T {
     let element: u128 = rng.gen();

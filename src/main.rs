@@ -1,26 +1,25 @@
-use std::ops::Div;
 use std::path::{Path, PathBuf};
 use std::process::exit;
-
-use anyhow::Result;
 
 use ark_bls12_381::{Fr, G1Projective};
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
-use ark_poly::univariate::DensePolynomial;
-use ark_poly::DenseUVPolynomial;
+use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
 use ark_serialize::{CanonicalDeserialize, Compress, Validate};
-use ark_std::test_rng;
-use komodo::error::KomodoError;
-use komodo::zk::Powers;
+use ark_std::{ops::Div, test_rng};
+
+use anyhow::Result;
 use tracing::{info, warn};
 
 use komodo::{
     encode,
+    error::KomodoError,
     fec::{decode, Shard},
     fs,
     linalg::Matrix,
-    recode, verify, zk, Block,
+    recode, verify,
+    zk::{self, Powers},
+    Block,
 };
 
 type UniPoly12_381 = DensePolynomial<Fr>;

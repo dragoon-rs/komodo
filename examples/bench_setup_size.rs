@@ -1,13 +1,10 @@
-use std::ops::Div;
-
 use ark_bls12_381::{Fr, G1Projective};
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
-use ark_poly::univariate::DensePolynomial;
-use ark_poly::DenseUVPolynomial;
-
+use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
 use ark_serialize::{CanonicalSerialize, Compress, Validate};
-use ark_std::test_rng;
+use ark_std::{ops::Div, test_rng};
+
 use komodo::zk;
 
 type UniPoly12_381 = DensePolynomial<Fr>;

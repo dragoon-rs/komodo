@@ -5,11 +5,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::Result;
-
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
+
+use anyhow::Result;
 use rs_merkle::{algorithms::Sha256, Hasher};
 use tracing::info;
 

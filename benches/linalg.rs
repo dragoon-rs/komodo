@@ -1,5 +1,6 @@
 use ark_bls12_381::Fr;
 use ark_ff::PrimeField;
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use komodo::linalg::Matrix;
