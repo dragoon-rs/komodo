@@ -96,7 +96,7 @@ pub fn commit<F, G, P>(
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>,
-    P: DenseUVPolynomial<F, Point = F>,
+    P: DenseUVPolynomial<F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     let mut commits = Vec::new();
@@ -121,7 +121,7 @@ pub fn encode<F, G, P>(
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>,
-    P: DenseUVPolynomial<F, Point = F>,
+    P: DenseUVPolynomial<F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     info!("encoding and proving {} bytes", bytes.len());
@@ -222,7 +222,7 @@ pub fn verify<F, G, P>(
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>,
-    P: DenseUVPolynomial<F, Point = F>,
+    P: DenseUVPolynomial<F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     let elements = block.shard.data.clone();
@@ -268,7 +268,7 @@ mod tests {
     where
         F: PrimeField,
         G: CurveGroup<ScalarField = F>,
-        P: DenseUVPolynomial<F, Point = F>,
+        P: DenseUVPolynomial<F>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
         let rng = &mut test_rng();
@@ -290,7 +290,7 @@ mod tests {
     where
         F: PrimeField,
         G: CurveGroup<ScalarField = F>,
-        P: DenseUVPolynomial<F, Point = F>,
+        P: DenseUVPolynomial<F>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
         let rng = &mut test_rng();
@@ -321,7 +321,7 @@ mod tests {
     where
         F: PrimeField,
         G: CurveGroup<ScalarField = F>,
-        P: DenseUVPolynomial<F, Point = F>,
+        P: DenseUVPolynomial<F>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
         let rng = &mut test_rng();
@@ -350,7 +350,7 @@ mod tests {
     where
         F: PrimeField,
         G: CurveGroup<ScalarField = F>,
-        P: DenseUVPolynomial<F, Point = F>,
+        P: DenseUVPolynomial<F>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
         let rng = &mut test_rng();
@@ -373,7 +373,7 @@ mod tests {
     where
         F: PrimeField,
         G: CurveGroup<ScalarField = F>,
-        P: DenseUVPolynomial<F, Point = F>,
+        P: DenseUVPolynomial<F>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
         let rng = &mut test_rng();
@@ -422,7 +422,7 @@ mod tests {
         F: PrimeField,
         T: Field,
         Fun: Fn(&[u8], &Matrix<T>) -> Result<(), KomodoError>,
-        P: DenseUVPolynomial<F, Point = F>,
+        P: DenseUVPolynomial<F>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
         let (k, n) = (3, 6);

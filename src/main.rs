@@ -128,7 +128,7 @@ pub fn generate_random_powers<F, G, P>(
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>,
-    P: DenseUVPolynomial<F, Point = F>,
+    P: DenseUVPolynomial<F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     let rng = &mut test_rng();
@@ -148,7 +148,7 @@ pub fn verify_blocks<F, G, P>(
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>,
-    P: DenseUVPolynomial<F, Point = F>,
+    P: DenseUVPolynomial<F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     let res = blocks

@@ -17,7 +17,7 @@ fn setup_template<F, G, P>(c: &mut Criterion, nb_bytes: usize)
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>,
-    P: DenseUVPolynomial<F, Point = F>,
+    P: DenseUVPolynomial<F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     let mut group = c.benchmark_group("setup");
