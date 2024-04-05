@@ -22,8 +22,6 @@ use komodo::{
     Block,
 };
 
-type UniPoly12_381 = DensePolynomial<Fr>;
-
 const COMPRESS: Compress = Compress::Yes;
 const VALIDATE: Validate = Validate::Yes;
 
@@ -188,7 +186,7 @@ fn main() {
     let powers_file = powers_dir.join(powers_filename);
 
     if do_generate_powers {
-        generate_random_powers::<Fr, G1Projective, UniPoly12_381>(
+        generate_random_powers::<Fr, G1Projective, DensePolynomial<Fr>>(
             nb_bytes,
             &powers_dir,
             Some(powers_filename),
@@ -292,7 +290,7 @@ fn main() {
     };
 
     if do_verify_blocks {
-        verify_blocks::<Fr, G1Projective, UniPoly12_381>(
+        verify_blocks::<Fr, G1Projective, DensePolynomial<Fr>>(
             &fs::read_blocks::<Fr, G1Projective>(&block_hashes, &block_dir, COMPRESS, VALIDATE)
                 .unwrap_or_else(|e| {
                     throw_error(1, &format!("could not read blocks: {}", e));
@@ -323,12 +321,11 @@ fn main() {
     };
 
     let formatted_output = fs::dump_blocks(
-        &encode::<Fr, G1Projective, UniPoly12_381>(&bytes, &encoding_mat, &powers).unwrap_or_else(
-            |e| {
+        &encode::<Fr, G1Projective, DensePolynomial<Fr>>(&bytes, &encoding_mat, &powers)
+            .unwrap_or_else(|e| {
                 throw_error(1, &format!("could not encode: {}", e));
                 unreachable!()
-            },
-        ),
+            }),
         &block_dir,
         COMPRESS,
     )

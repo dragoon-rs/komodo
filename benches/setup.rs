@@ -9,8 +9,6 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use komodo::zk::{self, Powers};
 
-type UniPoly12_381 = DensePolynomial<Fr>;
-
 fn setup_template<F, G, P>(c: &mut Criterion, nb_bytes: usize)
 where
     F: PrimeField,
@@ -118,7 +116,7 @@ where
 
 fn setup(c: &mut Criterion) {
     for n in [1, 2, 4, 8, 16] {
-        setup_template::<Fr, G1Projective, UniPoly12_381>(c, black_box(n * 1024));
+        setup_template::<Fr, G1Projective, DensePolynomial<Fr>>(c, black_box(n * 1024));
     }
 }
 

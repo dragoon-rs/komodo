@@ -7,8 +7,6 @@ use ark_std::{ops::Div, test_rng};
 
 use komodo::zk;
 
-type UniPoly12_381 = DensePolynomial<Fr>;
-
 fn setup_template<F, G, P>(nb_bytes: usize)
 where
     F: PrimeField,
@@ -50,6 +48,6 @@ where
 
 fn main() {
     for n in [1, 2, 4, 8, 16] {
-        setup_template::<Fr, G1Projective, UniPoly12_381>(n * 1024);
+        setup_template::<Fr, G1Projective, DensePolynomial<Fr>>(n * 1024);
     }
 }

@@ -256,8 +256,6 @@ mod tests {
         zk::{setup, Commitment},
     };
 
-    type UniPoly381 = DensePolynomial<Fr>;
-
     fn bytes() -> Vec<u8> {
         include_bytes!("../tests/dragoon_133x133.png").to_vec()
     }
@@ -436,32 +434,36 @@ mod tests {
 
     #[test]
     fn verification() {
-        run_template::<Fr, _, UniPoly381, _>(verify_template::<Fr, G1Projective, UniPoly381>);
+        run_template::<Fr, _, DensePolynomial<Fr>, _>(
+            verify_template::<Fr, G1Projective, DensePolynomial<Fr>>,
+        );
     }
 
     #[test]
     fn verify_with_errors() {
-        run_template::<Fr, _, UniPoly381, _>(
-            verify_with_errors_template::<Fr, G1Projective, UniPoly381>,
+        run_template::<Fr, _, DensePolynomial<Fr>, _>(
+            verify_with_errors_template::<Fr, G1Projective, DensePolynomial<Fr>>,
         );
     }
 
     #[test]
     fn verify_recoding() {
-        run_template::<Fr, _, UniPoly381, _>(
-            verify_recoding_template::<Fr, G1Projective, UniPoly381>,
+        run_template::<Fr, _, DensePolynomial<Fr>, _>(
+            verify_recoding_template::<Fr, G1Projective, DensePolynomial<Fr>>,
         );
     }
 
     #[test]
     fn end_to_end() {
-        run_template::<Fr, _, UniPoly381, _>(end_to_end_template::<Fr, G1Projective, UniPoly381>);
+        run_template::<Fr, _, DensePolynomial<Fr>, _>(
+            end_to_end_template::<Fr, G1Projective, DensePolynomial<Fr>>,
+        );
     }
 
     #[test]
     fn end_to_end_with_recoding() {
-        run_template::<Fr, _, UniPoly381, _>(
-            end_to_end_with_recoding_template::<Fr, G1Projective, UniPoly381>,
+        run_template::<Fr, _, DensePolynomial<Fr>, _>(
+            end_to_end_with_recoding_template::<Fr, G1Projective, DensePolynomial<Fr>>,
         );
     }
 }
