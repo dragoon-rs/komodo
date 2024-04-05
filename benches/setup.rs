@@ -22,10 +22,10 @@ where
 
     group.bench_function(
         &format!("setup {} on {}", nb_bytes, std::any::type_name::<F>()),
-        |b| b.iter(|| zk::setup::<_, F, G>(nb_bytes, rng).unwrap()),
+        |b| b.iter(|| zk::setup::<_, F, G>(zk::nb_elements_in_setup::<F>(nb_bytes), rng).unwrap()),
     );
 
-    let setup = zk::setup::<_, F, G>(nb_bytes, rng).unwrap();
+    let setup = zk::setup::<_, F, G>(zk::nb_elements_in_setup::<F>(nb_bytes), rng).unwrap();
 
     group.bench_function(
         &format!(

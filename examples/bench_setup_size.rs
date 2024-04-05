@@ -16,7 +16,7 @@ where
 {
     let rng = &mut test_rng();
 
-    let setup = zk::setup::<_, F, G>(nb_bytes, rng).unwrap();
+    let setup = zk::setup::<_, F, G>(zk::nb_elements_in_setup::<F>(nb_bytes), rng).unwrap();
 
     for (compress, validate) in [
         (Compress::Yes, Validate::Yes),

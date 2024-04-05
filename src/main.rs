@@ -131,7 +131,7 @@ where
     let rng = &mut test_rng();
 
     info!("generating new powers");
-    let powers = zk::setup::<_, F, G>(n, rng)?;
+    let powers = zk::setup::<_, F, G>(zk::nb_elements_in_setup::<F>(n), rng)?;
 
     fs::dump(&powers, powers_dir, powers_filename, COMPRESS)?;
 
@@ -283,10 +283,11 @@ fn main() {
         info!("regenerating temporary powers");
         let rng = &mut test_rng();
 
-        zk::setup::<_, Fr, G1Projective>(nb_bytes, rng).unwrap_or_else(|e| {
-            throw_error(1, &format!("could not generate powers: {}", e));
-            unreachable!()
-        })
+        zk::setup::<_, Fr, G1Projective>(zk::nb_elements_in_setup::<Fr>(nb_bytes), rng)
+            .unwrap_or_else(|e| {
+                throw_error(1, &format!("could not generate powers: {}", e));
+                unreachable!()
+            })
     };
 
     if do_verify_blocks {
