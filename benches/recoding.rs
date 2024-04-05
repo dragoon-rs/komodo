@@ -40,8 +40,11 @@ fn bench_template<F: PrimeField>(c: &mut Criterion, nb_bytes: usize, k: usize, n
 
     c.bench_function(
         &format!(
-            "recoding {} bytes and {} shards with k = {}",
-            nb_bytes, nb_shards, k
+            "recoding {} bytes and {} shards with k = {} on {}",
+            nb_bytes,
+            nb_shards,
+            k,
+            std::any::type_name::<F>()
         ),
         |b| b.iter(|| combine(&shards, &coeffs)),
     );
