@@ -6,6 +6,9 @@ use ark_std::{end_timer, rand::RngCore, start_timer};
 
 use crate::error::KomodoError;
 
+/// the representation of a ZK trusted setup
+///
+/// this is a simple wrapper around a sequence of elements of the curve.
 #[derive(Debug, Clone, Default, CanonicalSerialize, CanonicalDeserialize, PartialEq)]
 pub struct Powers<F: PrimeField, G: CurveGroup<ScalarField = F>>(Vec<G::Affine>);
 
@@ -24,9 +27,13 @@ impl<F: PrimeField, G: CurveGroup<ScalarField = F>> IntoIterator for Powers<F, G
     }
 }
 
+/// a ZK commitment, i.e. an evaluatio of a given polynomial on a secret
+///
+/// this is a simpler wrapper around a single elemenf of the curve.
 #[derive(Debug, Clone, Copy, Default, CanonicalSerialize, CanonicalDeserialize, PartialEq)]
 pub struct Commitment<F: PrimeField, G: CurveGroup<ScalarField = F>>(pub G::Affine);
 
+/// create a trusted setup of a given size, the expected maximum degree of the data
 pub fn setup<R: RngCore, F: PrimeField, G: CurveGroup<ScalarField = F>>(
     max_degree: usize,
     rng: &mut R,
@@ -92,6 +99,7 @@ fn convert_to_bigints<F: PrimeField>(p: &[F]) -> Vec<F::BigInt> {
     coeffs
 }
 
+/// compute a commitment of a polynomial on a trusted setup
 pub fn commit<F, G, P>(
     powers: &Powers<F, G>,
     polynomial: &P,
