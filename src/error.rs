@@ -1,3 +1,6 @@
+//! Komodo-specific errors
+//!
+//! there are a few linear algebra errors and some related to ZK.
 use thiserror::Error;
 
 #[derive(Clone, Debug, Error, PartialEq)]

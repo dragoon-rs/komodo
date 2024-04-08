@@ -1,3 +1,4 @@
+//! a replacement of Arkworks' KZG10 module
 use ark_ec::{scalar_mul::fixed_base::FixedBase, CurveGroup, VariableBaseMSM};
 use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;

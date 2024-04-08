@@ -85,7 +85,7 @@ impl<F: PrimeField, G: CurveGroup<ScalarField = F>> std::fmt::Display for Block<
 /// this function uses the commit scheme of KZG.
 ///
 /// > **Note**
-/// > - `powers` can be generated with functions like [`setup::setup`]
+/// > - `powers` can be generated with functions like [`zk::setup`]
 /// > - if `polynomials` has length `n`, then [`commit`] will generate `n`
 /// >   commits.
 #[allow(clippy::type_complexity)]

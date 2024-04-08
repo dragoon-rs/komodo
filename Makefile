@@ -29,3 +29,6 @@ show:
 	cargo --version
 	cargo clippy --version
 	nu --version
+
+doc:
+	cargo doc --document-private-items --no-deps --open
