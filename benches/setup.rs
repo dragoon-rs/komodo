@@ -4,7 +4,7 @@ use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
 use ark_poly_commit::kzg10::{self, KZG10};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
-use ark_std::{ops::Div, test_rng};
+use ark_std::ops::Div;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
@@ -19,7 +19,7 @@ where
 {
     let mut group = c.benchmark_group("setup");
 
-    let rng = &mut test_rng();
+    let rng = &mut rand::thread_rng();
 
     let degree = zk::nb_elements_in_setup::<F>(nb_bytes);
 
@@ -127,7 +127,7 @@ where
     P: DenseUVPolynomial<E::ScalarField>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
-    let rng = &mut test_rng();
+    let rng = &mut rand::thread_rng();
 
     let degree = zk::nb_elements_in_setup::<E::ScalarField>(nb_bytes);
 

@@ -4,8 +4,7 @@
 //! field.
 use ark_ff::Field;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-
-use rand::Rng;
+use ark_std::rand::{Rng, RngCore};
 
 use crate::error::KomodoError;
 
@@ -110,9 +109,7 @@ impl<T: Field> Matrix<T> {
     }
 
     /// build a completely random matrix of shape $n \times m$
-    pub fn random(n: usize, m: usize) -> Self {
-        let mut rng = rand::thread_rng();
-
+    pub fn random<R: RngCore>(n: usize, m: usize, rng: &mut R) -> Self {
         Self {
             elements: (0..(n * m)).map(|_| T::from(rng.gen::<u128>())).collect(),
             height: n,
@@ -584,6 +581,8 @@ mod tests {
 
     #[test]
     fn inverse() {
+        let mut rng = ark_std::test_rng();
+
         let matrix = Matrix::<Fr>::identity(3);
         let inverse = matrix.invert().unwrap();
         assert_eq!(Matrix::<Fr>::identity(3), inverse);
@@ -594,7 +593,7 @@ mod tests {
         assert_eq!(inverse.mul(&matrix).unwrap(), Matrix::<Fr>::identity(3));
 
         let n = 20;
-        let matrix = Matrix::random(n, n);
+        let matrix = Matrix::random(n, n, &mut rng);
         let inverse = matrix.invert().unwrap();
         assert_eq!(matrix.mul(&inverse).unwrap(), Matrix::<Fr>::identity(n));
         assert_eq!(inverse.mul(&matrix).unwrap(), Matrix::<Fr>::identity(n));
@@ -699,12 +698,14 @@ mod tests {
 
     #[test]
     fn rank() {
+        let mut rng = ark_std::test_rng();
+
         for n in 1..=20 {
             assert_eq!(Matrix::<Fr>::identity(n).rank(), n);
         }
 
         for _ in 0..20 {
-            let m = Matrix::<Fr>::random(7, 13);
+            let m = Matrix::<Fr>::random(7, 13, &mut rng);
             assert_eq!(m.rank(), m.transpose().rank());
         }
 

@@ -1,8 +1,8 @@
 use ark_bls12_381::Fr;
 use ark_ff::PrimeField;
+use ark_std::rand::Rng;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use rand::Rng;
 
 use komodo::{
     fec::{combine, Shard},

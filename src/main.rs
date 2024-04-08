@@ -6,9 +6,10 @@ use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
 use ark_serialize::{CanonicalDeserialize, Compress, Validate};
-use ark_std::{ops::Div, test_rng};
+use ark_std::ops::Div;
 
 use anyhow::Result;
+use ark_std::rand::RngCore;
 use tracing::{info, warn};
 
 use komodo::{
@@ -117,19 +118,19 @@ fn throw_error(code: i32, message: &str) {
     exit(code);
 }
 
-pub fn generate_random_powers<F, G, P>(
+pub fn generate_random_powers<F, G, P, R>(
     n: usize,
     powers_dir: &Path,
     powers_filename: Option<&str>,
+    rng: &mut R,
 ) -> Result<()>
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>,
     P: DenseUVPolynomial<F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+    R: RngCore,
 {
-    let rng = &mut test_rng();
-
     info!("generating new powers");
     let powers = zk::setup::<_, F, G>(zk::nb_elements_in_setup::<F>(n), rng)?;
 
@@ -164,6 +165,8 @@ where
 fn main() {
     tracing_subscriber::fmt::try_init().expect("cannot init logger");
 
+    let mut rng = rand::thread_rng();
+
     let (
         bytes,
         k,
@@ -186,10 +189,11 @@ fn main() {
     let powers_file = powers_dir.join(powers_filename);
 
     if do_generate_powers {
-        generate_random_powers::<Fr, G1Projective, DensePolynomial<Fr>>(
+        generate_random_powers::<Fr, G1Projective, DensePolynomial<Fr>, _>(
             nb_bytes,
             &powers_dir,
             Some(powers_filename),
+            &mut rng,
         )
         .unwrap_or_else(|e| throw_error(1, &format!("could not generate powers: {}", e)));
 
@@ -227,17 +231,18 @@ fn main() {
                 });
 
         let formatted_output = fs::dump_blocks(
-            &[
-                recode(&blocks.iter().map(|(_, b)| b).cloned().collect::<Vec<_>>())
-                    .unwrap_or_else(|e| {
-                        throw_error(1, &format!("could not encode block: {}", e));
-                        unreachable!()
-                    })
-                    .unwrap_or_else(|| {
-                        throw_error(1, "could not recode block (list of blocks is likely empty)");
-                        unreachable!()
-                    }),
-            ],
+            &[recode(
+                &blocks.iter().map(|(_, b)| b).cloned().collect::<Vec<_>>(),
+                &mut rng,
+            )
+            .unwrap_or_else(|e| {
+                throw_error(1, &format!("could not encode block: {}", e));
+                unreachable!()
+            })
+            .unwrap_or_else(|| {
+                throw_error(1, "could not recode block (list of blocks is likely empty)");
+                unreachable!()
+            })],
             &block_dir,
             COMPRESS,
         )
@@ -281,9 +286,7 @@ fn main() {
     } else {
         warn!("could not read powers from `{:?}`", powers_file);
         info!("regenerating temporary powers");
-        let rng = &mut test_rng();
-
-        zk::setup::<_, Fr, G1Projective>(zk::nb_elements_in_setup::<Fr>(nb_bytes), rng)
+        zk::setup::<_, Fr, G1Projective>(zk::nb_elements_in_setup::<Fr>(nb_bytes), &mut rng)
             .unwrap_or_else(|e| {
                 throw_error(1, &format!("could not generate powers: {}", e));
                 unreachable!()
@@ -314,7 +317,7 @@ fn main() {
                 .collect();
             Matrix::vandermonde(&points, k)
         }
-        "random" => Matrix::random(k, n),
+        "random" => Matrix::random(k, n, &mut rng),
         m => {
             throw_error(1, &format!("invalid encoding method: {}", m));
             unreachable!()

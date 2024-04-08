@@ -6,7 +6,8 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use komodo::linalg::Matrix;
 
 fn inverse_template<F: PrimeField>(c: &mut Criterion, n: usize) {
-    let matrix = Matrix::<F>::random(n, n);
+    let mut rng = rand::thread_rng();
+    let matrix = Matrix::<F>::random(n, n, &mut rng);
 
     c.bench_function(
         &format!("inverse {}x{} on {}", n, n, std::any::type_name::<F>()),
@@ -21,7 +22,8 @@ fn inverse(c: &mut Criterion) {
 }
 
 fn transpose_template<F: PrimeField>(c: &mut Criterion, n: usize) {
-    let matrix = Matrix::<F>::random(n, n);
+    let mut rng = rand::thread_rng();
+    let matrix = Matrix::<F>::random(n, n, &mut rng);
 
     c.bench_function(
         &format!("transpose {}x{} on {}", n, n, std::any::type_name::<F>()),
@@ -36,8 +38,9 @@ fn transpose(c: &mut Criterion) {
 }
 
 fn mul_template<F: PrimeField>(c: &mut Criterion, n: usize) {
-    let mat_a = Matrix::<F>::random(n, n);
-    let mat_b = Matrix::<F>::random(n, n);
+    let mut rng = rand::thread_rng();
+    let mat_a = Matrix::<F>::random(n, n, &mut rng);
+    let mat_b = Matrix::<F>::random(n, n, &mut rng);
 
     c.bench_function(
         &format!("mul {}x{} on {}", n, n, std::any::type_name::<F>()),

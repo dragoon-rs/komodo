@@ -2,7 +2,7 @@ use ark_bls12_381::{Bls12_381, Fr, G1Projective};
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
-use ark_std::{ops::Div, test_rng};
+use ark_std::ops::Div;
 
 use ark_poly_commit::kzg10::{Powers, KZG10};
 
@@ -17,7 +17,7 @@ where
     P: DenseUVPolynomial<F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
-    let rng = &mut test_rng();
+    let rng = &mut rand::thread_rng();
 
     let degree = zk::nb_elements_in_setup::<F>(nb_bytes);
 
@@ -40,7 +40,7 @@ where
     P: DenseUVPolynomial<E::ScalarField>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
-    let rng = &mut test_rng();
+    let rng = &mut rand::thread_rng();
 
     let degree = zk::nb_elements_in_setup::<E::ScalarField>(nb_bytes);
 

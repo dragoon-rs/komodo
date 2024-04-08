@@ -3,7 +3,7 @@ use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::ops::Div;
+use ark_std::{ops::Div, rand::RngCore};
 
 use tracing::{debug, info};
 
@@ -167,12 +167,11 @@ where
 ///
 /// > **Note**
 /// > this is a wrapper around [`fec::combine`].
-pub fn recode<F: PrimeField, G: CurveGroup<ScalarField = F>>(
+pub fn recode<F: PrimeField, G: CurveGroup<ScalarField = F>, R: RngCore>(
     blocks: &[Block<F, G>],
+    rng: &mut R,
 ) -> Result<Option<Block<F, G>>, KomodoError> {
-    let mut rng = rand::thread_rng();
-
-    let coeffs = blocks.iter().map(|_| F::rand(&mut rng)).collect::<Vec<_>>();
+    let coeffs = blocks.iter().map(|_| F::rand(rng)).collect::<Vec<_>>();
 
     for (i, (b1, b2)) in blocks.iter().zip(blocks.iter().skip(1)).enumerate() {
         if b1.shard.k != b2.shard.k {
@@ -326,11 +325,11 @@ mod tests {
         let blocks = encode::<F, G, P>(bytes, encoding_mat, &powers)?;
 
         assert!(verify::<F, G, P>(
-            &recode(&blocks[2..=3]).unwrap().unwrap(),
+            &recode(&blocks[2..=3], rng).unwrap().unwrap(),
             &powers
         )?);
         assert!(verify::<F, G, P>(
-            &recode(&[blocks[3].clone(), blocks[5].clone()])
+            &recode(&[blocks[3].clone(), blocks[5].clone()], rng)
                 .unwrap()
                 .unwrap(),
             &powers
@@ -377,7 +376,7 @@ mod tests {
         let powers = setup(bytes.len(), rng)?;
         let blocks = encode::<F, G, P>(bytes, encoding_mat, &powers)?;
 
-        let b_0_1 = recode(&blocks[0..=1]).unwrap().unwrap();
+        let b_0_1 = recode(&blocks[0..=1], rng).unwrap().unwrap();
         let shards = vec![
             b_0_1.shard,
             blocks[2].shard.clone(),
@@ -385,7 +384,7 @@ mod tests {
         ];
         assert_eq!(bytes, decode::<F>(shards).unwrap());
 
-        let b_0_1 = recode(&[blocks[0].clone(), blocks[1].clone()])
+        let b_0_1 = recode(&[blocks[0].clone(), blocks[1].clone()], rng)
             .unwrap()
             .unwrap();
         let shards = vec![
@@ -395,16 +394,16 @@ mod tests {
         ];
         assert!(decode::<F>(shards).is_err());
 
-        let b_0_1 = recode(&blocks[0..=1]).unwrap().unwrap();
-        let b_2_3 = recode(&blocks[2..=3]).unwrap().unwrap();
-        let b_1_4 = recode(&[blocks[1].clone(), blocks[4].clone()])
+        let b_0_1 = recode(&blocks[0..=1], rng).unwrap().unwrap();
+        let b_2_3 = recode(&blocks[2..=3], rng).unwrap().unwrap();
+        let b_1_4 = recode(&[blocks[1].clone(), blocks[4].clone()], rng)
             .unwrap()
             .unwrap();
         let shards = vec![b_0_1.shard, b_2_3.shard, b_1_4.shard];
         assert_eq!(bytes, decode::<F>(shards).unwrap());
 
         let fully_recoded_shards = (0..3)
-            .map(|_| recode(&blocks[0..=2]).unwrap().unwrap().shard)
+            .map(|_| recode(&blocks[0..=2], rng).unwrap().unwrap().shard)
             .collect();
         assert_eq!(bytes, decode::<F>(fully_recoded_shards).unwrap());
 
@@ -421,10 +420,12 @@ mod tests {
         P: DenseUVPolynomial<F>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
+        let mut rng = ark_std::test_rng();
+
         let (k, n) = (3, 6);
 
         let bytes = bytes();
-        let encoding_mat = Matrix::random(k, n);
+        let encoding_mat = Matrix::random(k, n, &mut rng);
 
         let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
 

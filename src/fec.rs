@@ -173,17 +173,21 @@ mod tests {
     }
 
     fn end_to_end_template<F: PrimeField>(data: &[u8], k: usize, n: usize) {
+        let mut rng = ark_std::test_rng();
+
         let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", data.len(), k, n);
         assert_eq!(
             data,
-            decode::<F>(encode(data, &Matrix::random(k, n)).unwrap()).unwrap(),
+            decode::<F>(encode(data, &Matrix::random(k, n, &mut rng)).unwrap()).unwrap(),
             "{test_case}"
         );
     }
 
     /// k should be at least 5
     fn end_to_end_with_recoding_template<F: PrimeField>(data: &[u8], k: usize, n: usize) {
-        let mut shards = encode(data, &Matrix::random(k, n)).unwrap();
+        let mut rng = ark_std::test_rng();
+
+        let mut shards = encode(data, &Matrix::random(k, n, &mut rng)).unwrap();
         shards[1] = shards[2].combine(to_curve::<F>(7), &shards[4], to_curve::<F>(6));
         shards[2] = shards[1].combine(to_curve::<F>(5), &shards[3], to_curve::<F>(4));
         assert_eq!(

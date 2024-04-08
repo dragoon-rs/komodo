@@ -3,7 +3,7 @@ use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
 use ark_serialize::{CanonicalSerialize, Compress, Validate};
-use ark_std::{ops::Div, test_rng};
+use ark_std::ops::Div;
 
 use komodo::zk;
 
@@ -14,7 +14,7 @@ where
     P: DenseUVPolynomial<F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
-    let rng = &mut test_rng();
+    let rng = &mut rand::thread_rng();
 
     let setup = zk::setup::<_, F, G>(zk::nb_elements_in_setup::<F>(nb_bytes), rng).unwrap();
 
