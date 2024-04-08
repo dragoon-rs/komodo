@@ -26,7 +26,7 @@ where
 
     c.bench_function(
         &format!(
-            "commit {} bytes on {}",
+            "commit (komodo) {} bytes on {}",
             nb_bytes,
             std::any::type_name::<F>()
         ),

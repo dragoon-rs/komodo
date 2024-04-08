@@ -24,7 +24,11 @@ where
     let degree = zk::nb_elements_in_setup::<F>(nb_bytes);
 
     group.bench_function(
-        &format!("setup {} on {}", nb_bytes, std::any::type_name::<F>()),
+        &format!(
+            "setup (komodo) {} on {}",
+            nb_bytes,
+            std::any::type_name::<F>()
+        ),
         |b| b.iter(|| zk::setup::<_, F, G>(degree, rng).unwrap()),
     );
 
