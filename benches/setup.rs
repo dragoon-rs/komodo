@@ -1,7 +1,8 @@
-use ark_bls12_381::{Fr, G1Projective};
-use ark_ec::CurveGroup;
+use ark_bls12_381::{Bls12_381, Fr, G1Projective};
+use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
+use ark_poly_commit::kzg10::{self, KZG10};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::{ops::Div, test_rng};
 
@@ -20,9 +21,11 @@ where
 
     let rng = &mut test_rng();
 
+    let degree = zk::nb_elements_in_setup::<F>(nb_bytes);
+
     group.bench_function(
         &format!("setup {} on {}", nb_bytes, std::any::type_name::<F>()),
-        |b| b.iter(|| zk::setup::<_, F, G>(zk::nb_elements_in_setup::<F>(nb_bytes), rng).unwrap()),
+        |b| b.iter(|| zk::setup::<_, F, G>(degree, rng).unwrap()),
     );
 
     let setup = zk::setup::<_, F, G>(zk::nb_elements_in_setup::<F>(nb_bytes), rng).unwrap();
@@ -114,11 +117,50 @@ where
     group.finish();
 }
 
+fn ark_setup_template<E, P>(c: &mut Criterion, nb_bytes: usize)
+where
+    E: Pairing,
+    P: DenseUVPolynomial<E::ScalarField>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    let rng = &mut test_rng();
+
+    let degree = zk::nb_elements_in_setup::<E::ScalarField>(nb_bytes);
+
+    c.bench_function(
+        &format!(
+            "setup (arkworks) {} bytes on {}",
+            nb_bytes,
+            std::any::type_name::<E>()
+        ),
+        |b| {
+            b.iter(|| {
+                let setup = KZG10::<E, P>::setup(degree, false, rng).unwrap();
+                let powers_of_g = setup.powers_of_g[..=degree].to_vec();
+                let powers_of_gamma_g = (0..=degree).map(|i| setup.powers_of_gamma_g[&i]).collect();
+                kzg10::Powers::<E> {
+                    powers_of_g: ark_std::borrow::Cow::Owned(powers_of_g),
+                    powers_of_gamma_g: ark_std::borrow::Cow::Owned(powers_of_gamma_g),
+                }
+            })
+        },
+    );
+}
+
 fn setup(c: &mut Criterion) {
     for n in [1, 2, 4, 8, 16] {
         setup_template::<Fr, G1Projective, DensePolynomial<Fr>>(c, black_box(n * 1024));
     }
 }
 
-criterion_group!(benches, setup);
+fn ark_setup(c: &mut Criterion) {
+    for n in [1, 2, 4, 8, 16] {
+        ark_setup_template::<Bls12_381, DensePolynomial<<Bls12_381 as Pairing>::ScalarField>>(
+            c,
+            black_box(n * 1024),
+        );
+    }
+}
+
+criterion_group!(benches, setup, ark_setup);
 criterion_main!(benches);
