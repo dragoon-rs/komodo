@@ -7,7 +7,7 @@ use ark_std::ops::Div;
 
 use komodo::zk;
 
-fn setup_template<F, G, P>(nb_bytes: usize)
+fn setup_template<F, G, P>(degree: usize)
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>,
@@ -16,7 +16,9 @@ where
 {
     let rng = &mut rand::thread_rng();
 
-    let setup = zk::setup::<_, F, G>(zk::nb_elements_in_setup::<F>(nb_bytes), rng).unwrap();
+    eprintln!("degree: {}", degree);
+
+    let setup = zk::setup::<_, F, G>(degree, rng).unwrap();
 
     for (compress, validate) in [
         (Compress::Yes, Validate::Yes),
@@ -39,7 +41,7 @@ where
                 Validate::Yes => "validation",
                 Validate::No => "no validation",
             },
-            nb_bytes,
+            degree,
             std::any::type_name::<F>(),
             serialized.len(),
         );

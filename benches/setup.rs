@@ -10,7 +10,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use komodo::zk::{self, Powers};
 
-fn setup_template<F, G, P>(c: &mut Criterion, nb_bytes: usize)
+fn setup_template<F, G, P>(c: &mut Criterion, degree: usize)
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>,
@@ -21,23 +21,21 @@ where
 
     let rng = &mut rand::thread_rng();
 
-    let degree = zk::nb_elements_in_setup::<F>(nb_bytes);
-
     group.bench_function(
         &format!(
             "setup (komodo) {} on {}",
-            nb_bytes,
+            degree,
             std::any::type_name::<F>()
         ),
         |b| b.iter(|| zk::setup::<_, F, G>(degree, rng).unwrap()),
     );
 
-    let setup = zk::setup::<_, F, G>(zk::nb_elements_in_setup::<F>(nb_bytes), rng).unwrap();
+    let setup = zk::setup::<_, F, G>(zk::nb_elements_in_setup::<F>(degree), rng).unwrap();
 
     group.bench_function(
         &format!(
             "serializing with compression {} on {}",
-            nb_bytes,
+            degree,
             std::any::type_name::<F>()
         ),
         |b| {
@@ -53,7 +51,7 @@ where
     group.bench_function(
         &format!(
             "serializing with no compression {} on {}",
-            nb_bytes,
+            degree,
             std::any::type_name::<F>()
         ),
         |b| {
@@ -78,8 +76,8 @@ where
             .unwrap();
 
         println!(
-            r#"["id": "{} bytes serialized with {} and {} on {}", "size": {}"#,
-            nb_bytes,
+            r#"["id": "{} degree serialized with {} and {} on {}", "size": {}"#,
+            degree,
             match compress {
                 Compress::Yes => "compression",
                 Compress::No => "no compression",
@@ -103,7 +101,7 @@ where
                     Validate::Yes => "validation",
                     Validate::No => "no validation",
                 },
-                nb_bytes,
+                degree,
                 std::any::type_name::<F>()
             ),
             |b| {
@@ -121,7 +119,7 @@ where
     group.finish();
 }
 
-fn ark_setup_template<E, P>(c: &mut Criterion, nb_bytes: usize)
+fn ark_setup_template<E, P>(c: &mut Criterion, degree: usize)
 where
     E: Pairing,
     P: DenseUVPolynomial<E::ScalarField>,
@@ -129,12 +127,10 @@ where
 {
     let rng = &mut rand::thread_rng();
 
-    let degree = zk::nb_elements_in_setup::<E::ScalarField>(nb_bytes);
-
     c.bench_function(
         &format!(
             "setup (arkworks) {} bytes on {}",
-            nb_bytes,
+            degree,
             std::any::type_name::<E>()
         ),
         |b| {

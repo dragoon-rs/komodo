@@ -102,7 +102,7 @@ def plot_setup(data: Data, save: bool = False):
     # key: the start of the `$.id` field
     def plot(data: Data, key: str, label: str, color: str, error_bar: bool, ax):
         filtered_data = list(filter(lambda line: line["id"].startswith(key), data))
-        sizes = b_to_kb([int(line["id"].lstrip(key).split(' ')[0]) for line in filtered_data])
+        sizes = [int(line["id"].lstrip(key).split(' ')[0]) for line in filtered_data]
 
         if error_bar:
             means = ns_to_ms(extract(filtered_data, "mean", "estimate"))
@@ -147,7 +147,7 @@ def plot_setup(data: Data, save: bool = False):
     plot(data, "serialized size with no compression and validation", "uncompressed validated", "blue", False, axs[3])
     plot(data, "serialized size with compression and validation", "compressed validated", "green", False, axs[3])
     axs[3].set_title("size")
-    axs[3].set_xlabel("number of expected bytes (in kb)")
+    axs[3].set_xlabel("degree")
     axs[3].set_ylabel("size (in kb)")
     axs[3].legend()
     axs[3].grid()
@@ -167,9 +167,9 @@ def plot_commit(data: Data, save: bool = False):
     def plot(data: Data, key: str, color: str, ax):
         filtered_data = list(filter(lambda line: line["id"].startswith(key), data))
 
-        sizes = b_to_kb([
+        sizes = [
             int(line["id"].lstrip(key).split(' ')[0]) for line in filtered_data
-        ])
+        ]
 
         means = ns_to_ms(extract(filtered_data, "mean", "estimate"))
         up = ns_to_ms(extract(filtered_data, "mean", "upper_bound"))
@@ -186,7 +186,7 @@ def plot_commit(data: Data, save: bool = False):
 
     ax.set_title("commit times")
     ax.set_ylabel("time (in ms)")
-    ax.set_xlabel("data size (in kb)")
+    ax.set_xlabel("degree")
     ax.legend()
     ax.grid(True)
 

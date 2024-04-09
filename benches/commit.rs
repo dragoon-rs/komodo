@@ -10,7 +10,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use komodo::zk;
 
-fn commit_template<F, G, P>(c: &mut Criterion, nb_bytes: usize)
+fn commit_template<F, G, P>(c: &mut Criterion, degree: usize)
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>,
@@ -19,30 +19,26 @@ where
 {
     let rng = &mut rand::thread_rng();
 
-    let degree = zk::nb_elements_in_setup::<F>(nb_bytes);
-
     let setup = zk::setup::<_, F, G>(degree, rng).unwrap();
     let polynomial = P::rand(degree, rng);
 
     c.bench_function(
         &format!(
-            "commit (komodo) {} bytes on {}",
-            nb_bytes,
+            "commit (komodo) {} on {}",
+            degree,
             std::any::type_name::<F>()
         ),
         |b| b.iter(|| zk::commit(&setup, &polynomial)),
     );
 }
 
-fn ark_commit_template<E, P>(c: &mut Criterion, nb_bytes: usize)
+fn ark_commit_template<E, P>(c: &mut Criterion, degree: usize)
 where
     E: Pairing,
     P: DenseUVPolynomial<E::ScalarField>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     let rng = &mut rand::thread_rng();
-
-    let degree = zk::nb_elements_in_setup::<E::ScalarField>(nb_bytes);
 
     let setup = KZG10::<E, P>::setup(degree, false, rng).unwrap();
     let powers_of_g = setup.powers_of_g[..=degree].to_vec();
@@ -55,8 +51,8 @@ where
 
     c.bench_function(
         &format!(
-            "commit (arkworks) {} bytes on {}",
-            nb_bytes,
+            "commit (arkworks) {} on {}",
+            degree,
             std::any::type_name::<E>()
         ),
         |b| b.iter(|| KZG10::commit(&powers, &polynomial, None, None)),
