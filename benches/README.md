@@ -10,6 +10,6 @@ nushell> cargo run --example bench_setup_size out>> results.ndjson
 
 ## plot the results
 ```shell
-python benches/plot.py results.ndjson --bench linalg
-python benches/plot.py results.ndjson --bench setup
+python scripts/plot/benches.py results.ndjson --bench linalg
+python scripts/plot/benches.py results.ndjson --bench setup
 ```

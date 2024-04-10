@@ -55,8 +55,13 @@ def read_data(data_file: str) -> Data:
 
 def plot_linalg(data: Data, save: bool = False):
     # key: the start of the `$.id` field
-    def plot(data: Data, key: str, ax):
-        filtered_data = list(filter(lambda line: line["id"].startswith(key), data))
+    def plot(data: Data, key: str, curve: str, color: str, ax):
+        filtered_data = list(filter(
+            lambda line: line["id"].startswith(key) and line["id"].endswith(f" on {curve}"),
+            data
+        ))
+        if len(filtered_data) == 0:
+            return
 
         sizes = [
             int(line["id"].split(' ')[1].split('x')[0]) for line in filtered_data
@@ -66,23 +71,17 @@ def plot_linalg(data: Data, save: bool = False):
         up = ns_to_ms(extract(filtered_data, "mean", "upper_bound"))
         down = ns_to_ms(extract(filtered_data, "mean", "lower_bound"))
 
-        ax.plot(sizes, means, label="mean", color="blue")
-        ax.fill_between(sizes, down, up, color="blue", alpha=0.3)
+        ax.plot(sizes, means, label=curve, color=color)
+        ax.fill_between(sizes, down, up, color=color, alpha=0.3)
 
-        medians = ns_to_ms(extract(filtered_data, "median", "estimate"))
-        up = ns_to_ms(extract(filtered_data, "median", "upper_bound"))
-        down = ns_to_ms(extract(filtered_data, "median", "lower_bound"))
+    keys = ["transpose", "mul", "inverse"]
 
-        ax.plot(sizes, medians, label="median", color="orange")
-        ax.fill_between(sizes, down, up, color="orange", alpha=0.3)
+    fig, axs = plt.subplots(len(keys), 1, figsize=(16, 9))
 
-    labels = ["transpose", "mul", "inverse"]
-
-    fig, axs = plt.subplots(len(labels), 1, figsize=(16, 9))
-
-    for label, ax in zip(labels, axs):
-        plot(data, key=label, ax=ax)
-        ax.set_title(label)
+    for key, ax in zip(keys, axs):
+        for (curve, color) in [("BLS12-381", "blue"), ("BN-254", "orange"), ("PALLAS", "green")]:
+            plot(data, key=key, curve=curve, color=color, ax=ax)
+        ax.set_title(key)
         ax.set_yscale("log")
         ax.set_ylabel("time in ms")
         ax.legend()
@@ -100,8 +99,14 @@ def plot_setup(data: Data, save: bool = False):
     fig, axs = plt.subplots(4, 1, sharex=True, figsize=(16, 9))
 
     # key: the start of the `$.id` field
-    def plot(data: Data, key: str, label: str, color: str, error_bar: bool, ax):
-        filtered_data = list(filter(lambda line: line["id"].startswith(key), data))
+    def plot(data: Data, key: str, curve: str, label: str, color: str, style: str, error_bar: bool, ax):
+        filtered_data = list(filter(
+            lambda line: line["id"].startswith(key) and line["id"].endswith(f" on {curve}"),
+            data
+        ))
+        if len(filtered_data) == 0:
+            return
+
         sizes = [int(line["id"].lstrip(key).split(' ')[0]) for line in filtered_data]
 
         if error_bar:
@@ -111,41 +116,43 @@ def plot_setup(data: Data, save: bool = False):
         else:
             means = b_to_kb(extract(filtered_data, "mean", None))
 
-        ax.plot(sizes, means, label=label, color=color)
+        ax.plot(sizes, means, label=f"{label} on {curve}", color=color, linestyle=style)
 
         if error_bar:
             ax.fill_between(sizes, down, up, color=color, alpha=0.3)
 
     # setup
-    plot(data, "setup/setup (komodo)", "komodo", "orange", True, axs[0])
-    plot(data, "setup (arkworks)", "arkworks", "blue", True, axs[0])
+    for (curve, color) in [("BLS12-381", "blue"), ("BN-254", "orange"), ("PALLAS", "green")]:
+        plot(data, "setup/setup (komodo)", curve, "komodo", color, "solid", True, axs[0])
+        plot(data, "setup (arkworks)", curve, "arkworks", color, "dashed", True, axs[0])
     axs[0].set_title("time to generate a random trusted setup")
     axs[0].set_ylabel("time (in ms)")
     axs[0].legend()
     axs[0].grid()
 
     # serialization
-    plot(data, "setup/serializing with compression", "compressed", "orange", True, axs[1])
-    plot(data, "setup/serializing with no compression", "uncompressed", "blue", True, axs[1])
+    for (curve, color) in [("BLS12-381", "blue"), ("BN-254", "orange"), ("PALLAS", "green")]:
+        plot(data, "setup/serializing with compression", curve, "compressed", color, "solid", True, axs[1])
+        plot(data, "setup/serializing with no compression", curve, "uncompressed", color, "dashed", True, axs[1])
     axs[1].set_title("serialization")
     axs[1].set_ylabel("time (in ms)")
     axs[1].legend()
     axs[1].grid()
 
     # deserialization
-    plot(data, "setup/deserializing with no compression and no validation", "uncompressed unvalidated", "red", True, axs[2])
-    plot(data, "setup/deserializing with compression and no validation", "compressed unvalidated", "orange", True, axs[2])
-    plot(data, "setup/deserializing with no compression and validation", "uncompressed validated", "blue", True, axs[2])
-    plot(data, "setup/deserializing with compression and validation", "compressed validated", "green", True, axs[2])
+    for (curve, color) in [("BLS12-381", "blue"), ("BN-254", "orange"), ("PALLAS", "green")]:
+        plot(data, "setup/deserializing with no compression and no validation", curve, "uncompressed unvalidated", color, "dotted", True, axs[2])
+        plot(data, "setup/deserializing with compression and no validation", curve, "compressed unvalidated", color, "dashed", True, axs[2])
+        plot(data, "setup/deserializing with no compression and validation", curve, "uncompressed validated", color, "dashdot", True, axs[2])
+        plot(data, "setup/deserializing with compression and validation", curve, "compressed validated", color, "solid", True, axs[2])
     axs[2].set_title("deserialization")
     axs[2].set_ylabel("time (in ms)")
     axs[2].legend()
     axs[2].grid()
 
-    plot(data, "serialized size with no compression and no validation", "uncompressed unvalidated", "red", False, axs[3])
-    plot(data, "serialized size with compression and no validation", "compressed unvalidated", "orange", False, axs[3])
-    plot(data, "serialized size with no compression and validation", "uncompressed validated", "blue", False, axs[3])
-    plot(data, "serialized size with compression and validation", "compressed validated", "green", False, axs[3])
+    for (curve, color) in [("BLS12-381", "blue"), ("BN-254", "orange"), ("PALLAS", "green")]:
+        plot(data, "serialized size with no compression", curve, "uncompressed", color, "dashed", False, axs[3])
+        plot(data, "serialized size with compression", curve, "compressed", color, "solid", False, axs[3])
     axs[3].set_title("size")
     axs[3].set_xlabel("degree")
     axs[3].set_ylabel("size (in kb)")
@@ -164,8 +171,13 @@ def plot_commit(data: Data, save: bool = False):
     fig, ax = plt.subplots(1, 1, figsize=(16, 9))
 
     # key: the start of the `$.id` field
-    def plot(data: Data, key: str, color: str, ax):
-        filtered_data = list(filter(lambda line: line["id"].startswith(key), data))
+    def plot(data: Data, key: str, curve: str, style: str, color: str, ax):
+        filtered_data = list(filter(
+            lambda line: line["id"].startswith(key) and line["id"].endswith(f" on {curve}"),
+            data
+        ))
+        if len(filtered_data) == 0:
+            return
 
         sizes = [
             int(line["id"].lstrip(key).split(' ')[0]) for line in filtered_data
@@ -175,14 +187,12 @@ def plot_commit(data: Data, save: bool = False):
         up = ns_to_ms(extract(filtered_data, "mean", "upper_bound"))
         down = ns_to_ms(extract(filtered_data, "mean", "lower_bound"))
 
-        ax.plot(sizes, means, label=key, color=color)
-        ax.fill_between(sizes, down, up, color=color, alpha=0.3)
+        ax.plot(sizes, means, label=f"{key} on {curve}", color=color, linestyle=style)
+        ax.fill_between(sizes, down, up, color=color, linestyle=style, alpha=0.3)
 
-    keys = ["commit (komodo)", "commit (arkworks)"]
-    colors = ["blue", "orange"]
-
-    for (k, c) in zip(keys, colors):
-        plot(data, key=k, color=c, ax=ax)
+    for (curve, color) in [("BLS12-381", "blue"), ("BN-254", "orange"), ("PALLAS", "green")]:
+        plot(data, key="commit (komodo)", curve=curve, style="solid", color=color, ax=ax)
+        plot(data, key="commit (arkworks)", curve=curve, style="dashed", color=color, ax=ax)
 
     ax.set_title("commit times")
     ax.set_ylabel("time (in ms)")

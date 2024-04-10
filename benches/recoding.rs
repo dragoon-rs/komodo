@@ -1,4 +1,5 @@
-use ark_bls12_381::Fr;
+use std::time::Duration;
+
 use ark_ff::PrimeField;
 use ark_std::rand::Rng;
 
@@ -28,7 +29,13 @@ fn create_fake_shard<F: PrimeField>(nb_bytes: usize, k: usize) -> Shard<F> {
     }
 }
 
-fn bench_template<F: PrimeField>(c: &mut Criterion, nb_bytes: usize, k: usize, nb_shards: usize) {
+fn bench_template<F: PrimeField>(
+    c: &mut Criterion,
+    nb_bytes: usize,
+    k: usize,
+    nb_shards: usize,
+    curve: &str,
+) {
     let shards: Vec<Shard<F>> = (0..nb_shards)
         .map(|_| create_fake_shard(nb_bytes, k))
         .collect();
@@ -41,10 +48,7 @@ fn bench_template<F: PrimeField>(c: &mut Criterion, nb_bytes: usize, k: usize, n
     c.bench_function(
         &format!(
             "recoding {} bytes and {} shards with k = {} on {}",
-            nb_bytes,
-            nb_shards,
-            k,
-            std::any::type_name::<F>()
+            nb_bytes, nb_shards, k, curve
         ),
         |b| b.iter(|| combine(&shards, &coeffs)),
     );
@@ -54,11 +58,19 @@ fn criterion_benchmark(c: &mut Criterion) {
     for nb_bytes in [1, 1_024, 1_024 * 1_024] {
         for nb_shards in [2, 4, 8, 16] {
             for k in [2, 4, 8, 16] {
-                bench_template::<Fr>(c, nb_bytes, k, nb_shards);
+                bench_template::<ark_bls12_381::Fr>(c, nb_bytes, k, nb_shards, "BLS-12-381");
+                bench_template::<ark_bn254::Fr>(c, nb_bytes, k, nb_shards, "BN-254");
+                bench_template::<ark_pallas::Fr>(c, nb_bytes, k, nb_shards, "PALLAS");
             }
         }
     }
 }
 
-criterion_group!(benches, criterion_benchmark);
+criterion_group!(
+    name = benches;
+    config = Criterion::default()
+        .warm_up_time(Duration::from_secs_f32(0.5))
+        .sample_size(10);
+    targets = criterion_benchmark
+);
 criterion_main!(benches);

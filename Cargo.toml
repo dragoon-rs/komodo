@@ -64,3 +64,11 @@ harness = false
 [[bench]]
 name = "commit"
 harness = false
+
+[[example]]
+name = "bench_commit"
+path = "examples/benches/commit.rs"
+
+[[example]]
+name = "bench_setup_size"
+path = "examples/benches/setup_size.rs"
