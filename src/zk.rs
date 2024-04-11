@@ -134,7 +134,7 @@ where
 /// this function uses the commit scheme of KZG.
 ///
 /// > **Note**
-/// > - `powers` can be generated with functions like [`zk::setup`]
+/// > - `powers` can be generated with functions like [`setup`]
 /// > - if `polynomials` has length `n`, then [`commit`] will generate `n`
 /// >   commits.
 #[allow(clippy::type_complexity)]
