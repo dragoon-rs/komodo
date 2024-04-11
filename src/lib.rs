@@ -28,7 +28,7 @@ use crate::{
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Block<F: PrimeField, G: CurveGroup<ScalarField = F>> {
     pub shard: fec::Shard<F>,
-    pub commit: Vec<Commitment<F, G>>,
+    commit: Vec<Commitment<F, G>>,
 }
 
 impl<F: PrimeField, G: CurveGroup<ScalarField = F>> std::fmt::Display for Block<F, G> {
@@ -80,34 +80,6 @@ impl<F: PrimeField, G: CurveGroup<ScalarField = F>> std::fmt::Display for Block<
     }
 }
 
-/// compute the commitments of a set of polynomials
-///
-/// this function uses the commit scheme of KZG.
-///
-/// > **Note**
-/// > - `powers` can be generated with functions like [`zk::setup`]
-/// > - if `polynomials` has length `n`, then [`commit`] will generate `n`
-/// >   commits.
-#[allow(clippy::type_complexity)]
-pub fn commit<F, G, P>(
-    powers: &Powers<F, G>,
-    polynomials: &[P],
-) -> Result<Vec<Commitment<F, G>>, KomodoError>
-where
-    F: PrimeField,
-    G: CurveGroup<ScalarField = F>,
-    P: DenseUVPolynomial<F>,
-    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
-{
-    let mut commits = Vec::new();
-    for polynomial in polynomials {
-        let commit = zk::commit(powers, polynomial)?;
-        commits.push(commit);
-    }
-
-    Ok(commits)
-}
-
 /// compute encoded and proven blocks of data from some data and an encoding
 /// method
 ///
@@ -146,10 +118,9 @@ where
         .collect::<Vec<P>>();
 
     debug!("committing the polynomials");
-    let commits = commit(powers, &polynomials_to_commit)?;
+    let commits = zk::batch_commit(powers, &polynomials_to_commit)?;
 
-    Ok(fec::encode(bytes, encoding_mat)
-        .unwrap() // TODO: don't unwrap here
+    Ok(fec::encode(bytes, encoding_mat)?
         .iter()
         .map(|s| Block {
             shard: s.clone(),
@@ -242,7 +213,7 @@ where
 mod tests {
     use ark_bls12_381::{Fr, G1Projective};
     use ark_ec::CurveGroup;
-    use ark_ff::{Field, PrimeField};
+    use ark_ff::PrimeField;
     use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
     use ark_std::{ops::Div, test_rng};
 
@@ -412,11 +383,10 @@ mod tests {
 
     // NOTE: this is part of an experiment, to be honest, to be able to see how
     // much these tests could be refactored and simplified
-    fn run_template<F, T, P, Fun>(test: Fun)
+    fn run_template<F, P, Fun>(test: Fun)
     where
         F: PrimeField,
-        T: Field,
-        Fun: Fn(&[u8], &Matrix<T>) -> Result<(), KomodoError>,
+        Fun: Fn(&[u8], &Matrix<F>) -> Result<(), KomodoError>,
         P: DenseUVPolynomial<F>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
@@ -435,35 +405,35 @@ mod tests {
 
     #[test]
     fn verification() {
-        run_template::<Fr, _, DensePolynomial<Fr>, _>(
+        run_template::<Fr, DensePolynomial<Fr>, _>(
             verify_template::<Fr, G1Projective, DensePolynomial<Fr>>,
         );
     }
 
     #[test]
     fn verify_with_errors() {
-        run_template::<Fr, _, DensePolynomial<Fr>, _>(
+        run_template::<Fr, DensePolynomial<Fr>, _>(
             verify_with_errors_template::<Fr, G1Projective, DensePolynomial<Fr>>,
         );
     }
 
     #[test]
     fn verify_recoding() {
-        run_template::<Fr, _, DensePolynomial<Fr>, _>(
+        run_template::<Fr, DensePolynomial<Fr>, _>(
             verify_recoding_template::<Fr, G1Projective, DensePolynomial<Fr>>,
         );
     }
 
     #[test]
     fn end_to_end() {
-        run_template::<Fr, _, DensePolynomial<Fr>, _>(
+        run_template::<Fr, DensePolynomial<Fr>, _>(
             end_to_end_template::<Fr, G1Projective, DensePolynomial<Fr>>,
         );
     }
 
     #[test]
     fn end_to_end_with_recoding() {
-        run_template::<Fr, _, DensePolynomial<Fr>, _>(
+        run_template::<Fr, DensePolynomial<Fr>, _>(
             end_to_end_with_recoding_template::<Fr, G1Projective, DensePolynomial<Fr>>,
         );
     }

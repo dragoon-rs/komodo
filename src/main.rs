@@ -118,7 +118,7 @@ fn throw_error(code: i32, message: &str) {
     exit(code);
 }
 
-pub fn generate_random_powers<F, G, P, R>(
+fn generate_random_powers<F, G, P, R>(
     n: usize,
     powers_dir: &Path,
     powers_filename: Option<&str>,
@@ -139,7 +139,7 @@ where
     Ok(())
 }
 
-pub fn verify_blocks<F, G, P>(
+fn verify_blocks<F, G, P>(
     blocks: &[(String, Block<F, G>)],
     powers: Powers<F, G>,
 ) -> Result<(), KomodoError>

@@ -3,7 +3,7 @@ use ark_ec::{scalar_mul::fixed_base::FixedBase, CurveGroup, VariableBaseMSM};
 use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{end_timer, rand::RngCore, start_timer};
+use ark_std::{end_timer, ops::Div, rand::RngCore, start_timer};
 
 use crate::error::KomodoError;
 
@@ -112,11 +112,8 @@ where
 {
     check_degree_is_too_large(polynomial.degree(), powers.len())?;
 
-    let commit_time = start_timer!(|| format!(
-        "Committing to polynomial of degree {} with hiding_bound: {:?}",
-        polynomial.degree(),
-        hiding_bound,
-    ));
+    let commit_time =
+        start_timer!(|| format!("Committing to polynomial of degree {}", polynomial.degree(),));
 
     let (num_leading_zeros, plain_coeffs) = skip_leading_zeros_and_convert_to_bigints(polynomial);
 
@@ -130,6 +127,35 @@ where
 
     end_timer!(commit_time);
     Ok(Commitment(commitment.into()))
+}
+
+/// compute the commitments of a set of polynomials
+///
+/// this function uses the commit scheme of KZG.
+///
+/// > **Note**
+/// > - `powers` can be generated with functions like [`zk::setup`]
+/// > - if `polynomials` has length `n`, then [`commit`] will generate `n`
+/// >   commits.
+#[allow(clippy::type_complexity)]
+#[inline(always)]
+pub fn batch_commit<F, G, P>(
+    powers: &Powers<F, G>,
+    polynomials: &[P],
+) -> Result<Vec<Commitment<F, G>>, KomodoError>
+where
+    F: PrimeField,
+    G: CurveGroup<ScalarField = F>,
+    P: DenseUVPolynomial<F>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    let mut commits = Vec::new();
+    for polynomial in polynomials {
+        let commit = commit(powers, polynomial)?;
+        commits.push(commit);
+    }
+
+    Ok(commits)
 }
 
 // compute the number of elements that a _trusted setup_ should have for data of

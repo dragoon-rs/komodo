@@ -45,7 +45,7 @@ impl<F: PrimeField> Shard<F> {
                 .data
                 .iter()
                 .zip(other.data.iter())
-                .map(|(es, eo)| es.mul(alpha).add(eo.mul(beta)))
+                .map(|(es, eo)| es.mul(alpha) + eo.mul(beta))
                 .collect::<Vec<_>>(),
             size: self.size,
         }
@@ -69,7 +69,7 @@ pub fn combine<F: PrimeField>(shards: &[Shard<F>], coeffs: &[F]) -> Option<Shard
 
     let (s, _) = shards
         .iter()
-        .zip(coeffs.iter())
+        .zip(coeffs)
         .skip(1)
         .fold((shards[0].clone(), coeffs[0]), |(acc_s, acc_c), (s, c)| {
             (acc_s.combine(acc_c, s, *c), F::one())
