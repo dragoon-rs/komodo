@@ -20,7 +20,7 @@ where
     let max_degree = *degrees.iter().max().unwrap_or(&0);
 
     eprint!("building trusted setup for degree {}... ", max_degree);
-    let setup = zk::setup::<_, F, G>(max_degree, rng).unwrap();
+    let setup = zk::setup::<F, G>(max_degree, rng).unwrap();
     eprintln!("done");
 
     for (i, degree) in degrees.iter().enumerate() {

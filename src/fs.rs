@@ -90,7 +90,7 @@ pub fn read_blocks<F: PrimeField, G: CurveGroup<ScalarField = F>>(
             let s = std::fs::read(filename)?;
             Ok((
                 f.clone(),
-                Block::<F, G>::deserialize_with_mode(&s[..], compress, validate)?,
+                Block::deserialize_with_mode(&s[..], compress, validate)?,
             ))
         })
         .collect()

@@ -13,12 +13,12 @@ use ark_std::rand::RngCore;
 use tracing::{info, warn};
 
 use komodo::{
-    encode,
+    build,
     error::KomodoError,
-    fec::{decode, Shard},
+    fec::{self, decode, Shard},
     fs,
     linalg::Matrix,
-    recode, verify,
+    prove, recode, verify,
     zk::{self, Powers},
     Block,
 };
@@ -118,21 +118,20 @@ fn throw_error(code: i32, message: &str) {
     exit(code);
 }
 
-fn generate_random_powers<F, G, P, R>(
+fn generate_random_powers<F, G, P>(
     n: usize,
     powers_dir: &Path,
     powers_filename: Option<&str>,
-    rng: &mut R,
+    rng: &mut impl RngCore,
 ) -> Result<()>
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>,
     P: DenseUVPolynomial<F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
-    R: RngCore,
 {
     info!("generating new powers");
-    let powers = zk::setup::<_, F, G>(zk::nb_elements_in_setup::<F>(n), rng)?;
+    let powers = zk::setup::<F, G>(zk::nb_elements_in_setup::<F>(n), rng)?;
 
     fs::dump(&powers, powers_dir, powers_filename, COMPRESS)?;
 
@@ -189,7 +188,7 @@ fn main() {
     let powers_file = powers_dir.join(powers_filename);
 
     if do_generate_powers {
-        generate_random_powers::<Fr, G1Projective, DensePolynomial<Fr>, _>(
+        generate_random_powers::<Fr, G1Projective, DensePolynomial<Fr>>(
             nb_bytes,
             &powers_dir,
             Some(powers_filename),
@@ -286,7 +285,7 @@ fn main() {
     } else {
         warn!("could not read powers from `{:?}`", powers_file);
         info!("regenerating temporary powers");
-        zk::setup::<_, Fr, G1Projective>(zk::nb_elements_in_setup::<Fr>(nb_bytes), &mut rng)
+        zk::setup::<Fr, G1Projective>(zk::nb_elements_in_setup::<Fr>(nb_bytes), &mut rng)
             .unwrap_or_else(|e| {
                 throw_error(1, &format!("could not generate powers: {}", e));
                 unreachable!()
@@ -324,16 +323,18 @@ fn main() {
         }
     };
 
-    let formatted_output = fs::dump_blocks(
-        &encode::<Fr, G1Projective, DensePolynomial<Fr>>(&bytes, &encoding_mat, &powers)
-            .unwrap_or_else(|e| {
-                throw_error(1, &format!("could not encode: {}", e));
-                unreachable!()
-            }),
-        &block_dir,
-        COMPRESS,
-    )
-    .unwrap_or_else(|e| {
+    let shards = fec::encode::<Fr>(&bytes, &encoding_mat).unwrap_or_else(|e| {
+        throw_error(1, &format!("could not encode: {}", e));
+        unreachable!()
+    });
+    let proof =
+        prove::<Fr, G1Projective, DensePolynomial<Fr>>(&bytes, &powers, k).unwrap_or_else(|e| {
+            throw_error(1, &format!("could not prove: {}", e));
+            unreachable!()
+        });
+    let blocks = build::<Fr, G1Projective, DensePolynomial<Fr>>(&shards, &proof);
+
+    let formatted_output = fs::dump_blocks(&blocks, &block_dir, COMPRESS).unwrap_or_else(|e| {
         throw_error(1, &format!("could not dump blocks: {}", e));
         unreachable!()
     });

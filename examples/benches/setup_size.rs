@@ -17,7 +17,7 @@ where
 
     eprintln!("degree: {}", degree);
 
-    let setup = zk::setup::<_, F, G>(degree, rng).unwrap();
+    let setup = zk::setup::<F, G>(degree, rng).unwrap();
 
     for compress in [Compress::Yes, Compress::No] {
         println!(

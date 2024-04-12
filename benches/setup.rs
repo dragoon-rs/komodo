@@ -21,7 +21,7 @@ where
     let rng = &mut rand::thread_rng();
 
     c.bench_function(&format!("setup (komodo) {} on {}", degree, curve), |b| {
-        b.iter(|| zk::setup::<_, F, G>(degree, rng).unwrap())
+        b.iter(|| zk::setup::<F, G>(degree, rng).unwrap())
     });
 }
 
@@ -60,7 +60,7 @@ where
 
     let rng = &mut rand::thread_rng();
 
-    let setup = zk::setup::<_, F, G>(degree, rng).unwrap();
+    let setup = zk::setup::<F, G>(degree, rng).unwrap();
 
     group.bench_function(
         &format!("serializing with compression {} on {}", degree, curve),

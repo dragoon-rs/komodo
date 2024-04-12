@@ -35,9 +35,9 @@ impl<F: PrimeField, G: CurveGroup<ScalarField = F>> IntoIterator for Powers<F, G
 pub struct Commitment<F: PrimeField, G: CurveGroup<ScalarField = F>>(pub G::Affine);
 
 /// create a trusted setup of a given size, the expected maximum degree of the data
-pub fn setup<R: RngCore, F: PrimeField, G: CurveGroup<ScalarField = F>>(
+pub fn setup<F: PrimeField, G: CurveGroup<ScalarField = F>>(
     max_degree: usize,
-    rng: &mut R,
+    rng: &mut impl RngCore,
 ) -> Result<Powers<F, G>, KomodoError> {
     if max_degree < 1 {
         return Err(KomodoError::DegreeIsZero);
@@ -182,7 +182,7 @@ mod tests {
 
         let rng = &mut test_rng();
 
-        let powers = setup::<_, F, G>(degree, rng).unwrap();
+        let powers = setup::<F, G>(degree, rng).unwrap();
 
         assert_eq!(
             powers.len(),
@@ -201,7 +201,7 @@ mod tests {
     fn generate_invalid_setup_template<F: PrimeField, G: CurveGroup<ScalarField = F>>() {
         let rng = &mut test_rng();
 
-        let powers = setup::<_, F, G>(0, rng);
+        let powers = setup::<F, G>(0, rng);
         assert!(
             powers.is_err(),
             "creating a trusted setup for a degree 0 polynomial should NOT work"
@@ -212,7 +212,7 @@ mod tests {
             "message should say the degree is zero"
         );
         assert!(
-            setup::<_, F, G>(1, rng).is_ok(),
+            setup::<F, G>(1, rng).is_ok(),
             "creating a trusted setup for any polynomial with degree at least 1 should work"
         );
     }
@@ -232,7 +232,7 @@ mod tests {
 
         let rng = &mut test_rng();
 
-        let powers = setup::<_, F, G>(degree, rng).unwrap();
+        let powers = setup::<F, G>(degree, rng).unwrap();
 
         assert!(
             commit_to_test(&powers, &P::rand(degree - 1, rng)).is_ok(),

@@ -6,7 +6,7 @@ use ark_std::rand::Rng;
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use komodo::{
-    fec::{combine, Shard},
+    fec::{recode_with_coeffs, Shard},
     field,
 };
 
@@ -50,7 +50,7 @@ fn bench_template<F: PrimeField>(
             "recoding {} bytes and {} shards with k = {} on {}",
             nb_bytes, nb_shards, k, curve
         ),
-        |b| b.iter(|| combine(&shards, &coeffs)),
+        |b| b.iter(|| recode_with_coeffs(&shards, &coeffs)),
     );
 }
 

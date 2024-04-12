@@ -19,7 +19,7 @@ where
 {
     let rng = &mut rand::thread_rng();
 
-    let setup = zk::setup::<_, F, G>(degree, rng).unwrap();
+    let setup = zk::setup::<F, G>(degree, rng).unwrap();
     let polynomial = P::rand(degree, rng);
 
     c.bench_function(&format!("commit (komodo) {} on {}", degree, curve), |b| {

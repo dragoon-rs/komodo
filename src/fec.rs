@@ -2,6 +2,7 @@
 
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::rand::RngCore;
 
 use rs_merkle::{algorithms::Sha256, Hasher};
 
@@ -25,7 +26,7 @@ pub struct Shard<F: PrimeField> {
 
 impl<F: PrimeField> Shard<F> {
     /// compute the linear combination between two [`Shard`]s
-    pub fn combine(&self, alpha: F, other: &Self, beta: F) -> Self {
+    pub fn recode_with(&self, alpha: F, other: &Self, beta: F) -> Self {
         if alpha.is_zero() {
             return other.clone();
         } else if beta.is_zero() {
@@ -55,11 +56,11 @@ impl<F: PrimeField> Shard<F> {
 /// compute the linear combination between an arbitrary number of [`Shard`]s
 ///
 /// > **Note**
-/// > this is basically a multi-[`Shard`] wrapper around [`Shard::combine`]
+/// > this is basically a multi-[`Shard`] wrapper around [`Shard::recode_with`]
 /// >
 /// > returns [`None`] if number of shards is not the same as the number of
 /// > coefficients or if no shards are provided.
-pub fn combine<F: PrimeField>(shards: &[Shard<F>], coeffs: &[F]) -> Option<Shard<F>> {
+pub fn recode_with_coeffs<F: PrimeField>(shards: &[Shard<F>], coeffs: &[F]) -> Option<Shard<F>> {
     if shards.len() != coeffs.len() {
         return None;
     }
@@ -72,9 +73,47 @@ pub fn combine<F: PrimeField>(shards: &[Shard<F>], coeffs: &[F]) -> Option<Shard
         .zip(coeffs)
         .skip(1)
         .fold((shards[0].clone(), coeffs[0]), |(acc_s, acc_c), (s, c)| {
-            (acc_s.combine(acc_c, s, *c), F::one())
+            (acc_s.recode_with(acc_c, s, *c), F::one())
         });
     Some(s)
+}
+
+/// compute a recoded shard from an arbitrary set of shards
+///
+/// coefficients will be drawn at random, one for each shard.
+///
+/// if the shards appear to come from different data, e.g. if `k` is not the
+/// same or the hash of the data is different, an error will be returned.
+///
+/// > **Note**
+/// > this is a wrapper around [`recode_with_coeffs`].
+pub fn recode_random<F: PrimeField>(
+    shards: &[Shard<F>],
+    rng: &mut impl RngCore,
+) -> Result<Option<Shard<F>>, KomodoError> {
+    for (i, (s1, s2)) in shards.iter().zip(shards.iter().skip(1)).enumerate() {
+        if s1.k != s2.k {
+            return Err(KomodoError::IncompatibleShards(format!(
+                "k is not the same at {}: {} vs {}",
+                i, s1.k, s2.k
+            )));
+        }
+        if s1.hash != s2.hash {
+            return Err(KomodoError::IncompatibleShards(format!(
+                "hash is not the same at {}: {:?} vs {:?}",
+                i, s1.hash, s2.hash
+            )));
+        }
+        if s1.size != s2.size {
+            return Err(KomodoError::IncompatibleShards(format!(
+                "size is not the same at {}: {} vs {}",
+                i, s1.size, s2.size
+            )));
+        }
+    }
+
+    let coeffs = shards.iter().map(|_| F::rand(rng)).collect::<Vec<_>>();
+    Ok(recode_with_coeffs(shards, &coeffs))
 }
 
 /// applies a given encoding matrix to some data to generate encoded shards
@@ -91,7 +130,7 @@ pub fn encode<F: PrimeField>(
     let k = encoding_mat.height;
 
     let source_shards = Matrix::from_vec_vec(
-        field::split_data_into_field_elements::<F>(data, k)
+        field::split_data_into_field_elements(data, k)
             .chunks(k)
             .map(|c| c.to_vec())
             .collect(),
@@ -146,7 +185,7 @@ pub fn decode<F: PrimeField>(shards: Vec<Shard<F>>) -> Result<Vec<u8>, KomodoErr
 
     let source_shards = encoding_mat.invert()?.mul(&shard_mat)?.transpose().elements;
 
-    let mut bytes = field::merge_elements_into_bytes::<F>(&source_shards);
+    let mut bytes = field::merge_elements_into_bytes(&source_shards);
     bytes.resize(shards[0].size, 0);
     Ok(bytes)
 }
@@ -162,7 +201,7 @@ mod tests {
         linalg::Matrix,
     };
 
-    use super::combine;
+    use super::recode_with_coeffs;
 
     fn bytes() -> Vec<u8> {
         include_bytes!("../tests/dragoon_32x32.png").to_vec()
@@ -188,8 +227,8 @@ mod tests {
         let mut rng = ark_std::test_rng();
 
         let mut shards = encode(data, &Matrix::random(k, n, &mut rng)).unwrap();
-        shards[1] = shards[2].combine(to_curve::<F>(7), &shards[4], to_curve::<F>(6));
-        shards[2] = shards[1].combine(to_curve::<F>(5), &shards[3], to_curve::<F>(4));
+        shards[1] = shards[2].recode_with(to_curve(7), &shards[4], to_curve(6));
+        shards[2] = shards[1].recode_with(to_curve(5), &shards[3], to_curve(4));
         assert_eq!(
             data,
             decode::<F>(shards).unwrap(),
@@ -232,7 +271,7 @@ mod tests {
             k: 2,
             linear_combination: linear_combination.to_vec(),
             hash: vec![],
-            data: field::split_data_into_field_elements::<F>(bytes, 1),
+            data: field::split_data_into_field_elements(bytes, 1),
             size: 0,
         }
     }
@@ -241,16 +280,16 @@ mod tests {
         let a: Shard<F> = create_fake_shard(&[F::one(), F::zero()], &[1, 2, 3]);
         let b: Shard<F> = create_fake_shard(&[F::zero(), F::one()], &[4, 5, 6]);
 
-        let c = a.combine(to_curve::<F>(3), &b, to_curve::<F>(5));
+        let c = a.recode_with(to_curve(3), &b, to_curve(5));
 
         assert_eq!(
             c,
-            create_fake_shard(&[to_curve::<F>(3), to_curve::<F>(5),], &[23, 31, 39])
+            create_fake_shard(&[to_curve(3), to_curve(5),], &[23, 31, 39])
         );
 
         assert_eq!(
-            c.combine(to_curve::<F>(2), &a, to_curve::<F>(4),),
-            create_fake_shard(&[to_curve::<F>(10), to_curve::<F>(10),], &[50, 70, 90],)
+            c.recode_with(to_curve(2), &a, to_curve(4),),
+            create_fake_shard(&[to_curve(10), to_curve(10),], &[50, 70, 90],)
         );
     }
 
@@ -260,23 +299,20 @@ mod tests {
     }
 
     fn combine_shards_template<F: PrimeField>() {
-        let a = create_fake_shard::<F>(&[to_curve::<F>(1), to_curve::<F>(0)], &[1, 4, 7]);
-        let b = create_fake_shard::<F>(&[to_curve::<F>(0), to_curve::<F>(2)], &[2, 5, 8]);
-        let c = create_fake_shard::<F>(&[to_curve::<F>(3), to_curve::<F>(5)], &[3, 6, 9]);
+        let a = create_fake_shard::<F>(&[to_curve(1), to_curve(0)], &[1, 4, 7]);
+        let b = create_fake_shard::<F>(&[to_curve(0), to_curve(2)], &[2, 5, 8]);
+        let c = create_fake_shard::<F>(&[to_curve(3), to_curve(5)], &[3, 6, 9]);
 
-        assert!(combine::<F>(&[], &[]).is_none());
-        assert!(combine::<F>(
+        assert!(recode_with_coeffs::<F>(&[], &[]).is_none());
+        assert!(recode_with_coeffs(
             &[a.clone(), b.clone(), c.clone()],
-            &[to_curve::<F>(1), to_curve::<F>(2)]
+            &[to_curve(1), to_curve(2)]
         )
         .is_none());
         assert_eq!(
-            combine::<F>(
-                &[a, b, c],
-                &[to_curve::<F>(1), to_curve::<F>(2), to_curve::<F>(3)]
-            ),
-            Some(create_fake_shard::<F>(
-                &[to_curve::<F>(10), to_curve::<F>(19)],
+            recode_with_coeffs(&[a, b, c], &[to_curve(1), to_curve(2), to_curve(3)]),
+            Some(create_fake_shard(
+                &[to_curve(10), to_curve(19)],
                 &[14, 32, 50]
             ))
         );

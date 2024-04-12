@@ -95,8 +95,8 @@ mod tests {
     }
 
     fn split_and_merge_template<F: PrimeField>(bytes: &[u8], modulus: usize) {
-        let elements = field::split_data_into_field_elements::<F>(bytes, modulus);
-        let mut actual = merge_elements_into_bytes::<F>(&elements);
+        let elements: Vec<F> = field::split_data_into_field_elements(bytes, modulus);
+        let mut actual = merge_elements_into_bytes(&elements);
         actual.resize(bytes.len(), 0);
         assert_eq!(bytes, actual, "TEST | modulus: {modulus}");
     }

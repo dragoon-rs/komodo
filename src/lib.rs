@@ -3,7 +3,8 @@ use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{ops::Div, rand::RngCore};
+use ark_std::ops::Div;
+use ark_std::rand::RngCore;
 
 use tracing::{debug, info};
 
@@ -16,8 +17,7 @@ pub mod zk;
 
 use crate::{
     error::KomodoError,
-    fec::combine,
-    linalg::Matrix,
+    fec::Shard,
     zk::{Commitment, Powers},
 };
 
@@ -28,7 +28,7 @@ use crate::{
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Block<F: PrimeField, G: CurveGroup<ScalarField = F>> {
     pub shard: fec::Shard<F>,
-    commit: Vec<Commitment<F, G>>,
+    proof: Vec<Commitment<F, G>>,
 }
 
 impl<F: PrimeField, G: CurveGroup<ScalarField = F>> std::fmt::Display for Block<F, G> {
@@ -70,7 +70,7 @@ impl<F: PrimeField, G: CurveGroup<ScalarField = F>> std::fmt::Display for Block<
         write!(f, "}}")?;
         write!(f, ",")?;
         write!(f, "commits: [")?;
-        for commit in &self.commit {
+        for commit in &self.proof {
             write!(f, r#""{}","#, commit.0)?;
         }
         write!(f, "]")?;
@@ -80,16 +80,47 @@ impl<F: PrimeField, G: CurveGroup<ScalarField = F>> std::fmt::Display for Block<
     }
 }
 
-/// compute encoded and proven blocks of data from some data and an encoding
-/// method
+/// compute a recoded block from an arbitrary set of blocks
+///
+/// coefficients will be drawn at random, one for each block.
+///
+/// if the blocks appear to come from different data, e.g. if the commits are
+/// different, an error will be returned.
 ///
 /// > **Note**
-/// > this is a wrapper around [`fec::encode`].
-pub fn encode<F, G, P>(
+/// > this is a wrapper around [`fec::recode_random`].
+pub fn recode<F: PrimeField, G: CurveGroup<ScalarField = F>>(
+    blocks: &[Block<F, G>],
+    rng: &mut impl RngCore,
+) -> Result<Option<Block<F, G>>, KomodoError> {
+    for (i, (b1, b2)) in blocks.iter().zip(blocks.iter().skip(1)).enumerate() {
+        if b1.proof != b2.proof {
+            return Err(KomodoError::IncompatibleBlocks(format!(
+                "proofs are not the same at {}: {:?} vs {:?}",
+                i, b1.proof, b2.proof
+            )));
+        }
+    }
+    let shard = match fec::recode_random(
+        &blocks.iter().map(|b| b.shard.clone()).collect::<Vec<_>>(),
+        rng,
+    )? {
+        Some(s) => s,
+        None => return Ok(None),
+    };
+
+    Ok(Some(Block {
+        shard,
+        proof: blocks[0].proof.clone(),
+    }))
+}
+
+/// compute the Semi-AVID proof for some data
+pub fn prove<F, G, P>(
     bytes: &[u8],
-    encoding_mat: &Matrix<F>,
     powers: &Powers<F, G>,
-) -> Result<Vec<Block<F, G>>, KomodoError>
+    k: usize,
+) -> Result<Vec<Commitment<F, G>>, KomodoError>
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>,
@@ -98,10 +129,8 @@ where
 {
     info!("encoding and proving {} bytes", bytes.len());
 
-    let k = encoding_mat.height;
-
     debug!("splitting bytes into polynomials");
-    let elements = field::split_data_into_field_elements::<F>(bytes, k);
+    let elements = field::split_data_into_field_elements(bytes, k);
     let polynomials = elements
         .chunks(k)
         .map(|c| P::from_coefficients_vec(c.to_vec()))
@@ -120,68 +149,25 @@ where
     debug!("committing the polynomials");
     let commits = zk::batch_commit(powers, &polynomials_to_commit)?;
 
-    Ok(fec::encode(bytes, encoding_mat)?
+    Ok(commits)
+}
+
+/// attach a Semi-AVID proof to a collection of encoded shards
+#[inline(always)]
+pub fn build<F, G, P>(shards: &[Shard<F>], proof: &[Commitment<F, G>]) -> Vec<Block<F, G>>
+where
+    F: PrimeField,
+    G: CurveGroup<ScalarField = F>,
+    P: DenseUVPolynomial<F>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    shards
         .iter()
         .map(|s| Block {
             shard: s.clone(),
-            commit: commits.clone(),
+            proof: proof.to_vec(),
         })
-        .collect::<Vec<_>>())
-}
-
-/// compute a recoded block from an arbitrary set of blocks
-///
-/// coefficients will be drawn at random, one for each block.
-///
-/// if the blocks appear to come from different data, e.g. if `k` is not the
-/// same or the hash of the data is different, an error will be returned.
-///
-/// > **Note**
-/// > this is a wrapper around [`fec::combine`].
-pub fn recode<F: PrimeField, G: CurveGroup<ScalarField = F>, R: RngCore>(
-    blocks: &[Block<F, G>],
-    rng: &mut R,
-) -> Result<Option<Block<F, G>>, KomodoError> {
-    let coeffs = blocks.iter().map(|_| F::rand(rng)).collect::<Vec<_>>();
-
-    for (i, (b1, b2)) in blocks.iter().zip(blocks.iter().skip(1)).enumerate() {
-        if b1.shard.k != b2.shard.k {
-            return Err(KomodoError::IncompatibleBlocks(format!(
-                "k is not the same at {}: {} vs {}",
-                i, b1.shard.k, b2.shard.k
-            )));
-        }
-        if b1.shard.hash != b2.shard.hash {
-            return Err(KomodoError::IncompatibleBlocks(format!(
-                "hash is not the same at {}: {:?} vs {:?}",
-                i, b1.shard.hash, b2.shard.hash
-            )));
-        }
-        if b1.shard.size != b2.shard.size {
-            return Err(KomodoError::IncompatibleBlocks(format!(
-                "size is not the same at {}: {} vs {}",
-                i, b1.shard.size, b2.shard.size
-            )));
-        }
-        if b1.commit != b2.commit {
-            return Err(KomodoError::IncompatibleBlocks(format!(
-                "commits are not the same at {}: {:?} vs {:?}",
-                i, b1.commit, b2.commit
-            )));
-        }
-    }
-    let shard = match combine(
-        &blocks.iter().map(|b| b.shard.clone()).collect::<Vec<_>>(),
-        &coeffs,
-    ) {
-        Some(s) => s,
-        None => return Ok(None),
-    };
-
-    Ok(Some(Block {
-        shard,
-        commit: blocks[0].commit.clone(),
-    }))
+        .collect::<Vec<_>>()
 }
 
 /// verify that a single block of encoded and proven data is valid
@@ -204,9 +190,9 @@ where
         .linear_combination
         .iter()
         .enumerate()
-        .map(|(i, w)| Into::<G>::into(block.commit[i].0) * w)
+        .map(|(i, w)| block.proof[i].0.into() * w)
         .sum();
-    Ok(Into::<G>::into(commit.0) == rhs)
+    Ok(commit.0.into() == rhs)
 }
 
 #[cfg(test)]
@@ -218,16 +204,22 @@ mod tests {
     use ark_std::{ops::Div, test_rng};
 
     use crate::{
-        encode,
+        build,
         error::KomodoError,
-        fec::{decode, Shard},
+        fec::{decode, encode, Shard},
         linalg::Matrix,
-        recode, verify,
+        prove, recode, verify,
         zk::{setup, Commitment},
     };
 
     fn bytes() -> Vec<u8> {
         include_bytes!("../tests/dragoon_133x133.png").to_vec()
+    }
+
+    macro_rules! full {
+        ($b:ident, $p:ident, $m:ident) => {
+            build::<F, G, P>(&encode($b, $m)?, &prove($b, &$p, $m.height)?)
+        };
     }
 
     fn verify_template<F, G, P>(bytes: &[u8], encoding_mat: &Matrix<F>) -> Result<(), KomodoError>
@@ -239,11 +231,12 @@ mod tests {
     {
         let rng = &mut test_rng();
 
-        let powers = setup(bytes.len(), rng)?;
-        let blocks = encode::<F, G, P>(bytes, encoding_mat, &powers)?;
+        let powers = setup::<F, G>(bytes.len(), rng)?;
+
+        let blocks = full!(bytes, powers, encoding_mat);
 
         for block in &blocks {
-            assert!(verify::<F, G, P>(block, &powers)?);
+            assert!(verify(block, &powers)?);
         }
 
         Ok(())
@@ -262,20 +255,21 @@ mod tests {
         let rng = &mut test_rng();
 
         let powers = setup(bytes.len(), rng)?;
-        let blocks = encode::<F, G, P>(bytes, encoding_mat, &powers)?;
+
+        let blocks = full!(bytes, powers, encoding_mat);
 
         for block in &blocks {
-            assert!(verify::<F, G, P>(block, &powers)?);
+            assert!(verify(block, &powers)?);
         }
 
         let mut corrupted_block = blocks[0].clone();
         // modify a field in the struct b to corrupt the block proof without corrupting the data serialization
         let a = F::from_le_bytes_mod_order(&123u128.to_le_bytes());
-        let mut commits: Vec<G> = corrupted_block.commit.iter().map(|c| c.0.into()).collect();
+        let mut commits: Vec<G> = corrupted_block.proof.iter().map(|c| c.0.into()).collect();
         commits[0] = commits[0].mul(a.pow([4321_u64]));
-        corrupted_block.commit = commits.iter().map(|&c| Commitment(c.into())).collect();
+        corrupted_block.proof = commits.iter().map(|&c| Commitment(c.into())).collect();
 
-        assert!(!verify::<F, G, P>(&corrupted_block, &powers)?);
+        assert!(!verify(&corrupted_block, &powers)?);
 
         Ok(())
     }
@@ -292,14 +286,15 @@ mod tests {
     {
         let rng = &mut test_rng();
 
-        let powers = setup(bytes.len(), rng)?;
-        let blocks = encode::<F, G, P>(bytes, encoding_mat, &powers)?;
+        let powers = setup::<F, G>(bytes.len(), rng)?;
 
-        assert!(verify::<F, G, P>(
+        let blocks = full!(bytes, powers, encoding_mat);
+
+        assert!(verify(
             &recode(&blocks[2..=3], rng).unwrap().unwrap(),
             &powers
         )?);
-        assert!(verify::<F, G, P>(
+        assert!(verify(
             &recode(&[blocks[3].clone(), blocks[5].clone()], rng)
                 .unwrap()
                 .unwrap(),
@@ -321,13 +316,13 @@ mod tests {
     {
         let rng = &mut test_rng();
 
-        let powers = setup(bytes.len(), rng)?;
-        let blocks: Vec<Shard<F>> = encode::<F, G, P>(bytes, encoding_mat, &powers)?
-            .iter()
-            .map(|b| b.shard.clone())
-            .collect();
+        let powers = setup::<F, G>(bytes.len(), rng)?;
 
-        assert_eq!(bytes, decode::<F>(blocks).unwrap());
+        let blocks = full!(bytes, powers, encoding_mat);
+
+        let shards: Vec<Shard<F>> = blocks.iter().map(|b| b.shard.clone()).collect();
+
+        assert_eq!(bytes, decode(shards).unwrap());
 
         Ok(())
     }
@@ -344,8 +339,9 @@ mod tests {
     {
         let rng = &mut test_rng();
 
-        let powers = setup(bytes.len(), rng)?;
-        let blocks = encode::<F, G, P>(bytes, encoding_mat, &powers)?;
+        let powers = setup::<F, G>(bytes.len(), rng)?;
+
+        let blocks = full!(bytes, powers, encoding_mat);
 
         let b_0_1 = recode(&blocks[0..=1], rng).unwrap().unwrap();
         let shards = vec![
@@ -353,7 +349,7 @@ mod tests {
             blocks[2].shard.clone(),
             blocks[3].shard.clone(),
         ];
-        assert_eq!(bytes, decode::<F>(shards).unwrap());
+        assert_eq!(bytes, decode(shards).unwrap());
 
         let b_0_1 = recode(&[blocks[0].clone(), blocks[1].clone()], rng)
             .unwrap()
@@ -363,7 +359,7 @@ mod tests {
             blocks[1].shard.clone(),
             b_0_1.shard,
         ];
-        assert!(decode::<F>(shards).is_err());
+        assert!(decode(shards).is_err());
 
         let b_0_1 = recode(&blocks[0..=1], rng).unwrap().unwrap();
         let b_2_3 = recode(&blocks[2..=3], rng).unwrap().unwrap();
@@ -371,12 +367,12 @@ mod tests {
             .unwrap()
             .unwrap();
         let shards = vec![b_0_1.shard, b_2_3.shard, b_1_4.shard];
-        assert_eq!(bytes, decode::<F>(shards).unwrap());
+        assert_eq!(bytes, decode(shards).unwrap());
 
         let fully_recoded_shards = (0..3)
             .map(|_| recode(&blocks[0..=2], rng).unwrap().unwrap().shard)
             .collect();
-        assert_eq!(bytes, decode::<F>(fully_recoded_shards).unwrap());
+        assert_eq!(bytes, decode(fully_recoded_shards).unwrap());
 
         Ok(())
     }
