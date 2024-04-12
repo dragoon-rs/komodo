@@ -1,3 +1,4 @@
+// see `benches/README.md`
 use std::time::Duration;
 
 use ark_ec::{pairing::Pairing, CurveGroup};

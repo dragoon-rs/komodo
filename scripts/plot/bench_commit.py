@@ -1,15 +1,4 @@
-# ## usage
-# ```nushell
-# let res = cargo run --example bench_commit
-#     | lines
-#     | parse "{curve}: {degree} -> {t}"
-#     | into int degree
-#     | update t { into int | into duration }
-#
-# python scripts/plot/bench_commit.py (
-#     $res | group-by curve --to-table | update items { reject curve } | to json
-# )
-# ```
+# see `benches/README.md`
 import json
 import sys
 import matplotlib.pyplot as plt

@@ -1,3 +1,4 @@
+// see `benches/README.md`
 use std::time::Instant;
 
 use ark_ec::CurveGroup;
