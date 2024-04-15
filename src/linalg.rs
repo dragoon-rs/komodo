@@ -71,23 +71,57 @@ impl<T: Field> Matrix<T> {
     /// are seed points and there are as many rows as there are powers of the
     /// seed points.
     ///
-    /// > **Note**
-    /// > the points need to be distinct.
-    /// > no runtime check will be performed to ensure that condition.
+    /// > **Note**  
+    /// > if you are sure the points are distinct and don't want to perform any
+    /// > runtime check to ensure that condition, have a look at
+    /// > [`Self::vandermonde_unchecked`].
     ///
     /// # Example
-    /// a Vandermonde matrix of height 4 with seed points $[0, 1, 2, 3, 4]$ is
-    /// ```text
-    /// [
-    ///     [1, 1, 1,  1,  1],
-    ///     [0, 1, 2,  3,  4],
-    ///     [0, 1, 4,  9, 16],
-    ///     [0, 1, 8, 27, 64],
-    /// ]
+    /// ```rust
+    /// # use ark_ff::Field;
+    /// # use komodo::linalg::Matrix;
+    /// // helper to convert integers to field elements
+    /// fn vec_to_elements<T: Field>(elements: Vec<u128>) -> Vec<T>
+    /// # {
+    /// #    elements.iter().map(|&x| T::from(x)).collect()
+    /// # }
+    /// # type T = ark_bls12_381::Fr;
+    ///
+    /// let seed_points = vec_to_elements(vec![0, 1, 2, 3, 4]);
+    /// let height = 4;
+    ///
+    /// let expected = vec_to_elements(vec![
+    ///     1, 1, 1,  1,  1,
+    ///     0, 1, 2,  3,  4,
+    ///     0, 1, 4,  9, 16,
+    ///     0, 1, 8, 27, 64,
+    /// ]);
+    ///
+    /// assert_eq!(
+    ///     Matrix::<T>::vandermonde(&seed_points, height).unwrap(),
+    ///     Matrix { elements: expected, height, width: seed_points.len() }
+    /// );
     /// ```
     ///
     /// [article]: https://en.wikipedia.org/wiki/Vandermonde_matrix
-    pub fn vandermonde(points: &[T], height: usize) -> Self {
+    pub fn vandermonde(points: &[T], height: usize) -> Result<Self, KomodoError> {
+        for i in 0..points.len() {
+            for j in (i + 1)..points.len() {
+                if points[i] == points[j] {
+                    return Err(KomodoError::InvalidVandermonde(
+                        i,
+                        j,
+                        format!("{}", points[i]),
+                    ));
+                }
+            }
+        }
+
+        Ok(Self::vandermonde_unchecked(points, height))
+    }
+
+    /// the unchecked version of [`Self::vandermonde`]
+    pub fn vandermonde_unchecked(points: &[T], height: usize) -> Self {
         let width = points.len();
 
         let mut elements = Vec::new();
@@ -119,12 +153,57 @@ impl<T: Field> Matrix<T> {
 
     /// build a matrix from a "_matrix_" of elements
     ///
-    /// > **Note**
-    /// > each row should have the same length
+    /// > **Note**  
+    /// > if you are sure each row should have the same length and don't want to
+    /// > perform any runtime check to ensure that condition, have a look at
+    /// > [`Self::from_vec_vec_unchecked`].
+    ///
+    /// # Example
+    /// ```rust
+    /// # use komodo::linalg::Matrix;
+    /// # use ark_ff::Field;
+    /// // helper to convert integers to field elements
+    /// fn vec_to_elements<T: Field>(elements: Vec<u128>) -> Vec<T>
+    /// # {
+    /// #    elements.iter().map(|&x| T::from(x)).collect()
+    /// # }
+    /// // helper to convert integers to field elements, in a "matrix"
+    /// fn mat_to_elements<T: Field>(mat: Vec<Vec<u128>>) -> Vec<Vec<T>>
+    /// # {
+    /// #     mat.iter().cloned().map(vec_to_elements).collect()
+    /// # }
+    /// # type T = ark_bls12_381::Fr;
+    ///
+    /// let elements = mat_to_elements(vec![
+    ///     vec![0, 1, 2, 3],
+    ///     vec![4, 5, 6, 7],
+    ///     vec![8, 9, 0, 1],
+    /// ]);
+    ///
+    /// let height = elements.len();
+    /// let width = elements[0].len();
+    ///
+    /// let expected = vec_to_elements(vec![
+    ///     0, 1, 2, 3,
+    ///     4, 5, 6, 7,
+    ///     8, 9, 0, 1,
+    /// ]);
+    ///
+    /// assert_eq!(
+    ///     Matrix::<T>::from_vec_vec(elements).unwrap(),
+    ///     Matrix { elements: expected, height, width }
+    /// );
+    /// ```
     pub fn from_vec_vec(matrix: Vec<Vec<T>>) -> Result<Self, KomodoError> {
-        let height = matrix.len();
-        let width = matrix[0].len();
+        if matrix.is_empty() {
+            return Ok(Self {
+                elements: vec![],
+                height: 0,
+                width: 0,
+            });
+        }
 
+        let width = matrix[0].len();
         for (i, row) in matrix.iter().enumerate() {
             if row.len() != width {
                 return Err(KomodoError::InvalidMatrixElements(format!(
@@ -136,6 +215,14 @@ impl<T: Field> Matrix<T> {
             }
         }
 
+        Ok(Self::from_vec_vec_unchecked(matrix))
+    }
+
+    /// the unchecked version of [`Self::from_vec_vec`]
+    pub fn from_vec_vec_unchecked(matrix: Vec<Vec<T>>) -> Self {
+        let height = matrix.len();
+        let width = matrix[0].len();
+
         let mut elements = Vec::new();
         elements.resize(height * width, T::zero());
         for i in 0..height {
@@ -144,11 +231,11 @@ impl<T: Field> Matrix<T> {
             }
         }
 
-        Ok(Self {
+        Self {
             elements,
             height,
             width,
-        })
+        }
     }
 
     fn get(&self, i: usize, j: usize) -> T {
@@ -631,7 +718,11 @@ mod tests {
 
     #[test]
     fn vandermonde() {
-        let actual = Matrix::<Fr>::vandermonde(&mat_to_elements(vec![vec![0, 1, 2, 3, 4]])[0], 4);
+        assert!(Matrix::<Fr>::vandermonde(&vec_to_elements(vec![0, 4, 2, 3, 4]), 4).is_err());
+        assert!(Matrix::<Fr>::vandermonde(&vec_to_elements(vec![0, 1, 2, 3, 4]), 4).is_ok());
+
+        let actual =
+            Matrix::<Fr>::vandermonde_unchecked(&mat_to_elements(vec![vec![0, 1, 2, 3, 4]])[0], 4);
         #[rustfmt::skip]
         let expected = Matrix::from_vec_vec(mat_to_elements(vec![
             vec![1, 1, 1,  1,  1],

@@ -13,6 +13,10 @@ pub enum KomodoError {
     NonInvertibleMatrix(usize),
     #[error("Matrices don't have compatible shapes: ({0} x {1}) and ({2} x {3})")]
     IncompatibleMatrixShapes(usize, usize, usize, usize),
+    #[error(
+        "Seed points of a Vandermonde matrix should be distinct: {0} and {1} are the same ({2})"
+    )]
+    InvalidVandermonde(usize, usize, String),
     #[error("Expected at least {1} shards, got {0}")]
     TooFewShards(usize, usize),
     #[error("Shards are incompatible: {0}")]

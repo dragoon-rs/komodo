@@ -314,7 +314,7 @@ fn main() {
             let points: Vec<Fr> = (0..n)
                 .map(|i| Fr::from_le_bytes_mod_order(&i.to_le_bytes()))
                 .collect();
-            Matrix::vandermonde(&points, k)
+            Matrix::vandermonde_unchecked(&points, k)
         }
         "random" => Matrix::random(k, n, &mut rng),
         m => {

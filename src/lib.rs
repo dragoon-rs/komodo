@@ -388,15 +388,27 @@ mod tests {
     {
         let mut rng = ark_std::test_rng();
 
-        let (k, n) = (3, 6);
+        let (k, n) = (3, 6_usize);
 
         let bytes = bytes();
-        let encoding_mat = Matrix::random(k, n, &mut rng);
 
         let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
 
-        test(&bytes, &encoding_mat)
-            .unwrap_or_else(|_| panic!("verification failed for bls12-381\n{test_case}"));
+        test(&bytes, &Matrix::random(k, n, &mut rng)).unwrap_or_else(|_| {
+            panic!("verification failed for bls12-381 and random encoding matrix\n{test_case}")
+        });
+        test(
+            &bytes,
+            &Matrix::vandermonde_unchecked(
+                &(0..n)
+                    .map(|i| F::from_le_bytes_mod_order(&i.to_le_bytes()))
+                    .collect::<Vec<_>>(),
+                k,
+            ),
+        )
+        .unwrap_or_else(|_| {
+            panic!("verification failed for bls12-381 and Vandermonde encoding matrix\n{test_case}")
+        });
     }
 
     #[test]
