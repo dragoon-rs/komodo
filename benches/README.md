@@ -20,21 +20,73 @@ cargo criterion --output-format verbose --message-format json --bench field_oper
 cargo criterion --output-format verbose --message-format json --bench curve_group_operations out> curve.ndjson
 ```
 ```nushell
-def read-atomic-ops []: list -> record {
-    where reason == "benchmark-complete"
+def read-atomic-ops [
+    --clean, --include: list<string> = [], --exclude: list<string> = []
+]: list -> record {
+    let raw = $in
+        | where reason == "benchmark-complete"
         | select id mean.estimate
-        | rename --column { mean_estimate: "mean" }
         | sort-by id
         | update id { parse "{op} on {curve}" }
         | flatten --all
-        | group-by op --to-table
-        | reject items.op
+        | rename --column { op: "group", curve: "species", mean_estimate: "measurement" }
+
+    let clean = if $clean {
+        $raw | update measurement {|it|
+            let species = $it.species
+            # FIXME: bug when no parentheses
+            let r = (
+                $raw
+                    | where group == 'random sampling' and species == $species
+                    | into record
+                    | get measurement
+            )
+            let l = (
+                $raw
+                    | where group == 'legendre' and species == $species
+                    | into record
+                    | get measurement
+            )
+            match $it.group {
+                "addition" | "multiplication" | "substraction" => ($it.measurement - 2 * $r),
+                "random sampling" => $it.measurement,
+                "sqrt" => ($it.measurement - $r - $l),
+                _ => ($it.measurement - $r),
+            }
+        }
+    } else {
+        $raw
+    }
+
+    let included = if $include != [] {
+        $clean | where group in $include
+    } else {
+        $clean
+    }
+
+    $included
+        | where group not-in $exclude
+        | group-by group --to-table
+        | reject items.group
         | update items { transpose -r | into record }
         | transpose -r
         | into record
 }
-python scripts/plot/multi_bar.py (open field.ndjson | read-atomic-ops | to json) --title "field operations" -l "time (in ns)"
-python scripts/plot/multi_bar.py (open curve.ndjson | read-atomic-ops | to json) --title "curve group operations" -l "time (in ns)"
+```
+```nushell
+python scripts/plot/multi_bar.py --title "simple field operations" -l "time (in ns)" (
+    open field.ndjson
+        | read-atomic-ops --clean --exclude [ "exponentiation", "legendre", "inverse", "sqrt" ]
+        | to json
+)
+python scripts/plot/multi_bar.py --title "complex field operations" -l "time (in ns)" (
+    open field.ndjson
+        | read-atomic-ops --include [ "exponentiation", "legendre", "inverse", "sqrt" ]
+        | to json
+)
+python scripts/plot/multi_bar.py --title "curve group operations" -l "time (in ns)" (
+    open curve.ndjson | read-atomic-ops | to json
+)
 ```
 
 ## oneshot benchmarks

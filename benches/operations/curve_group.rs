@@ -105,8 +105,8 @@ fn bench(c: &mut Criterion) {
 criterion_group!(
     name = benches;
     config = Criterion::default()
-        .warm_up_time(Duration::from_secs_f32(0.5))
-        .sample_size(10);
+        .warm_up_time(Duration::from_secs_f32(3.0))
+        .sample_size(100);
     targets = bench
 );
 criterion_main!(benches);
