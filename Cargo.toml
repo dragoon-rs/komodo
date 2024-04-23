@@ -13,6 +13,7 @@ ark-ff = "0.4.2"
 ark-poly = "0.4.2"
 ark-serialize = "0.4.2"
 ark-std = "0.4.0"
+clap = { version = "4.5.4", features = ["derive"] }
 rand = "0.8.5"
 rs_merkle = "1.4.1"
 thiserror = "1.0.50"

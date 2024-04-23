@@ -7,9 +7,10 @@ use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
 use ark_poly_commit::kzg10::{self, KZG10};
 use ark_std::ops::Div;
 
+use clap::{arg, command, Parser};
 use komodo::zk;
 
-fn run<F, G, P>(degrees: &Vec<usize>, curve: &str)
+fn run<F, G, P>(degrees: &Vec<usize>, curve: &str, nb_measurements: usize)
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>,
@@ -26,24 +27,34 @@ where
     eprintln!("done");
 
     for (i, degree) in degrees.iter().enumerate() {
-        eprint!("     d: {} [{}/{}]\r", degree, i + 1, degrees.len());
-        let polynomial = P::rand(*degree, rng);
+        let mut times = vec![];
+        for j in 0..nb_measurements {
+            eprint!(
+                "     d: {} [{}/{}:{:>5}/{}]   \r",
+                degree,
+                i + 1,
+                degrees.len(),
+                j + 1,
+                nb_measurements
+            );
+            let polynomial = P::rand(*degree, rng);
 
-        let start_time = Instant::now();
-        let _ = zk::commit(&setup, &polynomial);
-        let end_time = Instant::now();
+            let start_time = Instant::now();
+            let _ = zk::commit(&setup, &polynomial);
+            let end_time = Instant::now();
+
+            times.push(end_time.duration_since(start_time).as_nanos());
+        }
 
         println!(
-            "{}: {} -> {}",
-            curve,
-            degree,
-            end_time.duration_since(start_time).as_nanos()
+            "{{curve: {}, degree: {}, times: {:?}}}",
+            curve, degree, times,
         );
     }
     eprintln!();
 }
 
-fn ark_run<E, P>(degrees: &Vec<usize>, curve: &str)
+fn ark_run<E, P>(degrees: &Vec<usize>, curve: &str, nb_measurements: usize)
 where
     E: Pairing,
     P: DenseUVPolynomial<E::ScalarField>,
@@ -69,18 +80,28 @@ where
     eprintln!("done");
 
     for (i, degree) in degrees.iter().enumerate() {
-        eprint!("     d: {} [{}/{}]\r", degree, i + 1, degrees.len());
-        let polynomial = P::rand(*degree, rng);
+        let mut times = vec![];
+        for j in 0..nb_measurements {
+            eprint!(
+                "     d: {} [{}/{}:{:>5}/{}]   \r",
+                degree,
+                i + 1,
+                degrees.len(),
+                j + 1,
+                nb_measurements
+            );
+            let polynomial = P::rand(*degree, rng);
 
-        let start_time = Instant::now();
-        let _ = KZG10::commit(&setup, &polynomial, None, None);
-        let end_time = Instant::now();
+            let start_time = Instant::now();
+            let _ = KZG10::commit(&setup, &polynomial, None, None);
+            let end_time = Instant::now();
+
+            times.push(end_time.duration_since(start_time).as_nanos());
+        }
 
         println!(
-            "{}: {} -> {}",
-            curve,
-            degree,
-            end_time.duration_since(start_time).as_nanos()
+            "{{curve: {}, degree: {}, times: {:?}}}",
+            curve, degree, times,
         );
     }
     eprintln!();
@@ -89,11 +110,11 @@ where
 /// ## example
 /// ### non-pairing curves
 /// ```rust
-/// measure!(ark_pallas, degrees, G1=Projective, name="PALLAS");
+/// measure!(ark_pallas, degrees, 10, G1=Projective, name="PALLAS");
 /// ```
 /// will produce
 /// ```rust
-/// run::<ark_pallas::Fr, ark_pallas::Projective, DensePolynomial<ark_pallas::Fr>>(&degrees, "PALLAS");
+/// run::<ark_pallas::Fr, ark_pallas::Projective, DensePolynomial<ark_pallas::Fr>>(&degrees, "PALLAS", 10);
 /// ```
 ///
 /// ### pairing-friendly curves
@@ -101,6 +122,7 @@ where
 /// measure!(
 ///     ark_bls12_381,
 ///     degrees,
+///     10,
 ///     G1 = G1Projective,
 ///     E = Bls12_381,
 ///     name = "BLS12-381"
@@ -108,36 +130,51 @@ where
 /// ```
 /// will produce
 /// ```rust
-/// run::<ark_bls12_381::Fr, ark_bls12_381::G1Projective, DensePolynomial<ark_bls12_381::Fr> >(&degrees, "BLS12-381");
-/// ark_run::<ark_bls12_381::Bls12_381, DensePolynomial<<ark_bls12_381::Bls12_381 as Pairing>::ScalarField>>(&degrees, "BLS12-381");
+/// run::<ark_bls12_381::Fr, ark_bls12_381::G1Projective, DensePolynomial<ark_bls12_381::Fr> >(&degrees, "BLS12-381", 10);
+/// ark_run::<ark_bls12_381::Bls12_381, DensePolynomial<<ark_bls12_381::Bls12_381 as Pairing>::ScalarField>>(&degrees, "BLS12-381", 10);
 /// ```
 macro_rules! measure {
-    ($c:ident, $d:ident, G1=$g:ident, name=$n:expr) => {
-        run::<$c::Fr, $c::$g, DensePolynomial<$c::Fr>>(&$d, $n);
+    ($c:ident, $d:ident, $m:expr, G1=$g:ident, name=$n:expr) => {
+        run::<$c::Fr, $c::$g, DensePolynomial<$c::Fr>>(&$d, $n, $m);
     };
-    ($c:ident, $d:ident, G1=$g:ident, E=$e:ident, name=$n:expr) => {
-        measure!($c, $d, G1 = $g, name = $n);
+    ($c:ident, $d:ident, $m:expr, G1=$g:ident, E=$e:ident, name=$n:expr) => {
+        measure!($c, $d, $m, G1 = $g, name = $n);
         ark_run::<$c::$e, DensePolynomial<<$c::$e as Pairing>::ScalarField>>(
             &$d,
             concat!($n, "-ark"),
+            $m,
         );
     };
 }
 
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    /// the polynomial degrees to measure the commit time on
+    #[arg(num_args = 1.., value_delimiter = ' ')]
+    degrees: Vec<usize>,
+
+    /// the number of measurements to repeat each case, larger values will reduce the variance of
+    /// the measurements
+    #[arg(short, long)]
+    nb_measurements: usize,
+}
+
 fn main() {
-    let n = 20;
+    let cli = Cli::parse();
+    let degrees = cli.degrees;
 
-    let mut degrees = Vec::with_capacity(n);
-    let mut cur = 1;
-    for _ in 1..n {
-        degrees.push(cur);
-        cur *= 2;
-    }
-
-    measure!(ark_pallas, degrees, G1 = Projective, name = "PALLAS");
+    measure!(
+        ark_pallas,
+        degrees,
+        cli.nb_measurements,
+        G1 = Projective,
+        name = "PALLAS"
+    );
     measure!(
         ark_bls12_381,
         degrees,
+        cli.nb_measurements,
         G1 = G1Projective,
         E = Bls12_381,
         name = "BLS12-381"
@@ -145,11 +182,30 @@ fn main() {
     measure!(
         ark_bn254,
         degrees,
+        cli.nb_measurements,
         G1 = G1Projective,
         E = Bn254,
         name = "BN-254"
     );
-    measure!(ark_secp256k1, degrees, G1 = Projective, name = "SECP256-K1");
-    measure!(ark_secp256r1, degrees, G1 = Projective, name = "SECP256-R1");
-    measure!(ark_vesta, degrees, G1 = Projective, name = "VESTA");
+    measure!(
+        ark_secp256k1,
+        degrees,
+        cli.nb_measurements,
+        G1 = Projective,
+        name = "SECP256-K1"
+    );
+    measure!(
+        ark_secp256r1,
+        degrees,
+        cli.nb_measurements,
+        G1 = Projective,
+        name = "SECP256-R1"
+    );
+    measure!(
+        ark_vesta,
+        degrees,
+        cli.nb_measurements,
+        G1 = Projective,
+        name = "VESTA"
+    );
 }
