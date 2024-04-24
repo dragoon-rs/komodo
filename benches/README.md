@@ -18,12 +18,12 @@ python scripts/plot/benches.py results.ndjson --bench setup
 ```nushell
 cargo run --example bench_field_operations -- --nb-measurements 1000
     | lines
-    | each { from nuon }
+    | each { from json }
     | to ndjson
     | save --force field.ndjson
 cargo run --example bench_curve_group_operations -- --nb-measurements 1000
     | lines
-    | each { from nuon }
+    | each { from json }
     | to ndjson
     | save --force curve_group.ndjson
 ```
@@ -34,7 +34,7 @@ def read-atomic-ops [
     let raw = $in
         | insert t {|it| $it.times |math avg}
         | reject times
-        | rename --column { op: "group", curve: "species", t: "measurement" }
+        | rename --column { label: "group", name: "species", t: "measurement" }
 
     let included = if $include != [] {
         $raw | where group in $include

@@ -3,128 +3,74 @@ use std::time::{Duration, Instant};
 
 use ark_ff::PrimeField;
 use clap::{arg, command, Parser};
-use rand::RngCore;
 
-fn bench(b: &Bencher, op: &str, thing: fn(&mut dyn RngCore) -> Duration) {
-    let mut rng = ark_std::test_rng();
+fn bench_template<F: PrimeField>(b: &mut plnk::Bencher) {
+    plnk::bench(b, "random sampling", |rng| plnk::timeit!((|| F::rand(rng))));
 
-    let mut times = vec![];
-    for i in 0..b.nb_measurements {
-        eprint!(
-            "{} on {} [{:>5}/{}]\r",
-            op,
-            b.name,
-            i + 1,
-            b.nb_measurements
-        );
-
-        times.push(thing(&mut rng).as_nanos());
-    }
-    eprintln!();
-
-    println!(
-        r#"{{op: "{}", curve: "{}", times: {:?}}}"#,
-        op, b.name, times
-    );
-}
-
-macro_rules! timeit {
-    ($f:tt) => {{
-        let start_time = Instant::now();
-        #[allow(clippy::redundant_closure_call)]
-        let _ = $f();
-        Instant::now().duration_since(start_time)
-    }};
-}
-
-#[derive(Clone)]
-struct Bencher {
-    nb_measurements: usize,
-    name: String,
-}
-
-impl Bencher {
-    fn new(nb_measurements: usize) -> Self {
-        Self {
-            nb_measurements,
-            name: "".to_string(),
-        }
-    }
-
-    fn with_name(&self, name: impl ToString) -> Self {
-        let mut new = self.clone();
-        new.name = name.to_string();
-        new
-    }
-}
-
-fn bench_template<F: PrimeField>(b: &Bencher) {
-    bench(b, "random sampling", |rng| timeit!((|| F::rand(rng))));
-
-    bench(b, "addition", |rng| {
+    plnk::bench(b, "addition", |rng| {
         let f1 = F::rand(rng);
         let f2 = F::rand(rng);
 
-        timeit!((|| f1 + f2))
+        plnk::timeit!((|| f1 + f2))
     });
 
-    bench(b, "substraction", |rng| {
+    plnk::bench(b, "substraction", |rng| {
         let f1 = F::rand(rng);
         let f2 = F::rand(rng);
 
-        timeit!((|| f1 - f2))
+        plnk::timeit!((|| f1 - f2))
     });
 
-    bench(b, "double", |rng| {
+    plnk::bench(b, "double", |rng| {
         let f1 = F::rand(rng);
 
-        timeit!((|| f1.double()))
+        plnk::timeit!((|| f1.double()))
     });
 
-    bench(b, "multiplication", |rng| {
+    plnk::bench(b, "multiplication", |rng| {
         let f1 = F::rand(rng);
         let f2 = F::rand(rng);
 
-        timeit!((|| f1 * f2))
+        plnk::timeit!((|| f1 * f2))
     });
 
-    bench(b, "square", |rng| {
+    plnk::bench(b, "square", |rng| {
         let f1 = F::rand(rng);
 
-        timeit!((|| f1.square()))
+        plnk::timeit!((|| f1.square()))
     });
 
-    bench(b, "inverse", |rng| {
+    plnk::bench(b, "inverse", |rng| {
         let f1 = F::rand(rng);
 
-        timeit!((|| f1.inverse()))
+        plnk::timeit!((|| f1.inverse()))
     });
 
-    bench(b, "legendre", |rng| {
+    plnk::bench(b, "legendre", |rng| {
         let f1 = F::rand(rng);
 
-        timeit!((|| f1.legendre()))
+        plnk::timeit!((|| f1.legendre()))
     });
 
-    bench(b, "sqrt", |rng| {
+    plnk::bench(b, "sqrt", |rng| {
         let f1 = F::rand(rng);
         if f1.legendre().is_qr() {
-            timeit!((|| f1.sqrt()))
+            plnk::timeit!((|| f1.sqrt()))
         } else {
             Duration::default()
         }
     });
 
-    bench(b, "exponentiation", |rng| {
+    plnk::bench(b, "exponentiation", |rng| {
         let f1 = F::rand(rng);
 
-        timeit!((|| f1.pow(F::MODULUS)))
+        plnk::timeit!((|| f1.pow(F::MODULUS)))
     });
 
-    bench(b, "into bigint", |rng| {
+    plnk::bench(b, "into bigint", |rng| {
         let f1 = F::rand(rng);
 
-        timeit!((|| f1.into_bigint()))
+        plnk::timeit!((|| f1.into_bigint()))
     });
 }
 
@@ -140,9 +86,9 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
 
-    let bencher = Bencher::new(cli.nb_measurements);
+    let bencher = plnk::Bencher::new(cli.nb_measurements, ark_std::rand::thread_rng());
 
-    bench_template::<ark_bls12_381::Fr>(&bencher.with_name("BLS12-381"));
-    bench_template::<ark_bn254::Fr>(&bencher.with_name("BN-254"));
-    bench_template::<ark_pallas::Fr>(&bencher.with_name("PALLAS"));
+    bench_template::<ark_bls12_381::Fr>(&mut bencher.with_name("BLS12-381"));
+    bench_template::<ark_bn254::Fr>(&mut bencher.with_name("BN-254"));
+    bench_template::<ark_pallas::Fr>(&mut bencher.with_name("PALLAS"));
 }
