@@ -66,16 +66,6 @@ harness = false
 name = "commit"
 harness = false
 
-[[bench]]
-name = "field_operations"
-path = "benches/operations/field.rs"
-harness = false
-
-[[bench]]
-name = "curve_group_operations"
-path = "benches/operations/curve_group.rs"
-harness = false
-
 [[example]]
 name = "bench_commit"
 path = "examples/benches/commit.rs"
@@ -83,3 +73,13 @@ path = "examples/benches/commit.rs"
 [[example]]
 name = "bench_setup_size"
 path = "examples/benches/setup_size.rs"
+
+[[example]]
+name = "bench_field_operations"
+path = "examples/benches/operations/field.rs"
+harness = false
+
+[[example]]
+name = "bench_curve_group_operations"
+path = "examples/benches/operations/curve_group.rs"
+harness = false

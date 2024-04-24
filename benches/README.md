@@ -16,52 +16,30 @@ python scripts/plot/benches.py results.ndjson --bench setup
 
 ## atomic operations
 ```nushell
-cargo criterion --output-format verbose --message-format json --bench field_operations out> field.ndjson
-cargo criterion --output-format verbose --message-format json --bench curve_group_operations out> curve.ndjson
+cargo run --example bench_field_operations -- --nb-measurements 1000
+    | lines
+    | each { from nuon }
+    | to ndjson
+    | save --force field.ndjson
+cargo run --example bench_curve_group_operations -- --nb-measurements 1000
+    | lines
+    | each { from nuon }
+    | to ndjson
+    | save --force curve_group.ndjson
 ```
 ```nushell
 def read-atomic-ops [
-    --clean, --include: list<string> = [], --exclude: list<string> = []
+    --include: list<string> = [], --exclude: list<string> = []
 ]: list -> record {
     let raw = $in
-        | where reason == "benchmark-complete"
-        | select id mean.estimate
-        | sort-by id
-        | update id { parse "{op} on {curve}" }
-        | flatten --all
-        | rename --column { op: "group", curve: "species", mean_estimate: "measurement" }
-
-    let clean = if $clean {
-        $raw | update measurement {|it|
-            let species = $it.species
-            # FIXME: bug when no parentheses
-            let r = (
-                $raw
-                    | where group == 'random sampling' and species == $species
-                    | into record
-                    | get measurement
-            )
-            let l = (
-                $raw
-                    | where group == 'legendre' and species == $species
-                    | into record
-                    | get measurement
-            )
-            match $it.group {
-                "addition" | "multiplication" | "substraction" => ($it.measurement - 2 * $r),
-                "random sampling" => $it.measurement,
-                "sqrt" => ($it.measurement - $r - $l),
-                _ => ($it.measurement - $r),
-            }
-        }
-    } else {
-        $raw
-    }
+        | insert t {|it| $it.times |math avg}
+        | reject times
+        | rename --column { op: "group", curve: "species", t: "measurement" }
 
     let included = if $include != [] {
-        $clean | where group in $include
+        $raw | where group in $include
     } else {
-        $clean
+        $raw
     }
 
     $included
@@ -76,7 +54,7 @@ def read-atomic-ops [
 ```nushell
 python scripts/plot/multi_bar.py --title "simple field operations" -l "time (in ns)" (
     open field.ndjson
-        | read-atomic-ops --clean --exclude [ "exponentiation", "legendre", "inverse", "sqrt" ]
+        | read-atomic-ops --exclude [ "exponentiation", "legendre", "inverse", "sqrt" ]
         | to json
 )
 python scripts/plot/multi_bar.py --title "complex field operations" -l "time (in ns)" (
@@ -84,8 +62,15 @@ python scripts/plot/multi_bar.py --title "complex field operations" -l "time (in
         | read-atomic-ops --include [ "exponentiation", "legendre", "inverse", "sqrt" ]
         | to json
 )
-python scripts/plot/multi_bar.py --title "curve group operations" -l "time (in ns)" (
-    open curve.ndjson | read-atomic-ops | to json
+python scripts/plot/multi_bar.py --title "simple curve group operations" -l "time (in ns)" (
+    open curve_group.ndjson
+        | read-atomic-ops --exclude [ "random sampling", "scalar multiplication", "affine scalar multiplication" ]
+        | to json
+)
+python scripts/plot/multi_bar.py --title "complex curve group operations" -l "time (in ns)" (
+    open curve_group.ndjson
+        | read-atomic-ops --include [ "random sampling", "scalar multiplication", "affine scalar multiplication" ]
+        | to json
 )
 ```
 
