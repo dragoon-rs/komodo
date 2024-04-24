@@ -96,11 +96,12 @@ these are benchmarks that run a single measurement, implemented as _examples_ in
 ### commit
 ```nushell
 let degrees = seq 0 15 | each { 2 ** $in }
-let res = cargo run --example bench_commit -- --nb-measurements 1 ...$degrees
+let res = cargo run --example bench_commit -- --nb-measurements 10 ...$degrees
     | lines
     | each { from nuon }
     | update times { into duration }
-    | insert t {|it| $it.times | math avg}
+    | insert mean {|it| $it.times | math avg}
+    | insert stddev {|it| $it.times | into int | into float | math stddev | into int | into duration}
 
 python scripts/plot/bench_commit.py (
     $res | group-by curve --to-table | update items { reject curve } | to json
