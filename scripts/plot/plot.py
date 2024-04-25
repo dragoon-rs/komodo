@@ -34,7 +34,18 @@ import argparse
 #     },
 # ]
 # ```
-def plot(data, title: str, x_label: str, y_label: str, save: str = None):
+def plot(
+    data,
+    title: str,
+    x_label: str,
+    y_label: str,
+    save: str = None,
+    plot_layout: str = "constrained",
+    x_scale: str = "linear",
+    y_scale: str = "linear",
+):
+    fig, ax = plt.subplots(layout=plot_layout)
+
     for group in data:
         xs = [x["x"] for x in group["items"]]
         ys = [x["measurement"] for x in group["items"]]
@@ -44,16 +55,19 @@ def plot(data, title: str, x_label: str, y_label: str, save: str = None):
         up = [y + z for (y, z) in zip(ys, zs)]
 
         style = "dashed" if group["group"].endswith("-ark") else "solid"
-        plt.plot(xs, ys, label=group["group"], marker='o', linestyle=style)
-        plt.fill_between(xs, down, up, alpha=0.3)
+        ax.plot(xs, ys, label=group["group"], marker='o', linestyle=style)
+        ax.fill_between(xs, down, up, alpha=0.3)
 
-    plt.xlabel(x_label)
-    plt.ylabel(y_label)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
 
-    plt.title(title)
+    ax.set_xscale(x_scale)
+    ax.set_yscale(y_scale)
 
-    plt.legend()
-    plt.grid(True)
+    ax.set_title(title)
+
+    ax.legend()
+    ax.grid(True)
 
     if save is not None:
         fig.set_size_inches((16, 9), forward=False)
@@ -98,7 +112,21 @@ if __name__ == "__main__":
     parser.add_argument("--title", "-t", type=str, help="the title of the plot")
     parser.add_argument("--x-label", "-x", type=str, help="the x label of the plot")
     parser.add_argument("--y-label", "-y", type=str, help="the y label of the plot")
+    parser.add_argument("--x-scale", "-X", type=str, choices=["linear", "log"], default="linear", help="the x scale of the plot")
+    parser.add_argument("--y-scale", "-Y", type=str, choices=["linear", "log"], default="linear", help="the y scale of the plot")
+    parser.add_argument("--fullscreen", action="store_true")
     parser.add_argument("--save", "-s", type=str, help="a path to save the figure to")
     args = parser.parse_args()
 
-    plot(json.loads(args.data), args.title, args.x_label, args.y_label, save=args.save)
+    plot_layout = "constrained" if args.fullscreen else None
+
+    plot(
+        json.loads(args.data),
+        args.title,
+        args.x_label,
+        args.y_label,
+        save=args.save,
+        plot_layout=plot_layout,
+        x_scale=args.x_scale,
+        y_scale=args.y_scale,
+    )

@@ -117,9 +117,14 @@ if __name__ == "__main__":
                         """)
     parser.add_argument("--title", "-t", type=str, help="the title of the multibar plot")
     parser.add_argument("--label", "-l", type=str, help="the measurement label of the multibar plot")
+    parser.add_argument("--fullscreen", action="store_true")
     parser.add_argument("--save", "-s", type=str, help="a path to save the figure to")
     args = parser.parse_args()
 
     groups, measurements = extract(json.loads(args.data))
 
-    plot_multi_bar(groups, measurements, args.title, args.label, save=args.save)
+    plot_layout = "constrained" if args.fullscreen else None
+
+    plot_multi_bar(
+        groups, measurements, args.title, args.label, save=args.save, plot_layout=plot_layout
+    )

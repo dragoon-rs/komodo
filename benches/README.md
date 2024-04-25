@@ -1,15 +1,11 @@
+```nushell
+use scripts/math.nu *
+```
+
 ## atomic operations
 ```nushell
-cargo run --example bench_field_operations -- --nb-measurements 1000
-    | lines
-    | each { from json }
-    | to ndjson # NOTE: see https://github.com/nushell/nushell/issues/12655
-    | save --force field.ndjson
-cargo run --example bench_curve_group_operations -- --nb-measurements 1000
-    | lines
-    | each { from json }
-    | to ndjson # NOTE: see https://github.com/nushell/nushell/issues/12655
-    | save --force curve_group.ndjson
+cargo run --example bench_field_operations -- --nb-measurements 1000 out> field.ndjson
+cargo run --example bench_curve_group_operations -- --nb-measurements 1000 out> curve_group.ndjson
 ```
 ```nushell
 use scripts/parse.nu read-atomic-ops
@@ -39,17 +35,13 @@ python scripts/plot/multi_bar.py --title "complex curve group operations" -l "ti
 ## linear algebra
 ```nushell
 let sizes = seq 0 7 | each { 2 ** $in }
-cargo run --example bench_linalg -- --nb-measurements 10 ...$sizes
-    | lines
-    | each { from json }
-    | to ndjson # NOTE: see https://github.com/nushell/nushell/issues/12655
+cargo run --example bench_linalg -- --nb-measurements 10 ...$sizes out> linalg.ndjson
     | save --force linalg.ndjson
 ```
 ```nushell
 let linalg = open linalg.ndjson
-    | update times { each { $in / 1_000_000 } }
-    | insert mean {|it| $it.times | math avg}
-    | insert stddev {|it| $it.times | into float | math stddev}
+    | ns-to-ms $.times
+    | compute-stats $.times
     | update label { parse "{op} {n}"}
     | flatten --all label
     | into int n
@@ -65,6 +57,8 @@ for graph in [
         --title $graph.title
         --x-label "size"
         --y-label "time (in ms)"
+        --x-scale "log"
+        --y-scale "log"
         (
             $linalg
                 | where op == $graph.op
@@ -80,11 +74,7 @@ for graph in [
 ## trusted setup
 ```nushell
 let degrees = seq 0 13 | each { 2 ** $in }
-cargo run --example bench_setup -- --nb-measurements 10 ...$degrees
-    | lines
-    | each { from json }
-    | to ndjson # NOTE: see https://github.com/nushell/nushell/issues/12655
-    | save --force setup.ndjson
+cargo run --example bench_setup -- --nb-measurements 10 ...$degrees out> setup.ndjson
 ```
 ```nushell
 python scripts/plot/plot.py ...[
@@ -93,9 +83,8 @@ python scripts/plot/plot.py ...[
     --y-label "time (in ms)"
     (
         open setup.ndjson
-            | update times { each { $in / 1_000_000 } }
-            | insert mean {|it| $it.times | math avg}
-            | insert stddev {|it| $it.times | into float | math stddev}
+            | ns-to-ms $.times
+            | compute-stats $.times
             | insert degree { get label | parse "degree {d}" | into record | get d | into int}
             | insert curve {|it| if ($it.name | str starts-with  "ARK") {
                 let c = $it.name | parse "ARK setup on {curve}" | into record | get curve
@@ -114,11 +103,7 @@ python scripts/plot/plot.py ...[
 ## commit
 ```nushell
 let degrees = seq 0 15 | each { 2 ** $in }
-cargo run --example bench_commit -- --nb-measurements 10 ...$degrees
-    | lines
-    | each { from nuon }
-    | to ndjson # NOTE: see https://github.com/nushell/nushell/issues/12655
-    | save --force commit.ndjson
+cargo run --example bench_commit -- --nb-measurements 10 ...$degrees out> commit.ndjson
 ```
 ```nushell
 python scripts/plot/plot.py ...[
@@ -127,9 +112,8 @@ python scripts/plot/plot.py ...[
     --y-label "time (in ms)"
     (
         open commit.ndjson
-            | update times { each { $in / 1_000_000 } }
-            | insert mean {|it| $it.times | math avg}
-            | insert stddev {|it| $it.times | into float | math stddev}
+            | ns-to-ms $.times
+            | compute-stats $.times
             | update label { parse "degree {d}" | into record | get d | into int }
             | rename --column { label: "x", name: "curve", mean: "measurement", stddev: "error" }
             | group-by curve --to-table
