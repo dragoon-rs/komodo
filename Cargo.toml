@@ -55,18 +55,6 @@ criterion = "0.3"
 name = "recoding"
 harness = false
 
-[[bench]]
-name = "linalg"
-harness = false
-
-[[bench]]
-name = "setup"
-harness = false
-
-[[bench]]
-name = "commit"
-harness = false
-
 [[example]]
 name = "bench_commit"
 path = "examples/benches/commit.rs"
@@ -78,9 +66,15 @@ path = "examples/benches/setup_size.rs"
 [[example]]
 name = "bench_field_operations"
 path = "examples/benches/operations/field.rs"
-harness = false
 
 [[example]]
 name = "bench_curve_group_operations"
 path = "examples/benches/operations/curve_group.rs"
-harness = false
+
+[[example]]
+name = "bench_setup"
+path = "examples/benches/setup.rs"
+
+[[example]]
+name = "bench_linalg"
+path = "examples/benches/linalg.rs"

@@ -1,57 +1,19 @@
-## run the benchmarks
-```shell
-nushell> cargo criterion --output-format verbose --message-format json out> results.ndjson
-```
-
-## add the _trusted setup_ sizes
-```shell
-nushell> cargo run --example bench_setup_size out>> results.ndjson
-```
-
-## plot the results
-```shell
-python scripts/plot/benches.py results.ndjson --bench linalg
-python scripts/plot/benches.py results.ndjson --bench setup
-```
-
 ## atomic operations
 ```nushell
 cargo run --example bench_field_operations -- --nb-measurements 1000
     | lines
     | each { from json }
-    | to ndjson
+    | to ndjson # NOTE: see https://github.com/nushell/nushell/issues/12655
     | save --force field.ndjson
 cargo run --example bench_curve_group_operations -- --nb-measurements 1000
     | lines
     | each { from json }
-    | to ndjson
+    | to ndjson # NOTE: see https://github.com/nushell/nushell/issues/12655
     | save --force curve_group.ndjson
 ```
 ```nushell
-def read-atomic-ops [
-    --include: list<string> = [], --exclude: list<string> = []
-]: list -> record {
-    let raw = $in
-        | insert t {|it| $it.times |math avg}
-        | reject times
-        | rename --column { label: "group", name: "species", t: "measurement" }
+use scripts/parse.nu read-atomic-ops
 
-    let included = if $include != [] {
-        $raw | where group in $include
-    } else {
-        $raw
-    }
-
-    $included
-        | where group not-in $exclude
-        | group-by group --to-table
-        | reject items.group
-        | update items { transpose -r | into record }
-        | transpose -r
-        | into record
-}
-```
-```nushell
 python scripts/plot/multi_bar.py --title "simple field operations" -l "time (in ns)" (
     open field.ndjson
         | read-atomic-ops --exclude [ "exponentiation", "legendre", "inverse", "sqrt" ]
@@ -74,23 +36,105 @@ python scripts/plot/multi_bar.py --title "complex curve group operations" -l "ti
 )
 ```
 
-## oneshot benchmarks
-these are benchmarks that run a single measurement, implemented as _examples_ in
-`examples/benches/`.
+## linear algebra
+```nushell
+let sizes = seq 0 7 | each { 2 ** $in }
+cargo run --example bench_linalg -- --nb-measurements 10 ...$sizes
+    | lines
+    | each { from json }
+    | to ndjson # NOTE: see https://github.com/nushell/nushell/issues/12655
+    | save --force linalg.ndjson
+```
+```nushell
+let linalg = open linalg.ndjson
+    | update times { each { $in / 1_000_000 } }
+    | insert mean {|it| $it.times | math avg}
+    | insert stddev {|it| $it.times | into float | math stddev}
+    | update label { parse "{op} {n}"}
+    | flatten --all label
+    | into int n
 
-### commit
+for graph in [
+    [op, title];
+
+    ["inverse", "time to inverse an nxn matrix on certain curves"],
+    ["transpose", "time to transpose an nxn matrix on certain curves"],
+    ["mul", "time to multiply two nxn matrices on certain curves"]
+] {
+    python scripts/plot/plot.py ...[
+        --title $graph.title
+        --x-label "size"
+        --y-label "time (in ms)"
+        (
+            $linalg
+                | where op == $graph.op
+                | rename --column { n: "x", name: "curve", mean: "measurement", stddev: "error" }
+                | group-by curve --to-table
+                | update items { reject curve }
+                | to json
+        )
+    ]
+}
+```
+
+## trusted setup
+```nushell
+let degrees = seq 0 13 | each { 2 ** $in }
+cargo run --example bench_setup -- --nb-measurements 10 ...$degrees
+    | lines
+    | each { from json }
+    | to ndjson # NOTE: see https://github.com/nushell/nushell/issues/12655
+    | save --force setup.ndjson
+```
+```nushell
+python scripts/plot/plot.py ...[
+    --title "time to create trusted setups for certain curves"
+    --x-label "degree"
+    --y-label "time (in ms)"
+    (
+        open setup.ndjson
+            | update times { each { $in / 1_000_000 } }
+            | insert mean {|it| $it.times | math avg}
+            | insert stddev {|it| $it.times | into float | math stddev}
+            | insert degree { get label | parse "degree {d}" | into record | get d | into int}
+            | insert curve {|it| if ($it.name | str starts-with  "ARK") {
+                let c = $it.name | parse "ARK setup on {curve}" | into record | get curve
+                $"($c)-ark"
+            } else {
+                $it.name | parse "setup on {curve}" | into record | get curve
+            }}
+            | rename --column { degree: "x", mean: "measurement", stddev: "error" }
+            | group-by curve --to-table
+            | update items { reject curve }
+            | to json
+    )
+]
+```
+
+## commit
 ```nushell
 let degrees = seq 0 15 | each { 2 ** $in }
-let res = cargo run --example bench_commit -- --nb-measurements 10 ...$degrees
+cargo run --example bench_commit -- --nb-measurements 10 ...$degrees
     | lines
     | each { from nuon }
-    | update times { into duration }
-    | insert mean {|it| $it.times | math avg}
-    | insert stddev {|it| $it.times | into int | into float | math stddev | into int | into duration}
-    | update label { parse "degree {d}" | into record | get d | into int }
-    | rename --column { label: "degree", name: "curve" }
-
-python scripts/plot/bench_commit.py (
-    $res | group-by curve --to-table | update items { reject curve } | to json
-)
+    | to ndjson # NOTE: see https://github.com/nushell/nushell/issues/12655
+    | save --force commit.ndjson
+```
+```nushell
+python scripts/plot/plot.py ...[
+    --title "time to commit polynomials for certain curves"
+    --x-label "degree"
+    --y-label "time (in ms)"
+    (
+        open commit.ndjson
+            | update times { each { $in / 1_000_000 } }
+            | insert mean {|it| $it.times | math avg}
+            | insert stddev {|it| $it.times | into float | math stddev}
+            | update label { parse "degree {d}" | into record | get d | into int }
+            | rename --column { label: "x", name: "curve", mean: "measurement", stddev: "error" }
+            | group-by curve --to-table
+            | update items { reject curve }
+            | to json
+    )
+]
 ```
