@@ -1,76 +1,78 @@
 // see `benches/README.md`
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use ark_ff::PrimeField;
 use clap::{arg, command, Parser};
 
-fn bench_template<F: PrimeField>(b: &mut plnk::Bencher) {
-    plnk::bench(b, "random sampling", |rng| plnk::timeit!((|| F::rand(rng))));
+fn bench_template<F: PrimeField>(b: &plnk::Bencher) {
+    let rng = &mut ark_std::rand::thread_rng();
 
-    plnk::bench(b, "addition", |rng| {
+    plnk::bench(b, "random sampling", || plnk::timeit(|| F::rand(rng)));
+
+    plnk::bench(b, "addition", || {
         let f1 = F::rand(rng);
         let f2 = F::rand(rng);
 
-        plnk::timeit!((|| f1 + f2))
+        plnk::timeit(|| f1 + f2)
     });
 
-    plnk::bench(b, "substraction", |rng| {
+    plnk::bench(b, "substraction", || {
         let f1 = F::rand(rng);
         let f2 = F::rand(rng);
 
-        plnk::timeit!((|| f1 - f2))
+        plnk::timeit(|| f1 - f2)
     });
 
-    plnk::bench(b, "double", |rng| {
+    plnk::bench(b, "double", || {
         let f1 = F::rand(rng);
 
-        plnk::timeit!((|| f1.double()))
+        plnk::timeit(|| f1.double())
     });
 
-    plnk::bench(b, "multiplication", |rng| {
+    plnk::bench(b, "multiplication", || {
         let f1 = F::rand(rng);
         let f2 = F::rand(rng);
 
-        plnk::timeit!((|| f1 * f2))
+        plnk::timeit(|| f1 * f2)
     });
 
-    plnk::bench(b, "square", |rng| {
+    plnk::bench(b, "square", || {
         let f1 = F::rand(rng);
 
-        plnk::timeit!((|| f1.square()))
+        plnk::timeit(|| f1.square())
     });
 
-    plnk::bench(b, "inverse", |rng| {
+    plnk::bench(b, "inverse", || {
         let f1 = F::rand(rng);
 
-        plnk::timeit!((|| f1.inverse()))
+        plnk::timeit(|| f1.inverse())
     });
 
-    plnk::bench(b, "legendre", |rng| {
+    plnk::bench(b, "legendre", || {
         let f1 = F::rand(rng);
 
-        plnk::timeit!((|| f1.legendre()))
+        plnk::timeit(|| f1.legendre())
     });
 
-    plnk::bench(b, "sqrt", |rng| {
+    plnk::bench(b, "sqrt", || {
         let f1 = F::rand(rng);
         if f1.legendre().is_qr() {
-            plnk::timeit!((|| f1.sqrt()))
+            plnk::timeit(|| f1.sqrt())
         } else {
             Duration::default()
         }
     });
 
-    plnk::bench(b, "exponentiation", |rng| {
+    plnk::bench(b, "exponentiation", || {
         let f1 = F::rand(rng);
 
-        plnk::timeit!((|| f1.pow(F::MODULUS)))
+        plnk::timeit(|| f1.pow(F::MODULUS))
     });
 
-    plnk::bench(b, "into bigint", |rng| {
+    plnk::bench(b, "into bigint", || {
         let f1 = F::rand(rng);
 
-        plnk::timeit!((|| f1.into_bigint()))
+        plnk::timeit(|| f1.into_bigint())
     });
 }
 
@@ -86,9 +88,9 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
 
-    let bencher = plnk::Bencher::new(cli.nb_measurements, ark_std::rand::thread_rng());
+    let bencher = plnk::Bencher::new(cli.nb_measurements);
 
-    bench_template::<ark_bls12_381::Fr>(&mut bencher.with_name("BLS12-381"));
-    bench_template::<ark_bn254::Fr>(&mut bencher.with_name("BN-254"));
-    bench_template::<ark_pallas::Fr>(&mut bencher.with_name("PALLAS"));
+    bench_template::<ark_bls12_381::Fr>(&bencher.with_name("BLS12-381"));
+    bench_template::<ark_bn254::Fr>(&bencher.with_name("BN-254"));
+    bench_template::<ark_pallas::Fr>(&bencher.with_name("PALLAS"));
 }

@@ -22,7 +22,7 @@ if __name__ == "__main__":
         plt.fill_between(xs, down, up, alpha=0.3)
 
     plt.xlabel("degree")
-    plt.ylabel("time (in ns)")
+    plt.ylabel("time (in ms)")
 
     plt.title("time to commit polynomials for certain curves")
 

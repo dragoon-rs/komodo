@@ -14,7 +14,7 @@ ark-poly = "0.4.2"
 ark-serialize = "0.4.2"
 ark-std = "0.4.0"
 clap = { version = "4.5.4", features = ["derive"] }
-plnk = { git = "https://gitlab.isae-supaero.fr/a.stevan/plnk", tag = "0.3.0", version = "0.3.0" }
+plnk = { git = "https://gitlab.isae-supaero.fr/a.stevan/plnk", tag = "0.6.0", version = "0.6.0" }
 rand = "0.8.5"
 rs_merkle = "1.4.1"
 thiserror = "1.0.50"

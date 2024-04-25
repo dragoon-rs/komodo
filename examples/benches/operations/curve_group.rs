@@ -1,64 +1,64 @@
 // see `benches/README.md`
-use std::time::Instant;
-
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use clap::{command, Parser};
 
-fn bench_template<F: PrimeField, G: CurveGroup<ScalarField = F>>(b: &mut plnk::Bencher) {
-    plnk::bench(b, "random sampling", |rng| plnk::timeit!((|| G::rand(rng))));
+fn bench_template<F: PrimeField, G: CurveGroup<ScalarField = F>>(b: &plnk::Bencher) {
+    let rng = &mut ark_std::rand::thread_rng();
 
-    plnk::bench(b, "addition", |rng| {
+    plnk::bench(b, "random sampling", || plnk::timeit(|| G::rand(rng)));
+
+    plnk::bench(b, "addition", || {
         let g1 = G::rand(rng);
         let g2 = G::rand(rng);
 
-        plnk::timeit!((|| g1 + g2))
+        plnk::timeit(|| g1 + g2)
     });
 
-    plnk::bench(b, "substraction", |rng| {
+    plnk::bench(b, "substraction", || {
         let g1 = G::rand(rng);
         let g2 = G::rand(rng);
 
-        plnk::timeit!((|| g1 - g2))
+        plnk::timeit(|| g1 - g2)
     });
 
-    plnk::bench(b, "double", |rng| {
+    plnk::bench(b, "double", || {
         let g1 = G::rand(rng);
 
-        plnk::timeit!((|| g1.double()))
+        plnk::timeit(|| g1.double())
     });
 
-    plnk::bench(b, "scalar multiplication", |rng| {
+    plnk::bench(b, "scalar multiplication", || {
         let g1 = G::rand(rng);
         let f1 = F::rand(rng);
 
-        plnk::timeit!((|| g1.mul(f1)))
+        plnk::timeit(|| g1.mul(f1))
     });
 
-    plnk::bench(b, "into affine", |rng| {
+    plnk::bench(b, "into affine", || {
         let g1 = G::rand(rng);
 
-        plnk::timeit!((|| g1.into_affine()))
+        plnk::timeit(|| g1.into_affine())
     });
 
-    plnk::bench(b, "from affine", |rng| {
+    plnk::bench(b, "from affine", || {
         let g1_affine = G::rand(rng).into_affine();
 
-        plnk::timeit!((|| Into::<G>::into(g1_affine)))
+        plnk::timeit(|| Into::<G>::into(g1_affine))
     });
 
-    plnk::bench(b, "affine addition", |rng| {
+    plnk::bench(b, "affine addition", || {
         let g1_affine = G::rand(rng).into_affine();
         let g2_affine = G::rand(rng).into_affine();
 
-        plnk::timeit!((|| g1_affine + g2_affine))
+        plnk::timeit(|| g1_affine + g2_affine)
     });
 
-    plnk::bench(b, "affine scalar multiplication", |rng| {
+    plnk::bench(b, "affine scalar multiplication", || {
         let g1_affine = G::rand(rng).into_affine();
         let f1 = F::rand(rng);
 
-        plnk::timeit!((|| g1_affine * f1))
+        plnk::timeit(|| g1_affine * f1)
     });
 }
 
@@ -74,11 +74,11 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
 
-    let bencher = plnk::Bencher::new(cli.nb_measurements, ark_std::rand::thread_rng());
+    let bencher = plnk::Bencher::new(cli.nb_measurements);
 
     bench_template::<ark_bls12_381::Fr, ark_bls12_381::G1Projective>(
-        &mut bencher.with_name("BLS12-381"),
+        &bencher.with_name("BLS12-381"),
     );
-    bench_template::<ark_bn254::Fr, ark_bn254::G1Projective>(&mut bencher.with_name("BN-254"));
-    bench_template::<ark_pallas::Fr, ark_pallas::Projective>(&mut bencher.with_name("PALLAS"));
+    bench_template::<ark_bn254::Fr, ark_bn254::G1Projective>(&bencher.with_name("BN-254"));
+    bench_template::<ark_pallas::Fr, ark_pallas::Projective>(&bencher.with_name("PALLAS"));
 }

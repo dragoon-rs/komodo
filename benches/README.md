@@ -87,6 +87,8 @@ let res = cargo run --example bench_commit -- --nb-measurements 10 ...$degrees
     | update times { into duration }
     | insert mean {|it| $it.times | math avg}
     | insert stddev {|it| $it.times | into int | into float | math stddev | into int | into duration}
+    | update label { parse "degree {d}" | into record | get d | into int }
+    | rename --column { label: "degree", name: "curve" }
 
 python scripts/plot/bench_commit.py (
     $res | group-by curve --to-table | update items { reject curve } | to json

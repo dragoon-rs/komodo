@@ -1,6 +1,4 @@
 // see `benches/README.md`
-use std::time::Instant;
-
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
@@ -19,6 +17,7 @@ where
 {
     eprintln!("curve: {}", curve);
     let rng = &mut rand::thread_rng();
+    let b = plnk::Bencher::new(nb_measurements).with_name(curve);
 
     let max_degree = *degrees.iter().max().unwrap_or(&0);
 
@@ -26,32 +25,12 @@ where
     let setup = zk::setup::<F, G>(max_degree, rng).unwrap();
     eprintln!("done");
 
-    for (i, degree) in degrees.iter().enumerate() {
-        let mut times = vec![];
-        for j in 0..nb_measurements {
-            eprint!(
-                "     d: {} [{}/{}:{:>5}/{}]   \r",
-                degree,
-                i + 1,
-                degrees.len(),
-                j + 1,
-                nb_measurements
-            );
+    for degree in degrees {
+        plnk::bench(&b, &format!("degree {}", degree), || {
             let polynomial = P::rand(*degree, rng);
-
-            let start_time = Instant::now();
-            let _ = zk::commit(&setup, &polynomial);
-            let end_time = Instant::now();
-
-            times.push(end_time.duration_since(start_time).as_nanos());
-        }
-
-        println!(
-            "{{curve: {}, degree: {}, times: {:?}}}",
-            curve, degree, times,
-        );
+            plnk::timeit(|| zk::commit(&setup, &polynomial))
+        });
     }
-    eprintln!();
 }
 
 fn ark_run<E, P>(degrees: &Vec<usize>, curve: &str, nb_measurements: usize)
@@ -62,6 +41,7 @@ where
 {
     eprintln!("curve: {}", curve);
     let rng = &mut rand::thread_rng();
+    let b = plnk::Bencher::new(nb_measurements).with_name(curve);
 
     let max_degree = *degrees.iter().max().unwrap_or(&0);
 
@@ -79,32 +59,12 @@ where
     };
     eprintln!("done");
 
-    for (i, degree) in degrees.iter().enumerate() {
-        let mut times = vec![];
-        for j in 0..nb_measurements {
-            eprint!(
-                "     d: {} [{}/{}:{:>5}/{}]   \r",
-                degree,
-                i + 1,
-                degrees.len(),
-                j + 1,
-                nb_measurements
-            );
+    for degree in degrees {
+        plnk::bench(&b, &format!("degree {}", degree), || {
             let polynomial = P::rand(*degree, rng);
-
-            let start_time = Instant::now();
-            let _ = KZG10::commit(&setup, &polynomial, None, None);
-            let end_time = Instant::now();
-
-            times.push(end_time.duration_since(start_time).as_nanos());
-        }
-
-        println!(
-            "{{curve: {}, degree: {}, times: {:?}}}",
-            curve, degree, times,
-        );
+            plnk::timeit(|| KZG10::commit(&setup, &polynomial, None, None))
+        })
     }
-    eprintln!();
 }
 
 /// ## example
