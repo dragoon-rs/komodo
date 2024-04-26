@@ -63,8 +63,9 @@ for graph in [
         (
             $linalg
                 | where op == $graph.op
-                | rename --column { n: "x", mean: "measurement", stddev: "error" }
+                | rename --column { n: "x", mean: "y", stddev: "e" }
                 | group-by name --to-table
+                | rename --column { group: "name", items: "points" }
                 | to json
         )
     ]
@@ -92,8 +93,9 @@ python scripts/plot/plot.py ...[
             } else {
                 $it.name | parse "setup on {curve}" | into record | get curve
             }}
-            | rename --column { degree: "x", mean: "measurement", stddev: "error" }
+            | rename --column { degree: "x", mean: "y", stddev: "e" }
             | group-by name --to-table
+            | rename --column { group: "name", items: "points" }
             | to json
     )
 ]
@@ -114,8 +116,9 @@ python scripts/plot/plot.py ...[
             | ns-to-ms $.times
             | compute-stats $.times
             | insert degree { get label | parse "degree {d}" | into record | get d | into int }
-            | rename --column { degree: "x", mean: "measurement", stddev: "error" }
+            | rename --column { degree: "x", mean: "y", stddev: "e" }
             | group-by name --to-table
+            | rename --column { group: "name", items: "points" }
             | to json
     )
 ]
@@ -140,10 +143,11 @@ python scripts/plot/plot.py --title "recoding with k = 4" (
         | flatten --all label
         | insert case { $"($in.name) / ($in.shards)" }
         | where k == 4  # $k$ has a negligible influence on _recoding_
-        | rename --column { bytes: "x", mean: "measurement", stddev: "error" }
+        | rename --column { bytes: "x", mean: "y", stddev: "e" }
         | group-by case --to-table
+        | rename --column { group: "name", items: "points" }
         | insert style {|it|
-            let g = $it.group | parse "{c} / {s}" | into record | into int s
+            let g = $it.name | parse "{c} / {s}" | into record | into int s
             let c = match $g.c {
                 "BLS-12-381" => "blue"
                 "BN-254" => "orange"

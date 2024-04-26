@@ -4,13 +4,36 @@ import sys
 import matplotlib.pyplot as plt
 import argparse
 
+from typing import List, TypedDict
+
+# all fields of a `Points` should have the same length
+class Points(TypedDict):
+    x: List[float]
+    y: List[float]
+    e: List[float]
+
+class LineStyle(TypedDict):
+    marker: str
+    type: str
+    width: int
+
+class Style(TypedDict):
+    color: str
+    line: LineStyle
+    alpha: float
+
+class Graph(TypedDict):
+    name: str
+    points: Points
+    style: Style
+
 HELP = """## Example
 ```nuon
 [
     {
-        group: "Alice",
-        items: [
-            [ x, measurement, error ];
+        name: "Alice",
+        points: [
+            [ x, y, e ];
             [ 1, 1143, 120 ],
             [ 2, 1310, 248 ],
             [ 4, 1609, 258 ],
@@ -21,9 +44,9 @@ HELP = """## Example
         style = {},  # optional, see section below
     },
     {
-        group: "Bob",
-        items: [
-            [ x, measurement, error ];
+        name: "Bob",
+        points: [
+            [ x, y, e ];
             [ 1, 2388, 374 ],
             [ 2, 2738, 355 ],
             [ 4, 3191, 470 ],
@@ -55,7 +78,7 @@ default values have been chosen:
 
 # see [`HELP`]
 def plot(
-    data,
+    graphs: List[Graph],
     title: str,
     x_label: str,
     y_label: str,
@@ -66,10 +89,10 @@ def plot(
 ):
     fig, ax = plt.subplots(layout=plot_layout)
 
-    for group in data:
-        xs = [x["x"] for x in group["items"]]
-        ys = [x["measurement"] for x in group["items"]]
-        zs = [x["error"] for x in group["items"]]
+    for g in graphs:
+        xs = [x["x"] for x in g["points"]]
+        ys = [x["y"] for x in g["points"]]
+        zs = [x["e"] for x in g["points"]]
 
         down = [y - z for (y, z) in  zip(ys, zs)]
         up = [y + z for (y, z) in zip(ys, zs)]
@@ -81,15 +104,15 @@ def plot(
             "linewidth": None,
         }
         alpha = 0.3
-        if "style" in group:
-            custom_style = group["style"]
+        if "style" in g:
+            custom_style = g["style"]
             style["color"] = custom_style.get("color", None)
             style["marker"] = custom_style.get("line", {}).get("marker", style["marker"])
             style["linestyle"] = custom_style.get("line", {}).get("type", style["linestyle"])
             style["linewidth"] = custom_style.get("line", {}).get("width", style["linewidth"])
             alpha = custom_style.get("alpha", alpha)
 
-        ax.plot(xs, ys, label=group["group"], **style)
+        ax.plot(xs, ys, label=g["name"], **style)
         if style["color"] is None:
             ax.fill_between(xs, down, up, alpha=alpha)
         else:
@@ -119,7 +142,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter
     )
-    parser.add_argument("data", type=str, help=f"the actual data to show in a multibar plot\n\n{HELP}"
+    parser.add_argument("graphs", type=str, help=f"the list of graphs to plot\n\n{HELP}"
 )
     parser.add_argument("--title", "-t", type=str, help="the title of the plot")
     parser.add_argument("--x-label", "-x", type=str, help="the x label of the plot")
@@ -133,7 +156,7 @@ if __name__ == "__main__":
     plot_layout = "constrained" if args.fullscreen else None
 
     plot(
-        json.loads(args.data),
+        json.loads(args.graphs),
         args.title,
         args.x_label,
         args.y_label,
