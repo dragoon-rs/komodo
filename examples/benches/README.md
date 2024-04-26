@@ -1,5 +1,6 @@
 ```nushell
 use scripts/math.nu *
+use scripts/formats.nu *
 ```
 
 ## atomic operations
@@ -62,9 +63,8 @@ for graph in [
         (
             $linalg
                 | where op == $graph.op
-                | rename --column { n: "x", name: "curve", mean: "measurement", stddev: "error" }
-                | group-by curve --to-table
-                | update items { reject curve }
+                | rename --column { n: "x", mean: "measurement", stddev: "error" }
+                | group-by name --to-table
                 | to json
         )
     ]
@@ -86,15 +86,14 @@ python scripts/plot/plot.py ...[
             | ns-to-ms $.times
             | compute-stats $.times
             | insert degree { get label | parse "degree {d}" | into record | get d | into int}
-            | insert curve {|it| if ($it.name | str starts-with  "ARK") {
+            | update name {|it| if ($it.name | str starts-with  "ARK") {
                 let c = $it.name | parse "ARK setup on {curve}" | into record | get curve
                 $"($c)-ark"
             } else {
                 $it.name | parse "setup on {curve}" | into record | get curve
             }}
             | rename --column { degree: "x", mean: "measurement", stddev: "error" }
-            | group-by curve --to-table
-            | update items { reject curve }
+            | group-by name --to-table
             | to json
     )
 ]
@@ -114,11 +113,52 @@ python scripts/plot/plot.py ...[
         open commit.ndjson
             | ns-to-ms $.times
             | compute-stats $.times
-            | update label { parse "degree {d}" | into record | get d | into int }
-            | rename --column { label: "x", name: "curve", mean: "measurement", stddev: "error" }
-            | group-by curve --to-table
-            | update items { reject curve }
+            | insert degree { get label | parse "degree {d}" | into record | get d | into int }
+            | rename --column { degree: "x", mean: "measurement", stddev: "error" }
+            | group-by name --to-table
             | to json
     )
 ]
+```
+
+## end-to-end benchmarks
+### recoding
+```nushell
+cargo run --example bench_recoding -- ...[
+    --nb-measurements 10
+    ...[1, 1_024, (1_024 * 1_024)]
+    --shards ...[2, 4, 8, 16]
+    --ks ...[2, 4, 8, 16]
+] | from ndnuon | to ndjson out> recoding.ndjson
+```
+```nushell
+python scripts/plot/plot.py --title "recoding with k = 4" (
+    open recoding.ndjson
+        | ns-to-ms $.times
+        | compute-stats $.times
+        | update label { from nuon }
+        | flatten --all label
+        | insert case { $"($in.name) / ($in.shards)" }
+        | where k == 4  # $k$ has a negligible influence on _recoding_
+        | rename --column { bytes: "x", mean: "measurement", stddev: "error" }
+        | group-by case --to-table
+        | insert style {|it|
+            let g = $it.group | parse "{c} / {s}" | into record | into int s
+            let c = match $g.c {
+                "BLS-12-381" => "blue"
+                "BN-254" => "orange"
+                "PALLAS" => "green"
+                _ => "gray"
+            }
+            let t = match $g.s {
+                2 => "dotted"
+                4 => "dashdot"
+                8 => "dashed"
+                16 => "solid"
+                _ => { color: "loosely dotted" }
+            }
+            { color: $c, line: { type: $t } }
+        }
+        | to json
+)
 ```

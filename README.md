@@ -19,3 +19,6 @@ tests for the binary application can also be run with
 ```bash
 nu tests/cli.nu
 ```
+
+## the benchmarks
+see [the `README`](examples/benches/README.md)
