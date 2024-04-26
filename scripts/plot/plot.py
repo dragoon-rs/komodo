@@ -1,4 +1,3 @@
-# see `benches/README.md`
 import json
 import sys
 import matplotlib.pyplot as plt

@@ -1,4 +1,3 @@
-# see `benches/README.md`
 from typing import Dict, List
 
 import matplotlib.pyplot as plt

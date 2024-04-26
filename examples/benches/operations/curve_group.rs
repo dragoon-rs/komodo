@@ -1,4 +1,4 @@
-// see `benches/README.md`
+// see `examples/benches/README.md`
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use clap::{command, Parser};

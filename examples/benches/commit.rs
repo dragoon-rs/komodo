@@ -1,4 +1,4 @@
-// see `benches/README.md`
+// see `examples/benches/README.md`
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};

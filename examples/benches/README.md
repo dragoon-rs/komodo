@@ -149,7 +149,7 @@ python scripts/plot/plot.py --title "recoding with k = 4" (
         | insert style {|it|
             let g = $it.name | parse "{c} / {s}" | into record | into int s
             let c = match $g.c {
-                "BLS-12-381" => "blue"
+                "BLS12_381" => "blue"
                 "BN-254" => "orange"
                 "PALLAS" => "green"
                 _ => "gray"

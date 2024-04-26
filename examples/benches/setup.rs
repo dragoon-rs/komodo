@@ -1,4 +1,4 @@
-// see `benches/README.md`
+// see `examples/benches/README.md`
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
@@ -128,7 +128,7 @@ fn setup(degrees: &[usize], nb_measurements: usize) {
     }
 
     for d in degrees {
-        aux::<ark_bls12_381::Fr, ark_bls12_381::G1Projective>(*d, "BLS-12-381", nb_measurements);
+        aux::<ark_bls12_381::Fr, ark_bls12_381::G1Projective>(*d, "BLS12_381", nb_measurements);
         aux::<ark_bn254::Fr, ark_bn254::G1Projective>(*d, "BN-254", nb_measurements);
         aux::<ark_pallas::Fr, ark_pallas::Projective>(*d, "PALLAS", nb_measurements);
     }
@@ -147,7 +147,7 @@ fn serde(degrees: &[usize], nb_measurements: usize) {
     }
 
     for d in degrees {
-        aux::<ark_bls12_381::Fr, ark_bls12_381::G1Projective>(*d, "BLS-12-381", nb_measurements);
+        aux::<ark_bls12_381::Fr, ark_bls12_381::G1Projective>(*d, "BLS12_381", nb_measurements);
         aux::<ark_bn254::Fr, ark_bn254::G1Projective>(*d, "BN-254", nb_measurements);
         aux::<ark_pallas::Fr, ark_pallas::Projective>(*d, "PALLAS", nb_measurements);
     }
@@ -160,7 +160,7 @@ fn ark_setup(degrees: &[usize], nb_measurements: usize) {
     }
 
     for d in degrees {
-        aux::<ark_bls12_381::Bls12_381>(*d, "BLS-12-381", nb_measurements);
+        aux::<ark_bls12_381::Bls12_381>(*d, "BLS12_381", nb_measurements);
         aux::<ark_bn254::Bn254>(*d, "BN-254", nb_measurements);
     }
 }

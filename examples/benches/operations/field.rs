@@ -1,4 +1,4 @@
-// see `benches/README.md`
+// see `examples/benches/README.md`
 use std::time::Duration;
 
 use ark_ff::PrimeField;
