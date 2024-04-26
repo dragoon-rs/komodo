@@ -166,3 +166,73 @@ python scripts/plot/plot.py --title "recoding with k = 4" (
         | to json
 )
 ```
+
+### FEC
+```nushell
+let rho = 1 / 2
+
+"" out> fec.ndjson
+
+[3, 5] | each { |k|
+    cargo run --example bench_fec  -- ...[
+        ...[100, 1_000, 10_000]
+        --encoding vandermonde
+        -k $k
+        -n ($k / $rho)
+        --nb-measurements 100
+    ] | from ndnuon | to ndjson out>> fec.ndjson
+}
+```
+```nushell
+python scripts/plot/plot.py --title "encoding" --x-label "nb bytes" --y-label "time (in ms)" (
+    open fec.ndjson
+        | update label { from json }
+        | flatten label
+        | ns-to-ms times
+        | compute-stats times
+        | insert foo { $"($in.name) / ($in.k)" }
+        | where step == "encode"
+        | rename --column { bytes: "x", mean: "y", stddev: "e" }
+        | group-by foo --to-table
+        | rename --column { group: "name", items: "points" }
+        | to json
+)
+
+python scripts/plot/plot.py --title "decoding" --x-label "nb bytes" --y-label "time (in ms)" (
+    open fec.ndjson
+        | update label { from json }
+        | flatten label
+        | ns-to-ms times
+        | compute-stats times
+        | insert foo { $"($in.name) / ($in.k)" }
+        | where step == "decode"
+        | rename --column { bytes: "x", mean: "y", stddev: "e" }
+        | group-by foo --to-table
+        | rename --column { group: "name", items: "points" }
+        | to json
+)
+
+let x = open fec.ndjson
+    | update label { from json }
+    | flatten label
+    | insert foo { $"($in.name) / ($in.k) / ($in.bytes)" }
+    | group-by foo --to-table
+    | update items {|it|
+        $it.items
+            | update step e2e
+            | update times { $it.items.0.times | zip $it.items.1.times | each { $in.0 + $in.1 } }
+    }
+    | flatten --all
+    | reject group foo
+
+python scripts/plot/plot.py --title "e2e" --x-label "nb bytes" --y-label "time (in ms)" (
+    $x
+        | ns-to-ms times
+        | compute-stats times
+        | insert foo { $"($in.name) / ($in.k)" }
+        | rename --column { bytes: "x", mean: "y", stddev: "e" }
+        | group-by foo --to-table
+        | rename --column { group: "name", items: "points" }
+        | to json
+)
+```

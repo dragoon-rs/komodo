@@ -78,3 +78,7 @@ path = "examples/benches/linalg.rs"
 [[example]]
 name = "bench_recoding"
 path = "examples/benches/recoding.rs"
+
+[[example]]
+name = "bench_fec"
+path = "examples/benches/fec.rs"
