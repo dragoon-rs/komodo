@@ -130,22 +130,25 @@ gplt plot ...[
 ## end-to-end benchmarks
 ### recoding
 ```nushell
-cargo run --example bench_recoding -- ...[
-    --nb-measurements 10
-    ...[1, 1_024, (1_024 * 1_024)]
-    --shards ...[2, 4, 8, 16]
-    --ks ...[2, 4, 8, 16]
-] | from ndnuon | to ndjson out> recoding.ndjson
+"" out> recoding.ndjson
+
+[2, 4, 8, 16] | each { |k|
+    cargo run --example bench_recoding -- ...[
+        --nb-measurements 10
+        ...[100, 1_000, 10_000]
+        --shards $k
+        --ks $k
+    ] | from ndnuon | to ndjson out>> recoding.ndjson
+}
 ```
 ```nushell
-gplt plot --title "recoding with k = 4" (
+gplt plot --title "k-recoding with k = #shards" --x-label "nb bytes" --y-label "time (in ms)" (
     open recoding.ndjson
         | ns-to-ms $.times
         | compute-stats $.times
         | update label { from nuon }
         | flatten --all label
         | insert case { $"($in.name) / ($in.shards)" }
-        | where k == 4  # $k$ has a negligible influence on _recoding_
         | rename --column { bytes: "x", mean: "y", stddev: "e" }
         | group-by case --to-table
         | rename --column { group: "name", items: "points" }
@@ -172,22 +175,20 @@ gplt plot --title "recoding with k = 4" (
 
 ### FEC
 ```nushell
-let rho = 1 / 2
-
 "" out> fec.ndjson
 
-[3, 5] | each { |k|
+[2, 4, 8, 16] | each { |k|
     cargo run --example bench_fec  -- ...[
         ...[100, 1_000, 10_000]
         --encoding vandermonde
         -k $k
-        -n ($k / $rho)
+        -n 1
         --nb-measurements 100
     ] | from ndnuon | to ndjson out>> fec.ndjson
 }
 ```
 ```nushell
-gplt plot --title "encoding" --x-label "nb bytes" --y-label "time (in ms)" (
+gplt plot --title "1-encoding" --x-label "nb bytes" --y-label "time (in ms)" (
     open fec.ndjson
         | update label { from json }
         | flatten label
@@ -201,7 +202,7 @@ gplt plot --title "encoding" --x-label "nb bytes" --y-label "time (in ms)" (
         | to json
 )
 
-gplt plot --title "decoding" --x-label "nb bytes" --y-label "time (in ms)" (
+gplt plot --title "k-decoding" --x-label "nb bytes" --y-label "time (in ms)" (
     open fec.ndjson
         | update label { from json }
         | flatten label
@@ -228,10 +229,11 @@ let x = open fec.ndjson
     | flatten --all
     | reject group foo
 
-gplt plot --title "e2e" --x-label "nb bytes" --y-label "time (in ms)" (
+gplt plot --title "e2e: k-decoding + 1-encoding" --x-label "nb bytes" --y-label "time (in ms)" (
     $x
         | ns-to-ms times
         | compute-stats times
+        | reject times
         | insert foo { $"($in.name) / ($in.k)" }
         | rename --column { bytes: "x", mean: "y", stddev: "e" }
         | group-by foo --to-table

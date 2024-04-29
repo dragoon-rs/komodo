@@ -45,6 +45,8 @@ fn template<F: PrimeField>(b: &Bencher, nb_bytes: usize, k: usize, n: usize, enc
         },
     );
 
+    let encoding_mat = build_encoding_mat(k, k, encoding, &mut rng);
+
     plnk::bench(
         b,
         &format!(
