@@ -1,3 +1,6 @@
+## requirements
+- install [GPLT](https://gitlab.isae-supaero.fr/a.stevan/gplt)
+
 ```nushell
 use scripts/math.nu *
 use scripts/formats.nu *
@@ -11,22 +14,22 @@ cargo run --example bench_curve_group_operations -- --nb-measurements 1000 out> 
 ```nushell
 use scripts/parse.nu read-atomic-ops
 
-python scripts/plot/multi_bar.py --title "simple field operations" -l "time (in ns)" (
+gplt multi_bar --title "simple field operations" -l "time (in ns)" (
     open field.ndjson
         | read-atomic-ops --exclude [ "exponentiation", "legendre", "inverse", "sqrt" ]
         | to json
 )
-python scripts/plot/multi_bar.py --title "complex field operations" -l "time (in ns)" (
+gplt multi_bar --title "complex field operations" -l "time (in ns)" (
     open field.ndjson
         | read-atomic-ops --include [ "exponentiation", "legendre", "inverse", "sqrt" ]
         | to json
 )
-python scripts/plot/multi_bar.py --title "simple curve group operations" -l "time (in ns)" (
+gplt multi_bar --title "simple curve group operations" -l "time (in ns)" (
     open curve_group.ndjson
         | read-atomic-ops --exclude [ "random sampling", "scalar multiplication", "affine scalar multiplication" ]
         | to json
 )
-python scripts/plot/multi_bar.py --title "complex curve group operations" -l "time (in ns)" (
+gplt multi_bar --title "complex curve group operations" -l "time (in ns)" (
     open curve_group.ndjson
         | read-atomic-ops --include [ "random sampling", "scalar multiplication", "affine scalar multiplication" ]
         | to json
@@ -54,7 +57,7 @@ for graph in [
     ["transpose", "time to transpose an nxn matrix on certain curves"],
     ["mul", "time to multiply two nxn matrices on certain curves"]
 ] {
-    python scripts/plot/plot.py ...[
+    gplt plot ...[
         --title $graph.title
         --x-label "size"
         --y-label "time (in ms)"
@@ -78,7 +81,7 @@ let degrees = seq 0 13 | each { 2 ** $in }
 cargo run --example bench_setup -- --nb-measurements 10 ...$degrees out> setup.ndjson
 ```
 ```nushell
-python scripts/plot/plot.py ...[
+gplt plot ...[
     --title "time to create trusted setups for certain curves"
     --x-label "degree"
     --y-label "time (in ms)"
@@ -107,7 +110,7 @@ let degrees = seq 0 15 | each { 2 ** $in }
 cargo run --example bench_commit -- --nb-measurements 10 ...$degrees out> commit.ndjson
 ```
 ```nushell
-python scripts/plot/plot.py ...[
+gplt plot ...[
     --title "time to commit polynomials for certain curves"
     --x-label "degree"
     --y-label "time (in ms)"
@@ -135,7 +138,7 @@ cargo run --example bench_recoding -- ...[
 ] | from ndnuon | to ndjson out> recoding.ndjson
 ```
 ```nushell
-python scripts/plot/plot.py --title "recoding with k = 4" (
+gplt plot --title "recoding with k = 4" (
     open recoding.ndjson
         | ns-to-ms $.times
         | compute-stats $.times
@@ -184,7 +187,7 @@ let rho = 1 / 2
 }
 ```
 ```nushell
-python scripts/plot/plot.py --title "encoding" --x-label "nb bytes" --y-label "time (in ms)" (
+gplt plot --title "encoding" --x-label "nb bytes" --y-label "time (in ms)" (
     open fec.ndjson
         | update label { from json }
         | flatten label
@@ -198,7 +201,7 @@ python scripts/plot/plot.py --title "encoding" --x-label "nb bytes" --y-label "t
         | to json
 )
 
-python scripts/plot/plot.py --title "decoding" --x-label "nb bytes" --y-label "time (in ms)" (
+gplt plot --title "decoding" --x-label "nb bytes" --y-label "time (in ms)" (
     open fec.ndjson
         | update label { from json }
         | flatten label
@@ -225,7 +228,7 @@ let x = open fec.ndjson
     | flatten --all
     | reject group foo
 
-python scripts/plot/plot.py --title "e2e" --x-label "nb bytes" --y-label "time (in ms)" (
+gplt plot --title "e2e" --x-label "nb bytes" --y-label "time (in ms)" (
     $x
         | ns-to-ms times
         | compute-stats times
