@@ -159,7 +159,7 @@ python scripts/plot/plot.py --title "recoding with k = 4" (
                 4 => "dashdot"
                 8 => "dashed"
                 16 => "solid"
-                _ => { color: "loosely dotted" }
+                _ => "loosely dotted"
             }
             { color: $c, line: { type: $t } }
         }

@@ -15,7 +15,7 @@ fn to_curve<F: PrimeField>(n: u128) -> F {
 
 fn create_fake_shard<F: PrimeField>(nb_bytes: usize, k: usize) -> Shard<F> {
     let mut rng = rand::thread_rng();
-    let bytes: Vec<u8> = (0..nb_bytes).map(|_| rng.gen::<u8>()).collect();
+    let bytes: Vec<u8> = (0..(nb_bytes / k)).map(|_| rng.gen::<u8>()).collect();
 
     let linear_combination: Vec<F> = (0..k).map(|_| to_curve::<F>(rng.gen::<u128>())).collect();
 
