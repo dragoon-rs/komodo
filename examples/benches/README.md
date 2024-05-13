@@ -82,7 +82,7 @@ cargo run --example bench_setup -- --nb-measurements 10 ...$degrees out> setup.n
 ```
 ```nushell
 gplt plot ...[
-    --title "time to create trusted setups for certain curves"
+    # --title "time to create trusted setups for certain curves"
     --x-label "degree"
     --y-label "time (in ms)"
     (
@@ -97,10 +97,19 @@ gplt plot ...[
                 $it.name | parse "setup on {curve}" | into record | get curve
             }}
             | rename --column { degree: "x", mean: "y", stddev: "e" }
+            | select name x y e
             | group-by name --to-table
+            | reject items.name
             | rename --column { group: "name", items: "points" }
+            | sort-by name
             | to json
     )
+    --fullscreen
+    --dpi 150
+    --fig-size ...[16, 9]
+    --font ({ size: 30, family: serif, sans-serif: Helvetica } | to json)
+    --use-tex
+    # --save setup.pdf
 ]
 ```
 
@@ -111,19 +120,29 @@ cargo run --example bench_commit -- --nb-measurements 10 ...$degrees out> commit
 ```
 ```nushell
 gplt plot ...[
-    --title "time to commit polynomials for certain curves"
+    # --title "time to commit polynomials for certain curves"
     --x-label "degree"
     --y-label "time (in ms)"
     (
         open commit.ndjson
+            | where name !~ '^SEC'
             | ns-to-ms $.times
             | compute-stats $.times
             | insert degree { get label | parse "degree {d}" | into record | get d | into int }
             | rename --column { degree: "x", mean: "y", stddev: "e" }
+            | select name x y e
             | group-by name --to-table
+            | reject items.name
             | rename --column { group: "name", items: "points" }
+            | sort-by name
             | to json
     )
+    --fullscreen
+    --dpi 150
+    --fig-size ...[16, 9]
+    --font ({ size: 30, family: serif, sans-serif: Helvetica } | to json)
+    --use-tex
+    # --save commit.pdf
 ]
 ```
 
@@ -142,7 +161,7 @@ gplt plot ...[
 }
 ```
 ```nushell
-gplt plot --title "k-recoding with k = #shards" --x-label "nb bytes" --y-label "time (in ms)" (
+gplt plot --title "k-recoding with k = #shards" --x-label '\#bytes' --y-label "time (in ms)" (
     open recoding.ndjson
         | ns-to-ms $.times
         | compute-stats $.times
@@ -155,7 +174,7 @@ gplt plot --title "k-recoding with k = #shards" --x-label "nb bytes" --y-label "
         | insert style {|it|
             let g = $it.name | parse "{c} / {s}" | into record | into int s
             let c = match $g.c {
-                "BLS12_381" => "blue"
+                "BLS12-381" => "blue"
                 "BN-254" => "orange"
                 "PALLAS" => "green"
                 _ => "gray"
@@ -171,6 +190,35 @@ gplt plot --title "k-recoding with k = #shards" --x-label "nb bytes" --y-label "
         }
         | to json
 )
+```
+an alternate plot
+```nushell
+gplt plot ...[
+    # --title "k-recoding with k = #shards"
+    --x-label '\#bytes'
+    --y-label "time (in ms)"
+    (
+        open recoding.ndjson
+            | ns-to-ms $.times
+            | compute-stats $.times
+            | update label { from nuon }
+            | flatten --all label
+            | where name == "BLS12-381"
+            | rename --column { bytes: "x", mean: "y", stddev: "e" }
+            | select shards x y e
+            | group-by shards --to-table
+            | reject items.shards
+            | rename --column { group: "name", items: "points" }
+            | update name { $"$k = ($in)$"}
+            | to json
+    )
+    --fullscreen
+    --dpi 150
+    --fig-size ...[16, 9]
+    --font ({ size: 30, family: serif, sans-serif: Helvetica } | to json)
+    --use-tex
+    # --save recoding.pdf
+]
 ```
 
 ### FEC
@@ -188,33 +236,59 @@ gplt plot --title "k-recoding with k = #shards" --x-label "nb bytes" --y-label "
 }
 ```
 ```nushell
-gplt plot --title "1-encoding" --x-label "nb bytes" --y-label "time (in ms)" (
-    open fec.ndjson
-        | update label { from json }
-        | flatten label
-        | ns-to-ms times
-        | compute-stats times
-        | insert foo { $"($in.name) / ($in.k)" }
-        | where step == "encode"
-        | rename --column { bytes: "x", mean: "y", stddev: "e" }
-        | group-by foo --to-table
-        | rename --column { group: "name", items: "points" }
-        | to json
-)
+gplt plot ...[
+    # --title "1-encoding"
+    --x-label '\#bytes'
+    --y-label "time (in ms)"
+    (
+        open fec.ndjson
+            | update label { from json }
+            | flatten label
+            | ns-to-ms times
+            | compute-stats times
+            | where name == "BLS12-381" and step == "encode"
+            | rename --column { bytes: "x", mean: "y", stddev: "e" }
+            | select k x y e
+            | group-by k --to-table
+            | reject items.k
+            | rename --column { group: "name", items: "points" }
+            | update name { $"$k = ($in)$" }
+            | to json
+    )
+    --fullscreen
+    --dpi 150
+    --fig-size ...[16, 9]
+    --font ({ size: 30, family: serif, sans-serif: Helvetica } | to json)
+    --use-tex
+    # --save encoding.pdf
+]
 
-gplt plot --title "k-decoding" --x-label "nb bytes" --y-label "time (in ms)" (
-    open fec.ndjson
-        | update label { from json }
-        | flatten label
-        | ns-to-ms times
-        | compute-stats times
-        | insert foo { $"($in.name) / ($in.k)" }
-        | where step == "decode"
-        | rename --column { bytes: "x", mean: "y", stddev: "e" }
-        | group-by foo --to-table
-        | rename --column { group: "name", items: "points" }
-        | to json
-)
+gplt plot ...[
+    # --title "k-encoding"
+    --x-label '\#bytes'
+    --y-label "time (in ms)"
+    (
+        open fec.ndjson
+            | update label { from json }
+            | flatten label
+            | ns-to-ms times
+            | compute-stats times
+            | where name == "BLS12-381" and step == "decode"
+            | rename --column { bytes: "x", mean: "y", stddev: "e" }
+            | select k x y e
+            | group-by k --to-table
+            | reject items.k
+            | rename --column { group: "name", items: "points" }
+            | update name { $"$k = ($in)$" }
+            | to json
+    )
+    --fullscreen
+    --dpi 150
+    --fig-size ...[16, 9]
+    --font ({ size: 30, family: serif, sans-serif: Helvetica } | to json)
+    --use-tex
+    # --save decoding.pdf
+]
 
 let x = open fec.ndjson
     | update label { from json }
@@ -229,15 +303,29 @@ let x = open fec.ndjson
     | flatten --all
     | reject group foo
 
-gplt plot --title "e2e: k-decoding + 1-encoding" --x-label "nb bytes" --y-label "time (in ms)" (
-    $x
-        | ns-to-ms times
-        | compute-stats times
-        | reject times
-        | insert foo { $"($in.name) / ($in.k)" }
-        | rename --column { bytes: "x", mean: "y", stddev: "e" }
-        | group-by foo --to-table
-        | rename --column { group: "name", items: "points" }
-        | to json
-)
+gplt plot ...[
+    # --title "e2e: k-decoding + 1-encoding"
+    --x-label '\#bytes'
+    --y-label "time (in ms)"
+    (
+        $x
+            | ns-to-ms times
+            | compute-stats times
+            | reject times
+            | where name == "BLS12-381"
+            | rename --column { bytes: "x", mean: "y", stddev: "e" }
+            | select k x y e
+            | group-by k --to-table
+            | reject items.k
+            | rename --column { group: "name", items: "points" }
+            | update name { $"$k = ($in)$" }
+            | to json
+    )
+    --fullscreen
+    --dpi 150
+    --fig-size ...[16, 9]
+    --font ({ size: 30, family: serif, sans-serif: Helvetica } | to json)
+    --use-tex
+    # --save e2e.pdf
+]
 ```

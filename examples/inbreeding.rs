@@ -43,7 +43,8 @@
 /// use std repeat
 ///
 /// # let raw = $data | update inbreeding { take ($l - $w + 1)}
-/// let smooth = $data | update inbreeding { prepend (1 | repeat $w) | window $w | each { math avg } }
+/// # let smooth = $data | update inbreeding { prepend (1 | repeat $w) | window $w | each { math avg } }
+/// let smooth = $data
 ///
 /// $smooth
 ///     | insert name {|it|
@@ -70,6 +71,7 @@
 ///             _ => "gray",
 ///         }
 ///     }
+///     | reject r
 ///     | save --force /tmp/graphs.json
 /// ```
 /// ```
@@ -77,10 +79,19 @@
 /// let x_max = open /tmp/graphs.json | get points.0.x | math max
 ///
 /// gplt plot ...[
-///     --graphs-file /tmp/graphs.json
+///     --json-data-file /tmp/graphs.json
 ///     --x-lim ($x_min - 1) ($x_max + 1)
 ///     --y-lim -0.01 1.01
 ///     --fullscreen
+///     # --title "diversity over time when recoding shards $r$ shards"
+///     --x-label "time (in nb of steps)"
+///     --y-label "diversity"
+///     --dpi 150
+///     --fig-size ...[16, 5]
+///     --font ({ size: 15, family: serif, sans-serif: Helvetica } | to json)
+///     --use-tex
+///     --legend-loc "upper right"
+///     # --save inbreeding.pdf
 /// ]
 /// ```
 use std::process::exit;

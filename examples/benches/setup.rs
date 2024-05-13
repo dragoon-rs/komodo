@@ -128,9 +128,10 @@ fn setup(degrees: &[usize], nb_measurements: usize) {
     }
 
     for d in degrees {
-        aux::<ark_bls12_381::Fr, ark_bls12_381::G1Projective>(*d, "BLS12_381", nb_measurements);
+        aux::<ark_bls12_381::Fr, ark_bls12_381::G1Projective>(*d, "BLS12-381", nb_measurements);
         aux::<ark_bn254::Fr, ark_bn254::G1Projective>(*d, "BN-254", nb_measurements);
         aux::<ark_pallas::Fr, ark_pallas::Projective>(*d, "PALLAS", nb_measurements);
+        aux::<ark_vesta::Fr, ark_vesta::Projective>(*d, "VESTA", nb_measurements);
     }
 }
 
@@ -147,9 +148,10 @@ fn serde(degrees: &[usize], nb_measurements: usize) {
     }
 
     for d in degrees {
-        aux::<ark_bls12_381::Fr, ark_bls12_381::G1Projective>(*d, "BLS12_381", nb_measurements);
+        aux::<ark_bls12_381::Fr, ark_bls12_381::G1Projective>(*d, "BLS12-381", nb_measurements);
         aux::<ark_bn254::Fr, ark_bn254::G1Projective>(*d, "BN-254", nb_measurements);
         aux::<ark_pallas::Fr, ark_pallas::Projective>(*d, "PALLAS", nb_measurements);
+        aux::<ark_vesta::Fr, ark_vesta::Projective>(*d, "VESTA", nb_measurements);
     }
 }
 
@@ -160,7 +162,7 @@ fn ark_setup(degrees: &[usize], nb_measurements: usize) {
     }
 
     for d in degrees {
-        aux::<ark_bls12_381::Bls12_381>(*d, "BLS12_381", nb_measurements);
+        aux::<ark_bls12_381::Bls12_381>(*d, "BLS12-381", nb_measurements);
         aux::<ark_bn254::Bn254>(*d, "BN-254", nb_measurements);
     }
 }

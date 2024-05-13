@@ -74,7 +74,7 @@ fn main() {
     for b in cli.bytes {
         for s in &cli.shards {
             for k in &cli.ks {
-                bench_template::<ark_bls12_381::Fr>(&bencher.with_name("BLS12_381"), b, *k, *s);
+                bench_template::<ark_bls12_381::Fr>(&bencher.with_name("BLS12-381"), b, *k, *s);
                 bench_template::<ark_bn254::Fr>(&bencher.with_name("BN-254"), b, *k, *s);
                 bench_template::<ark_pallas::Fr>(&bencher.with_name("PALLAS"), b, *k, *s);
             }
