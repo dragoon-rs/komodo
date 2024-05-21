@@ -8,8 +8,8 @@ use scripts/formats.nu *
 
 ## atomic operations
 ```nushell
-cargo run --example bench_field_operations -- --nb-measurements 1000 out> field.ndjson
-cargo run --example bench_curve_group_operations -- --nb-measurements 1000 out> curve_group.ndjson
+cargo run --release --example bench_field_operations -- --nb-measurements 1000 out> field.ndjson
+cargo run --release --example bench_curve_group_operations -- --nb-measurements 1000 out> curve_group.ndjson
 ```
 ```nushell
 use scripts/parse.nu read-atomic-ops
@@ -39,7 +39,7 @@ gplt multi_bar --title "complex curve group operations" -l "time (in ns)" (
 ## linear algebra
 ```nushell
 let sizes = seq 0 7 | each { 2 ** $in }
-cargo run --example bench_linalg -- --nb-measurements 10 ...$sizes out> linalg.ndjson
+cargo run --release --example bench_linalg -- --nb-measurements 10 ...$sizes out> linalg.ndjson
     | save --force linalg.ndjson
 ```
 ```nushell
@@ -78,7 +78,7 @@ for graph in [
 ## trusted setup
 ```nushell
 let degrees = seq 0 13 | each { 2 ** $in }
-cargo run --example bench_setup -- --nb-measurements 10 ...$degrees out> setup.ndjson
+cargo run --release --example bench_setup -- --nb-measurements 10 ...$degrees out> setup.ndjson
 ```
 ```nushell
 gplt plot ...[
@@ -116,7 +116,7 @@ gplt plot ...[
 ## commit
 ```nushell
 let degrees = seq 0 15 | each { 2 ** $in }
-cargo run --example bench_commit -- --nb-measurements 10 ...$degrees out> commit.ndjson
+cargo run --release --example bench_commit -- --nb-measurements 10 ...$degrees out> commit.ndjson
 ```
 ```nushell
 gplt plot ...[
@@ -161,7 +161,7 @@ use scripts/plot.nu [
 "" out> recoding.ndjson
 
 [2, 4, 8, 16] | each { |k|
-    cargo run --example bench_recoding -- ...[
+    cargo run --release --example bench_recoding -- ...[
         --nb-measurements 10
         ...(seq 0 18 | each { 512 * 2 ** $in })
         --shards $k
@@ -197,7 +197,7 @@ gplt plot ($graphs | to json) ...[
 "" out> fec.ndjson
 
 [2, 4, 8, 16] | each { |k|
-    cargo run --example bench_fec  -- ...[
+    cargo run --release --example bench_fec  -- ...[
         ...(seq 0 18 | each { 512 * 2 ** $in })
         --encoding vandermonde
         -k $k

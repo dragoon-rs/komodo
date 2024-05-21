@@ -1,4 +1,4 @@
-.PHONY: fmt fmt-check check clippy test example show
+.PHONY: fmt fmt-check check clippy test example show build-examples
 
 DEFAULT_GOAL: fmt-check check clippy test
 
@@ -32,3 +32,6 @@ show:
 
 doc:
 	cargo doc --document-private-items --no-deps --open
+
+build-examples:
+	cargo build --examples --release

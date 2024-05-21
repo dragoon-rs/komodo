@@ -1,4 +1,8 @@
 /// # Example
+/// - build the example for best performance
+/// ```shell
+/// cargo build --release --example inbreeding
+/// ```
 /// - run the experiment
 /// ```nushell
 /// const NB_BYTES = 1_024 * 10
@@ -8,7 +12,7 @@
 /// const MEASUREMENT_SCHEDULE = 1
 /// const MAX_T = 150
 ///
-/// cargo run --example inbreeding -- ...[
+/// ./target/release/examples/inbreeding ...[
 ///     $NB_BYTES,
 ///     -k $K
 ///     -n $N
@@ -19,7 +23,7 @@
 /// ] | lines | into float | save --force baseline.nuon
 ///
 /// seq 1 $K | reverse | each {|r|
-///     let inbreeding = cargo run --example inbreeding -- ...[
+///     let inbreeding = ./target/release/examples/inbreeding ...[
 ///         $NB_BYTES,
 ///         -k $K
 ///         -n $N
@@ -293,6 +297,7 @@ fn main() {
 
     match cli.test_case {
         TestCase::EndToEnd => {
+            eprintln!("naive: k = {}, n = {}", cli.k, cli.n);
             let _ = end_to_end::<ark_pallas::Fr, _>(
                 &bytes,
                 cli.k,
@@ -309,6 +314,12 @@ fn main() {
                 exit(1);
             }
 
+            eprintln!(
+                "true: k = {}, n = {}, sigma = {}",
+                cli.k,
+                cli.n,
+                cli.r.unwrap(),
+            );
             let _ = recoding::<ark_pallas::Fr, _>(
                 &bytes,
                 cli.k,
