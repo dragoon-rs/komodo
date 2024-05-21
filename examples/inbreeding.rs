@@ -18,7 +18,7 @@
 ///     --test-case end-to-end
 /// ] | lines | into float | save --force baseline.nuon
 ///
-/// seq 2 $K | reverse | each {|r|
+/// seq 1 $K | reverse | each {|r|
 ///     let inbreeding = cargo run --example inbreeding -- ...[
 ///         $NB_BYTES,
 ///         -k $K
@@ -52,26 +52,26 @@
 /// $smooth
 ///     | insert name {|it|
 ///        let r = if $it.r == $k { "k" }  else { $"k - ($k - $it.r)" }
-///        $"$r = ($r)$"
+///        $"$\\sigma = ($r)$"
 ///     }
 ///     # | append ($raw | insert name null | insert style { line: { alpha: 0.1 } })
 ///     | update inbreeding {|it|
 ///         let l = $it.inbreeding | length
-///         $it.inbreeding | wrap y | merge (seq 1 $l | wrap x) | insert e 0
+///         $it.inbreeding | wrap y | merge (seq 0 $l | wrap x) | insert e 0
 ///     }
 ///     | rename --column { inbreeding: "points" }
 ///     | insert style.color {|it|
 ///         match $it.r {
-///             10 => "red",
-///             9 => "orange",
-///             8 => "yellow",
-///             7 => "blue",
-///             6 => "purple",
-///             5 => "green",
-///             4 => "cyan",
-///             3 => "black",
-///             2 => "magenta",
-///             _ => "gray",
+///             10 => "tab:red",
+///             9 => "tab:orange",
+///             8 => "tab:olive",
+///             7 => "tab:blue",
+///             6 => "tab:purple",
+///             5 => "tab:green",
+///             4 => "tab:cyan",
+///             3 => "tab:brown",
+///             2 => "tab:pink",
+///             _ => "tab:gray",
 ///         }
 ///     }
 ///     | reject r
@@ -88,7 +88,7 @@
 ///     --fullscreen
 ///     # --title "diversity over time when recoding shards $r$ shards"
 ///     --x-label "time (in nb of steps)"
-///     --y-label "diversity"
+///     --y-label "diversity $\\delta$"
 ///     --dpi 150
 ///     --fig-size ...[16, 5]
 ///     --font ({ size: 15, family: serif, sans-serif: Helvetica } | to json)
