@@ -5,6 +5,7 @@
 /// const K = 10
 /// const N = 2 * $K
 /// const NB_MEASUREMENTS = 1_000
+/// const MEASUREMENT_SCHEDULE = 1
 /// const MAX_T = 150
 ///
 /// cargo run --example inbreeding -- ...[
@@ -12,6 +13,7 @@
 ///     -k $K
 ///     -n $N
 ///     --nb-measurements $NB_MEASUREMENTS
+///     --measurement-schedule $MEASUREMENT_SCHEDULE
 ///     -t $MAX_T
 ///     --test-case end-to-end
 /// ] | lines | into float | save --force baseline.nuon
@@ -22,6 +24,7 @@
 ///         -k $K
 ///         -n $N
 ///         --nb-measurements $NB_MEASUREMENTS
+///         --measurement-schedule $MEASUREMENT_SCHEDULE
 ///         -t $MAX_T
 ///         --test-case recoding
 ///         -r $r
@@ -99,7 +102,7 @@ use std::process::exit;
 use ark_ff::PrimeField;
 
 use clap::{Parser, ValueEnum};
-use indicatif::ProgressBar;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use komodo::{
     error::KomodoError,
     fec::{self, Shard},
@@ -125,36 +128,56 @@ fn measure_inbreeding<F: PrimeField>(
     shards: &[Shard<F>],
     k: usize,
     nb_measurements: usize,
+    mp: &MultiProgress,
+    sty: &ProgressStyle,
     rng: &mut impl RngCore,
 ) -> f64 {
     let mut s: Vec<_> = shards.to_vec();
     let mut count = 0;
+
+    let pb = mp.add(ProgressBar::new(nb_measurements as u64));
+    pb.set_style(sty.clone());
+    pb.set_message("measure");
     for _ in 0..nb_measurements {
         // get any k of the shards
         s.shuffle(rng);
         if fec::decode(s.iter().take(k).cloned().collect()).is_ok() {
             count += 1;
         }
+        pb.inc(1);
     }
 
     count as f64 / nb_measurements as f64
 }
 
-fn end_to_end<F: PrimeField>(
+fn end_to_end<F, Fun>(
     bytes: &[u8],
     k: usize,
     n: usize,
     max_t: usize,
     nb_measurements: usize,
+    measurement_schedule: Fun,
     rng: &mut impl RngCore,
-) -> Result<(), KomodoError> {
+) -> Result<(), KomodoError>
+where
+    F: PrimeField,
+    Fun: Fn(usize) -> bool,
+{
     let original_shards = setup(bytes, k, n)?;
     let mut shards = original_shards.clone();
 
-    let pb = ProgressBar::new(max_t as u64);
-    for _ in 0..max_t {
-        let inbreeding = measure_inbreeding(&shards, k, nb_measurements, rng);
-        println!("{}", inbreeding);
+    let mp = MultiProgress::new();
+    let sty = ProgressStyle::with_template("{msg}: {bar:40.cyan/blue} {pos:>7}/{len:7}")
+        .unwrap()
+        .progress_chars("##-");
+    let pb = mp.add(ProgressBar::new(max_t as u64));
+    pb.set_style(sty.clone());
+    pb.set_message("main");
+    for t in 0..=max_t {
+        if measurement_schedule(t) {
+            let inbreeding = measure_inbreeding(&shards, k, nb_measurements, &mp, &sty, rng);
+            println!("{}", inbreeding);
+        }
 
         // decode the data
         let data = fec::decode(original_shards.clone())?;
@@ -171,26 +194,40 @@ fn end_to_end<F: PrimeField>(
     Ok(())
 }
 
-fn recoding<F: PrimeField>(
+#[allow(clippy::too_many_arguments)]
+fn recoding<F, Fun>(
     bytes: &[u8],
     k: usize,
     n: usize,
     max_t: usize,
     nb_shards_to_recode: usize,
     nb_measurements: usize,
+    measurement_schedule: Fun,
     rng: &mut impl RngCore,
-) -> Result<(), KomodoError> {
-    let mut shards = setup(bytes, k, n)?;
+) -> Result<(), KomodoError>
+where
+    F: PrimeField,
+    Fun: Fn(usize) -> bool,
+{
+    let mut shards = setup::<F>(bytes, k, n)?;
 
-    let pb = ProgressBar::new(max_t as u64);
-    for _ in 0..max_t {
-        let inbreeding = measure_inbreeding(&shards, k, nb_measurements, rng);
-        println!("{}", inbreeding);
+    let mp = MultiProgress::new();
+    let sty = ProgressStyle::with_template("{msg}: {bar:40.cyan/blue} {pos:>7}/{len:7}")
+        .unwrap()
+        .progress_chars("##-");
+    let pb = mp.add(ProgressBar::new(max_t as u64));
+    pb.set_style(sty.clone());
+    pb.set_message("main");
+    for t in 0..=max_t {
+        if measurement_schedule(t) {
+            let inbreeding = measure_inbreeding(&shards, k, nb_measurements, &mp, &sty, rng);
+            println!("{}", inbreeding);
+        }
 
         // recode a new random shard
-        let coeffs: Vec<F> = (0..nb_shards_to_recode).map(|_| F::rand(rng)).collect();
+        shards.shuffle(rng);
         let s: Vec<_> = shards.iter().take(nb_shards_to_recode).cloned().collect();
-        let new_shard = fec::recode_with_coeffs(&s, &coeffs).unwrap();
+        let new_shard = fec::recode_random(&s, rng).unwrap().unwrap();
         shards.push(new_shard);
 
         pb.inc(1);
@@ -228,6 +265,9 @@ struct Cli {
     /// the measurements
     #[arg(long)]
     nb_measurements: usize,
+
+    #[arg(long)]
+    measurement_schedule: usize,
 }
 
 fn main() {
@@ -245,14 +285,21 @@ fn main() {
 
     let bytes = random_bytes(cli.nb_bytes, &mut rng);
 
+    eprintln!(
+        "diversity will be measured every {} steps",
+        cli.measurement_schedule
+    );
+    let measurement_schedule = |t| t % cli.measurement_schedule == 0;
+
     match cli.test_case {
         TestCase::EndToEnd => {
-            let _ = end_to_end::<ark_pallas::Fr>(
+            let _ = end_to_end::<ark_pallas::Fr, _>(
                 &bytes,
                 cli.k,
                 cli.n,
                 cli.t,
                 cli.nb_measurements,
+                measurement_schedule,
                 &mut rng,
             );
         }
@@ -262,13 +309,14 @@ fn main() {
                 exit(1);
             }
 
-            let _ = recoding::<ark_pallas::Fr>(
+            let _ = recoding::<ark_pallas::Fr, _>(
                 &bytes,
                 cli.k,
                 cli.n,
                 cli.t,
                 cli.r.unwrap(),
                 cli.nb_measurements,
+                measurement_schedule,
                 &mut rng,
             );
         }
