@@ -22,7 +22,7 @@ export def encoding [data: path, --save: path] {
 
     let options = [
         # --title "1-encoding"
-        ...($graphs.points | flatten | into-axis-options -y "duration")
+        ...($graphs.points | flatten | into-axis-options -x "filesize" -y "duration")
         ...$COMMON_OPTIONS
         (if $save != null { [ --save $save ] })
     ]
@@ -49,7 +49,7 @@ export def decoding [data: path, --save: path] {
 
     let options = [
         # --title "k-encoding"
-        ...($graphs.points | flatten | into-axis-options -y "duration")
+        ...($graphs.points | flatten | into-axis-options -x "filesize" -y "duration")
         --no-legend
         ...$COMMON_OPTIONS
         (if $save != null { [ --save $save ] })
@@ -87,7 +87,7 @@ export def e2e [data: path, --save: path] {
 
     let options = [
         # --title "k-encoding + 1-encoding"
-        ...($graphs.points | flatten | into-axis-options -y "duration")
+        ...($graphs.points | flatten | into-axis-options -x "filesize" -y "duration")
         --no-legend
         ...$COMMON_OPTIONS
         (if $save != null { [ --save $save ] })
@@ -190,7 +190,7 @@ export def combined [data: path, --recoding: path, --save: path] {
         }
 
     let options = [
-        ...($graphs.points | flatten | into-axis-options -y "duration")
+        ...($graphs.points | flatten | into-axis-options -x "filesize" -y "duration")
         --legend-loc "upper left" "lower right"
         ...$COMMON_OPTIONS
         (if $save != null { [ --save $save ] })
@@ -254,7 +254,7 @@ export def ratio [data: path, --recoding: path, --save: path] {
         | update name { $"$k = ($in)$" }
 
     let options = [
-        ...($graphs.points | flatten | into-axis-options)
+        ...($graphs.points | flatten | into-axis-options -x "filesize" -y "plain")
         --legend-loc "upper right"
         ...$COMMON_OPTIONS
         (if $save != null { [ --save $save ] })

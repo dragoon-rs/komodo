@@ -53,15 +53,15 @@ fn main() {
 
     for n in cli.sizes {
         inverse_template::<ark_bls12_381::Fr>(&b.with_name("BLS12-381"), n);
-        inverse_template::<ark_bn254::Fr>(&b.with_name("BN-254"), n);
+        inverse_template::<ark_bn254::Fr>(&b.with_name("BN254"), n);
         inverse_template::<ark_pallas::Fr>(&b.with_name("PALLAS"), n);
 
         transpose_template::<ark_bls12_381::Fr>(&b.with_name("BLS12-381"), n);
-        transpose_template::<ark_bn254::Fr>(&b.with_name("BN-254"), n);
+        transpose_template::<ark_bn254::Fr>(&b.with_name("BN254"), n);
         transpose_template::<ark_pallas::Fr>(&b.with_name("PALLAS"), n);
 
         mul_template::<ark_bls12_381::Fr>(&b.with_name("BLS12-381"), n);
-        mul_template::<ark_bn254::Fr>(&b.with_name("BN-254"), n);
+        mul_template::<ark_bn254::Fr>(&b.with_name("BN254"), n);
         mul_template::<ark_pallas::Fr>(&b.with_name("PALLAS"), n);
     }
 }

@@ -30,15 +30,23 @@ export def into-filesize-tick-labels []: list<int> -> list<string> {
         | each { to text | str replace ".0 " " " }
 }
 
-export def into-axis-options [-y: string]: table<x: float, y: float> -> list<string> {
+export def into-axis-options [-x: string, -y: string]: table<x: float, y: float> -> list<string> {
     let input = $in
 
     let xs = $input | flatten | get x | uniq
 
+    let x_tick_labels = match $x {
+        "filesize" => ($xs | into-filesize-tick-labels),
+        "plain" => $xs,
+        _ => {
+            print $"warning: ($y) option is unknown for -y"
+            $xs
+        },
+    }
     let options = [
         --x-lim ($xs | first) ($xs | last)
         --x-ticks ...$xs
-        --x-tick-labels ...($xs | into-filesize-tick-labels)
+        --x-tick-labels ...$x_tick_labels
     ]
 
     let ys = $input | flatten | get y

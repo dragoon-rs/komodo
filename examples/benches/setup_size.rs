@@ -41,7 +41,7 @@ fn main() {
 
     for n in [1, 2, 4, 8, 16] {
         aux::<ark_bls12_381::Fr, ark_bls12_381::G1Projective>(n, "BLS12-381");
-        aux::<ark_bn254::Fr, ark_bn254::G1Projective>(n, "BN-254");
+        aux::<ark_bn254::Fr, ark_bn254::G1Projective>(n, "BN254");
         aux::<ark_pallas::Fr, ark_pallas::Projective>(n, "PALLAS");
     }
 }

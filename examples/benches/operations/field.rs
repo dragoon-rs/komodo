@@ -91,6 +91,6 @@ fn main() {
     let bencher = plnk::Bencher::new(cli.nb_measurements);
 
     bench_template::<ark_bls12_381::Fr>(&bencher.with_name("BLS12-381"));
-    bench_template::<ark_bn254::Fr>(&bencher.with_name("BN-254"));
+    bench_template::<ark_bn254::Fr>(&bencher.with_name("BN254"));
     bench_template::<ark_pallas::Fr>(&bencher.with_name("PALLAS"));
 }

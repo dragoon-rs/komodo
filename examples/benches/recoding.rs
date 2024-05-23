@@ -2,7 +2,7 @@
 use ark_ff::PrimeField;
 use ark_std::rand::Rng;
 
-use clap::{arg, command, Parser};
+use clap::{arg, command, Parser, ValueEnum};
 use komodo::{
     fec::{recode_with_coeffs, Shard},
     field,
@@ -48,6 +48,13 @@ fn bench_template<F: PrimeField>(b: &Bencher, nb_bytes: usize, k: usize, nb_shar
     );
 }
 
+#[derive(ValueEnum, Clone, Hash, PartialEq, Eq)]
+enum Curve {
+    BLS12381,
+    BN254,
+    Pallas,
+}
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -59,6 +66,9 @@ struct Cli {
 
     #[arg(short, long, num_args = 1.., value_delimiter = ' ')]
     ks: Vec<usize>,
+
+    #[arg(short, long, num_args=1.., value_delimiter = ' ')]
+    curves: Vec<Curve>,
 
     /// the number of measurements to repeat each case, larger values will reduce the variance of
     /// the measurements
@@ -74,9 +84,25 @@ fn main() {
     for b in cli.bytes {
         for s in &cli.shards {
             for k in &cli.ks {
-                bench_template::<ark_bls12_381::Fr>(&bencher.with_name("BLS12-381"), b, *k, *s);
-                bench_template::<ark_bn254::Fr>(&bencher.with_name("BN-254"), b, *k, *s);
-                bench_template::<ark_pallas::Fr>(&bencher.with_name("PALLAS"), b, *k, *s);
+                for curve in &cli.curves {
+                    match curve {
+                        Curve::BLS12381 => bench_template::<ark_bls12_381::Fr>(
+                            &bencher.with_name("BLS12-381"),
+                            b,
+                            *k,
+                            *s,
+                        ),
+                        Curve::BN254 => {
+                            bench_template::<ark_bn254::Fr>(&bencher.with_name("BN254"), b, *k, *s)
+                        }
+                        Curve::Pallas => bench_template::<ark_pallas::Fr>(
+                            &bencher.with_name("PALLAS"),
+                            b,
+                            *k,
+                            *s,
+                        ),
+                    }
+                }
             }
         }
     }

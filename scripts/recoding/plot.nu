@@ -21,7 +21,7 @@ export def main [data: path, --save: path] {
 
     let options = [
         # --y-label "time (in ms)"
-        ...($graphs.points | flatten | into-axis-options -y "duration")
+        ...($graphs.points | flatten | into-axis-options -x "filesize" -y "duration")
         --no-legend
         ...$COMMON_OPTIONS
         (if $save != null { [ --save $save ] })

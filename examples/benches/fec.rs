@@ -68,6 +68,13 @@ enum Encoding {
     Random,
 }
 
+#[derive(ValueEnum, Clone, Hash, PartialEq, Eq)]
+enum Curve {
+    BLS12381,
+    BN254,
+    Pallas,
+}
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -77,6 +84,9 @@ struct Cli {
 
     #[arg(short, long)]
     encoding: Encoding,
+
+    #[arg(short, long, num_args=1.., value_delimiter = ' ')]
+    curves: Vec<Curve>,
 
     #[arg(short)]
     k: usize,
@@ -95,8 +105,26 @@ fn main() {
     let b = plnk::Bencher::new(cli.nb_measurements);
 
     for n in cli.sizes {
-        template::<ark_bls12_381::Fr>(&b.with_name("BLS12-381"), n, cli.k, cli.n, &cli.encoding);
-        template::<ark_bn254::Fr>(&b.with_name("BN-254"), n, cli.k, cli.n, &cli.encoding);
-        template::<ark_pallas::Fr>(&b.with_name("PALLAS"), n, cli.k, cli.n, &cli.encoding);
+        for curve in &cli.curves {
+            match curve {
+                Curve::BLS12381 => template::<ark_bls12_381::Fr>(
+                    &b.with_name("BLS12-381"),
+                    n,
+                    cli.k,
+                    cli.n,
+                    &cli.encoding,
+                ),
+                Curve::BN254 => {
+                    template::<ark_bn254::Fr>(&b.with_name("BN254"), n, cli.k, cli.n, &cli.encoding)
+                }
+                Curve::Pallas => template::<ark_pallas::Fr>(
+                    &b.with_name("PALLAS"),
+                    n,
+                    cli.k,
+                    cli.n,
+                    &cli.encoding,
+                ),
+            }
+        }
     }
 }

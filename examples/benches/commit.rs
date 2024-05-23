@@ -5,7 +5,7 @@ use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
 use ark_poly_commit::kzg10::{self, KZG10};
 use ark_std::ops::Div;
 
-use clap::{arg, command, Parser};
+use clap::{arg, command, Parser, ValueEnum};
 use komodo::zk;
 
 fn run<F, G, P>(degrees: &Vec<usize>, curve: &str, nb_measurements: usize)
@@ -86,25 +86,35 @@ where
 ///     G1 = G1Projective,
 ///     E = Bls12_381,
 ///     name = "BLS12-381"
-/// );
+/// )
 /// ```
 /// will produce
 /// ```rust
-/// run::<ark_bls12_381::Fr, ark_bls12_381::G1Projective, DensePolynomial<ark_bls12_381::Fr> >(&degrees, "BLS12-381", 10);
-/// ark_run::<ark_bls12_381::Bls12_381, DensePolynomial<<ark_bls12_381::Bls12_381 as Pairing>::ScalarField>>(&degrees, "BLS12-381", 10);
+/// ark_run::<ark_bls12_381::Bls12_381, DensePolynomial<<ark_bls12_381::Bls12_381 as Pairing>::ScalarField>>(&degrees, "BLS12-381", 10)
 /// ```
 macro_rules! measure {
     ($c:ident, $d:ident, $m:expr, G1=$g:ident, name=$n:expr) => {
-        run::<$c::Fr, $c::$g, DensePolynomial<$c::Fr>>(&$d, $n, $m);
+        run::<$c::Fr, $c::$g, DensePolynomial<$c::Fr>>(&$d, $n, $m)
     };
     ($c:ident, $d:ident, $m:expr, G1=$g:ident, E=$e:ident, name=$n:expr) => {
-        measure!($c, $d, $m, G1 = $g, name = $n);
         ark_run::<$c::$e, DensePolynomial<<$c::$e as Pairing>::ScalarField>>(
             &$d,
             concat!($n, "-ark"),
             $m,
-        );
+        )
     };
+}
+
+#[derive(ValueEnum, Clone, Hash, PartialEq, Eq)]
+enum Curve {
+    BLS12381,
+    BN254,
+    Pallas,
+    ARKBLS12381,
+    ARKBN254,
+    SECP256K1,
+    SECP256R1,
+    Vesta,
 }
 
 #[derive(Parser)]
@@ -118,54 +128,91 @@ struct Cli {
     /// the measurements
     #[arg(short, long)]
     nb_measurements: usize,
+
+    #[arg(short, long, num_args=1.., value_delimiter = ',')]
+    curves: Vec<Curve>,
 }
 
 fn main() {
     let cli = Cli::parse();
     let degrees = cli.degrees;
 
-    measure!(
-        ark_pallas,
-        degrees,
-        cli.nb_measurements,
-        G1 = Projective,
-        name = "PALLAS"
-    );
-    measure!(
-        ark_bls12_381,
-        degrees,
-        cli.nb_measurements,
-        G1 = G1Projective,
-        E = Bls12_381,
-        name = "BLS12-381"
-    );
-    measure!(
-        ark_bn254,
-        degrees,
-        cli.nb_measurements,
-        G1 = G1Projective,
-        E = Bn254,
-        name = "BN-254"
-    );
-    measure!(
-        ark_secp256k1,
-        degrees,
-        cli.nb_measurements,
-        G1 = Projective,
-        name = "SECP256-K1"
-    );
-    measure!(
-        ark_secp256r1,
-        degrees,
-        cli.nb_measurements,
-        G1 = Projective,
-        name = "SECP256-R1"
-    );
-    measure!(
-        ark_vesta,
-        degrees,
-        cli.nb_measurements,
-        G1 = Projective,
-        name = "VESTA"
-    );
+    for curve in cli.curves {
+        match curve {
+            Curve::Pallas => {
+                measure!(
+                    ark_pallas,
+                    degrees,
+                    cli.nb_measurements,
+                    G1 = Projective,
+                    name = "PALLAS"
+                )
+            }
+            Curve::ARKBLS12381 => {
+                measure!(
+                    ark_bls12_381,
+                    degrees,
+                    cli.nb_measurements,
+                    G1 = G1Projective,
+                    E = Bls12_381,
+                    name = "BLS12-381"
+                )
+            }
+            Curve::ARKBN254 => {
+                measure!(
+                    ark_bn254,
+                    degrees,
+                    cli.nb_measurements,
+                    G1 = G1Projective,
+                    E = Bn254,
+                    name = "BN254"
+                )
+            }
+            Curve::BLS12381 => {
+                measure!(
+                    ark_bls12_381,
+                    degrees,
+                    cli.nb_measurements,
+                    G1 = G1Projective,
+                    name = "BLS12-381"
+                )
+            }
+            Curve::BN254 => {
+                measure!(
+                    ark_bn254,
+                    degrees,
+                    cli.nb_measurements,
+                    G1 = G1Projective,
+                    name = "BN254"
+                )
+            }
+            Curve::SECP256K1 => {
+                measure!(
+                    ark_secp256k1,
+                    degrees,
+                    cli.nb_measurements,
+                    G1 = Projective,
+                    name = "SECP256-K1"
+                )
+            }
+            Curve::SECP256R1 => {
+                measure!(
+                    ark_secp256r1,
+                    degrees,
+                    cli.nb_measurements,
+                    G1 = Projective,
+                    name = "SECP256-R1"
+                )
+            }
+            Curve::Vesta => {
+                measure!(
+                    ark_vesta,
+                    degrees,
+                    cli.nb_measurements,
+                    G1 = Projective,
+                    name = "VESTA"
+                )
+            }
+        }
+    }
 }

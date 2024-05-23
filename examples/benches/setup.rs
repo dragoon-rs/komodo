@@ -6,7 +6,7 @@ use ark_poly_commit::kzg10::{self, KZG10};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::ops::Div;
 
-use clap::{command, Parser};
+use clap::{command, Parser, ValueEnum};
 use komodo::zk::{self, Powers};
 use plnk::Bencher;
 
@@ -117,21 +117,14 @@ where
     }
 }
 
-fn setup(degrees: &[usize], nb_measurements: usize) {
-    fn aux<F: PrimeField, G: CurveGroup<ScalarField = F>>(
-        degree: usize,
-        curve: &str,
-        nb_measurements: usize,
-    ) {
-        let b = plnk::Bencher::new(nb_measurements).with_name(format!("setup on {}", curve));
-        setup_template::<F, G, DensePolynomial<F>>(&b, degree);
-    }
-
+fn setup<F: PrimeField, G: CurveGroup<ScalarField = F>>(
+    degrees: &[usize],
+    nb_measurements: usize,
+    curve: &str,
+) {
     for d in degrees {
-        aux::<ark_bls12_381::Fr, ark_bls12_381::G1Projective>(*d, "BLS12-381", nb_measurements);
-        aux::<ark_bn254::Fr, ark_bn254::G1Projective>(*d, "BN-254", nb_measurements);
-        aux::<ark_pallas::Fr, ark_pallas::Projective>(*d, "PALLAS", nb_measurements);
-        aux::<ark_vesta::Fr, ark_vesta::Projective>(*d, "VESTA", nb_measurements);
+        let b = plnk::Bencher::new(nb_measurements).with_name(format!("setup on {}", curve));
+        setup_template::<F, G, DensePolynomial<F>>(&b, *d);
     }
 }
 
@@ -149,22 +142,26 @@ fn serde(degrees: &[usize], nb_measurements: usize) {
 
     for d in degrees {
         aux::<ark_bls12_381::Fr, ark_bls12_381::G1Projective>(*d, "BLS12-381", nb_measurements);
-        aux::<ark_bn254::Fr, ark_bn254::G1Projective>(*d, "BN-254", nb_measurements);
+        aux::<ark_bn254::Fr, ark_bn254::G1Projective>(*d, "BN254", nb_measurements);
         aux::<ark_pallas::Fr, ark_pallas::Projective>(*d, "PALLAS", nb_measurements);
         aux::<ark_vesta::Fr, ark_vesta::Projective>(*d, "VESTA", nb_measurements);
     }
 }
 
-fn ark_setup(degrees: &[usize], nb_measurements: usize) {
-    fn aux<E: Pairing>(degree: usize, curve: &str, nb_measurements: usize) {
-        let b = plnk::Bencher::new(nb_measurements).with_name(format!("ARK setup on {}", curve));
-        ark_setup_template::<E, DensePolynomial<E::ScalarField>>(&b, degree);
-    }
-
+fn ark_setup<E: Pairing>(degrees: &[usize], nb_measurements: usize, curve: &str) {
     for d in degrees {
-        aux::<ark_bls12_381::Bls12_381>(*d, "BLS12-381", nb_measurements);
-        aux::<ark_bn254::Bn254>(*d, "BN-254", nb_measurements);
+        let b = plnk::Bencher::new(nb_measurements).with_name(format!("ARK setup on {}", curve));
+        ark_setup_template::<E, DensePolynomial<E::ScalarField>>(&b, *d);
     }
+}
+
+#[derive(ValueEnum, Clone, Hash, PartialEq, Eq)]
+enum Curve {
+    BLS12381,
+    BN254,
+    Pallas,
+    ARKBLS12381,
+    ARKBN254,
 }
 
 #[derive(Parser)]
@@ -178,13 +175,50 @@ struct Cli {
     /// the measurements
     #[arg(short, long)]
     nb_measurements: usize,
+
+    #[arg(short, long, num_args=1.., value_delimiter = ',')]
+    curves: Vec<Curve>,
 }
 
 fn main() {
     let cli = Cli::parse();
 
-    setup(&cli.degrees, cli.nb_measurements);
-    ark_setup(&cli.degrees, cli.nb_measurements);
+    for curve in cli.curves {
+        match curve {
+            Curve::ARKBN254 => {
+                ark_setup::<ark_bn254::Bn254>(&cli.degrees, cli.nb_measurements, "BN254");
+            }
+            Curve::ARKBLS12381 => {
+                ark_setup::<ark_bls12_381::Bls12_381>(
+                    &cli.degrees,
+                    cli.nb_measurements,
+                    "BLS12-381",
+                );
+            }
+            Curve::Pallas => {
+                setup::<ark_pallas::Fr, ark_pallas::Projective>(
+                    &cli.degrees,
+                    cli.nb_measurements,
+                    "PALLAS",
+                );
+            }
+            Curve::BN254 => {
+                setup::<ark_bn254::Fr, ark_bn254::G1Projective>(
+                    &cli.degrees,
+                    cli.nb_measurements,
+                    "BN254",
+                );
+            }
+            Curve::BLS12381 => {
+                setup::<ark_bls12_381::Fr, ark_bls12_381::G1Projective>(
+                    &cli.degrees,
+                    cli.nb_measurements,
+                    "BLS12-381",
+                );
+            }
+        }
+    }
+
     // NOTE: this is disabled for now because it takes so much time...
     // serde(&cli.degrees, cli.nb_measurements);
 }

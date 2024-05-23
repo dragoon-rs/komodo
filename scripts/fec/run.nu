@@ -3,7 +3,8 @@ use ../formats.nu *
 export def main [
     --output: path = "./fec.ndjson",
     --nb-measurements: int = 10,
-    --ks: list<int>
+    --ks: list<int>,
+    --curves: list<string>,
 ]: list<int> -> nothing {
     let input = $in
 
@@ -21,6 +22,7 @@ export def main [
             --encoding vandermonde
             -k $k
             -n 1
+            --curves ...$curves
         ] | from ndnuon | to ndjson out>> $output
     }
 }

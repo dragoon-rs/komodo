@@ -3,7 +3,8 @@ use ../formats.nu *
 export def main [
     --output: path = "./recoding.ndjson",
     --nb-measurements: int = 10,
-    --ks: list<int>
+    --ks: list<int>,
+    --curves: list<string>,
 ]: list<int> -> nothing {
     let input = $in
 
@@ -20,6 +21,7 @@ export def main [
             ...$input
             --shards $k
             --ks $k
+            --curves ...$curves
         ] | from ndnuon | to ndjson out>> $output
     }
 }

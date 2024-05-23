@@ -1,23 +1,11 @@
 use ../math.nu *
 use ../fs.nu check-file
-use ../plot.nu gplt
+use ../plot.nu [ into-axis-options, COMMON_OPTIONS, gplt ]
 
 export def main [data: path, --save: path] {
-    let options = [
-        # --title "time to create trusted setups for certain curves"
-        --x-label "degree"
-        --y-label "time (in ms)"
-        --fullscreen
-        --dpi 150
-        --fig-size ...[16, 9]
-        --font ({ size: 30, family: serif, sans-serif: Helvetica } | to json)
-        --use-tex
-        (if $save != null { [ --save $save ] })
-    ]
-
     check-file $data --span (metadata $data).span
 
-    open $data
+    let graphs = open $data
         | ns-to-ms times
         | compute-stats times
         | insert degree { get label | parse "degree {d}" | into record | get d | into int}
@@ -33,5 +21,15 @@ export def main [data: path, --save: path] {
         | reject items.name
         | rename --column { group: "name", items: "points" }
         | sort-by name
-        | gplt plot ($in | to json) ...($options | flatten | compact)
+
+    let options = [
+        # --title "time to create trusted setups for certain curves"
+        --x-label "degree"
+        --y-label "time (in ms)"
+        ...($graphs.points | flatten | into-axis-options -x "plain" -y "duration")
+        ...$COMMON_OPTIONS
+        (if $save != null { [ --save $save ] })
+    ]
+
+    gplt plot ($graphs | to json) ...($options | flatten | compact)
 }

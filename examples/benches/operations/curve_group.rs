@@ -79,6 +79,6 @@ fn main() {
     bench_template::<ark_bls12_381::Fr, ark_bls12_381::G1Projective>(
         &bencher.with_name("BLS12-381"),
     );
-    bench_template::<ark_bn254::Fr, ark_bn254::G1Projective>(&bencher.with_name("BN-254"));
+    bench_template::<ark_bn254::Fr, ark_bn254::G1Projective>(&bencher.with_name("BN254"));
     bench_template::<ark_pallas::Fr, ark_pallas::Projective>(&bencher.with_name("PALLAS"));
 }

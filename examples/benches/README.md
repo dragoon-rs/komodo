@@ -77,7 +77,7 @@ for graph in [
 
 ## trusted setup
 ```nushell
-use scripts/setup/run.nu; seq 0 13 | each { 2 ** $in } | run --output setup.ndjson
+use scripts/setup/run.nu; seq 0 13 | each { 2 ** $in } | run --output setup.ndjson --curves [ bls12381, pallas, bn254 ]
 ```
 ```nushell
 use ./scripts/setup/plot.nu; plot setup.ndjson
@@ -85,7 +85,7 @@ use ./scripts/setup/plot.nu; plot setup.ndjson
 
 ## commit
 ```nushell
-use scripts/commit/run.nu; seq 0 13 | each { 2 ** $in } | run --output commit.ndjson
+use scripts/commit/run.nu; seq 0 13 | each { 2 ** $in } | run --output commit.ndjson --curves [bls12381, pallas, bn254 ]
 ```
 ```nushell
 use ./scripts/commit/plot.nu; plot commit.ndjson
@@ -95,7 +95,7 @@ use ./scripts/commit/plot.nu; plot commit.ndjson
 ### recoding
 ```nushell
 use scripts/recoding/run.nu
-seq 0 18 | each { 512 * 2 ** $in } | run --ks [2, 4, 8, 16] --output recoding.ndjson
+seq 0 18 | each { 512 * 2 ** $in } | run --ks [2, 4, 8, 16] --output recoding.ndjson --curves [ bls12381 ]
 ```
 ```nushell
 use ./scripts/recoding/plot.nu; plot recoding.ndjson
@@ -104,7 +104,7 @@ use ./scripts/recoding/plot.nu; plot recoding.ndjson
 ### FEC
 ```nushell
 use scripts/fec/run.nu
-seq 0 18 | each { 512 * 2 ** $in } | run --ks [2, 4, 8, 16] --output fec.ndjson
+seq 0 18 | each { 512 * 2 ** $in } | run --ks [2, 4, 8, 16] --output fec.ndjson --curves [ bls12381 ]
 ```
 ```nushell
 use ./scripts/fec/plot.nu; plot encoding fec.ndjson
