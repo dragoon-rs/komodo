@@ -83,3 +83,7 @@ path = "examples/benches/recoding.rs"
 [[example]]
 name = "bench_fec"
 path = "examples/benches/fec.rs"
+
+[[example]]
+name = "inbreeding"
+path = "examples/inbreeding/mod.rs"

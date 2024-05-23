@@ -22,8 +22,20 @@
 ///     --test-case end-to-end
 /// ] | lines | into float | save --force baseline.nuon
 ///
-/// seq 1 $K | reverse | each {|r|
-///     let inbreeding = ./target/release/examples/inbreeding ...[
+/// let strategies = seq 1 $K
+///     | each { $"single:($in)" }
+///     | append [
+///         "double:0.5:1:2",
+///         "double:0.5:2:3",
+///         "double:0.333:1:2",
+///         "double:0.666:1:2",
+///         "double:0.333:2:3",
+///         "double:0.666:2:3"
+///     ]
+/// let environment = "fixed:0"
+///
+/// $strategies | each {|s|
+///     let diversity = ./target/release/examples/inbreeding ...[
 ///         $NB_BYTES,
 ///         -k $K
 ///         -n $N
@@ -31,41 +43,76 @@
 ///         --measurement-schedule $MEASUREMENT_SCHEDULE
 ///         -t $MAX_T
 ///         --test-case recoding
-///         -r $r
+///         --strategy $s
+///         --environment $environment
 ///     ] | lines | into float
 ///
 ///     {
-///         r: $r,
-///         inbreeding: $inbreeding,
+///         strategy: $s,
+///         diversity: $diversity,
 ///     }
 /// } | save --force inbreeding.nuon
 /// ```
 /// - plot the results
 /// ```nushell
 /// let data = open inbreeding.nuon
-/// let k = $data.r | math max
 /// let w = 3
-/// let l = $data.inbreeding.0 | length
+/// let l = $data.diversity.0 | length
 ///
 /// use std repeat
 ///
-/// # let raw = $data | update inbreeding { take ($l - $w + 1)}
-/// # let smooth = $data | update inbreeding { prepend (1 | repeat $w) | window $w | each { math avg } }
+/// def "parse strategy" []: string -> record<type: string> {
+///     let s = $in
+///
+///     if ($s | str starts-with "single") {
+///         let res = $s
+///             | parse "single:{n}"
+///             | into record
+///             | into int n
+///         { type: "single", n: $res.n }
+///     } else {
+///         let res = $s
+///             | parse "double:{p}:{n}:{m}"
+///             | into record
+///             | into float p
+///             | into int n
+///             | into int m
+///         { type: "double", p: $res.p, n: $res.n, m: $res.m }
+///     }
+/// }
+///
+/// # let raw = $data | update diversity { take ($l - $w + 1)}
+/// # let smooth = $data | update diversity { prepend (1 | repeat $w) | window $w | each { math avg } }
 /// let smooth = $data
 ///
 /// $smooth
+///     | update strategy { parse strategy }
+///     | insert sort {|it|
+///         match $it.strategy.type {
+///             "single" => [$it.strategy.n, 1.0]
+///             "double" => [$it.strategy.n, $it.strategy.p]
+///         }
+///     }
+///     | sort-by sort
+///     | reverse
+///     | reject sort
 ///     | insert name {|it|
-///        let r = if $it.r == $k { "k" }  else { $"k - ($k - $it.r)" }
-///        $"$\\sigma = ($r)$"
+///         match $it.strategy.type {
+///             "single" => {
+///                 let sigma = if $it.strategy.n == $K { "k" }  else { $"k - ($K - $it.strategy.n)" }
+///                 $"$\\sigma = ($sigma) = ($it.strategy.n)$"
+///             }
+///             "double" => $"($it.strategy.p)? ($it.strategy.n) ; ($it.strategy.m)"
+///         }
 ///     }
 ///     # | append ($raw | insert name null | insert style { line: { alpha: 0.1 } })
-///     | update inbreeding {|it|
-///         let l = $it.inbreeding | length
-///         $it.inbreeding | wrap y | merge (seq 0 $l | wrap x) | insert e 0
+///     | update diversity {|it|
+///         let l = $it.diversity | length
+///         $it.diversity | wrap y | merge (seq 0 $l | wrap x) | insert e 0
 ///     }
-///     | rename --column { inbreeding: "points" }
-///     | insert style.color {|it|
-///         match $it.r {
+///     | rename --column { diversity: "points" }
+///     | insert style {|it|
+///         let color = match $it.strategy.n {
 ///             10 => "tab:red",
 ///             9 => "tab:orange",
 ///             8 => "tab:olive",
@@ -77,8 +124,10 @@
 ///             2 => "tab:pink",
 ///             _ => "tab:gray",
 ///         }
+///
+///         { color: $color, line: { alpha: ($it.strategy.p? | default 1.0) } }
 ///     }
-///     | reject r
+///     | reject strategy
 ///     | save --force /tmp/graphs.json
 /// ```
 /// ```
@@ -113,6 +162,11 @@ use komodo::{
     linalg::Matrix,
 };
 use rand::{rngs::ThreadRng, seq::SliceRandom, thread_rng, Rng, RngCore};
+
+mod environment;
+mod strategy;
+
+use crate::{environment::Environment, strategy::Strategy};
 
 fn random_bytes(n: usize, rng: &mut ThreadRng) -> Vec<u8> {
     (0..n).map(|_| rng.gen::<u8>()).collect()
@@ -204,7 +258,8 @@ fn recoding<F, Fun>(
     k: usize,
     n: usize,
     max_t: usize,
-    nb_shards_to_recode: usize,
+    strategy: Strategy,
+    env: Environment,
     nb_measurements: usize,
     measurement_schedule: Fun,
     rng: &mut impl RngCore,
@@ -229,10 +284,12 @@ where
         }
 
         // recode a new random shard
-        shards.shuffle(rng);
-        let s: Vec<_> = shards.iter().take(nb_shards_to_recode).cloned().collect();
-        let new_shard = fec::recode_random(&s, rng).unwrap().unwrap();
+        let new_shard = fec::recode_random(&strategy.draw(&shards, rng), rng)
+            .unwrap()
+            .unwrap();
         shards.push(new_shard);
+
+        shards = env.update(&shards, rng);
 
         pb.inc(1);
     }
@@ -259,8 +316,15 @@ struct Cli {
     n: usize,
     #[arg(short)]
     t: usize,
-    #[arg(short)]
-    r: Option<usize>,
+    /// something of the form `<p>:<i>,<j>`
+    /// at each time step, shard $i$ will be used for recoding with probability $p$, otherwise, $j$
+    /// will be used with probability $1 - p$
+    #[arg(long)]
+    strategy: Option<String>,
+    /// something of the form `random-dynamic:<p>:<q>` where a proportion $q$ of the shards will be removed at
+    /// each step with probability $p$
+    #[arg(long)]
+    environment: Option<String>,
 
     #[arg(long)]
     test_case: TestCase,
@@ -309,23 +373,29 @@ fn main() {
             );
         }
         TestCase::Recoding => {
-            if cli.r.is_none() {
-                eprintln!("recoding needs -r");
+            if cli.strategy.is_none() {
+                eprintln!("recoding needs --strategy");
+                exit(1);
+            }
+            if cli.environment.is_none() {
+                eprintln!("recoding needs --environment");
                 exit(1);
             }
 
+            let environment = Environment::from_str(&cli.environment.unwrap()).unwrap();
+            let strategy = Strategy::from_str(&cli.strategy.unwrap()).unwrap();
+
             eprintln!(
-                "true: k = {}, n = {}, sigma = {}",
-                cli.k,
-                cli.n,
-                cli.r.unwrap(),
+                "true: k = {}, n = {}, strategy = {:?}, environment = {:?}",
+                cli.k, cli.n, strategy, environment,
             );
             let _ = recoding::<ark_pallas::Fr, _>(
                 &bytes,
                 cli.k,
                 cli.n,
                 cli.t,
-                cli.r.unwrap(),
+                strategy,
+                environment,
                 cli.nb_measurements,
                 measurement_schedule,
                 &mut rng,

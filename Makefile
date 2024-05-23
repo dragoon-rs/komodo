@@ -16,6 +16,7 @@ clippy:
 
 test:
 	cargo test --workspace --verbose
+	cargo test --examples --verbose
 	nu tests/cli.nu
 	nu tests/binary.nu
 
