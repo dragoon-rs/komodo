@@ -1,3 +1,5 @@
+use venv.nu VENV
+
 export const COMMON_OPTIONS = [
     --x-scale log
     --x-scale-base 2
@@ -57,4 +59,9 @@ export def into-axis-options [-y: string]: table<x: float, y: float> -> list<str
         --y-ticks ...$y_ticks
         --y-tick-labels ...$y_tick_labels
     ]
+}
+
+export def --wrapped gplt [...args: string] {
+    overlay use $VENV
+    ^gplt ...$args
 }
