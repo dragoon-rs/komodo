@@ -8,7 +8,7 @@ export def main [
 ]: list<int> -> nothing {
     let input = $in
 
-    if ($ks | is-empty) {
+    if ($ks | is-empty) or ($input | is-empty) or ($curves | is-empty) {
         print "nothing to do"
         return
     }
