@@ -1,38 +1,53 @@
-#!/usr/bin/env nu
-
-use options.nu
-
 const BIN = "./target/release/examples/inbreeding"
 
-def main [--output: path = "./inbreeding.nuon", --baseline] {
+export def main [
+    --output: path = "./inbreeding.nuon",
+    --baseline,
+    --options: record<
+        nb_bytes: int,
+        k: int,
+        n: int,
+        nb_measurements: int,
+        nb_scenarii: int,
+        measurement_schedule: int,
+        max_t: int,
+        strategies: list<string>,
+        environment: string,
+    >
+] {
     if $baseline {
         ^$BIN ...[
-            $options.NB_BYTES,
-            -k $options.K
-            -n $options.N
-            --nb-measurements $options.NB_MEASUREMENTS
-            --measurement-schedule $options.MEASUREMENT_SCHEDULE
-            -t $options.MAX_T
+            $options.nb_bytes,
+            -k $options.k
+            -n $options.n
+            --nb-measurements $options.nb_measurements
+            --measurement-schedule $options.measurement_schedule
+            -t $options.max_t
             --test-case end-to-end
         ] | lines | into float | save --force baseline.nuon
 
         print "baseline saved to `baseline.nuon`"
     }
 
-    let strategies = seq 1 $options.K | each { $"single:($in)" } | append $options.EXTRA_STRATEGIES
+    $options.strategies | each {|s|
+        let res = 1..$options.nb_scenarii | each {
+            ^$BIN ...[
+                $options.nb_bytes,
+                -k $options.k
+                -n $options.n
+                --nb-measurements $options.nb_measurements
+                --measurement-schedule $options.measurement_schedule
+                -t $options.max_t
+                --test-case recoding
+                --strategy $s
+                --environment $options.environment
+            ] | lines | into float
+        }
 
-    $strategies | each {|s|
-        let diversity = ^$BIN ...[
-            $options.NB_BYTES,
-            -k $options.K
-            -n $options.N
-            --nb-measurements $options.NB_MEASUREMENTS
-            --measurement-schedule $options.MEASUREMENT_SCHEDULE
-            -t $options.MAX_T
-            --test-case recoding
-            --strategy $s
-            --environment $options.ENVIRONMENT
-        ] | lines | into float
+        let diversity = $res
+            | skip 1
+            | reduce --fold $res.0 {|it, acc| $acc | zip $it | each { flatten }}
+            | each { math avg }
 
         {
             strategy: $s,

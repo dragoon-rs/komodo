@@ -2,7 +2,6 @@
 
 use std repeat
 
-use options.nu
 use ../plot.nu gplt
 
 def "parse strategy" []: string -> record<type: string> {
@@ -25,7 +24,7 @@ def "parse strategy" []: string -> record<type: string> {
     }
 }
 
-def main [data: path, --save: path] {
+export def main [data: path, --save: path, --options: record<k: int>] {
     let data = open $data
     let l = $data.diversity.0 | length
 
@@ -43,10 +42,10 @@ def main [data: path, --save: path] {
         | insert name {|it|
             match $it.strategy.type {
                 "single" => {
-                    let sigma = if $it.strategy.n == $options.K {
+                    let sigma = if $it.strategy.n == $options.k {
                         "k"
                     } else {
-                        $"k - ($options.K - $it.strategy.n)"
+                        $"k - ($options.k - $it.strategy.n)"
                     }
                     $"$\\sigma = ($sigma) = ($it.strategy.n)$"
                 }

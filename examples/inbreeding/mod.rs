@@ -5,8 +5,19 @@
 /// # Example
 /// ```shell
 /// ./scripts/inbreeding/build.nu
-/// ./scripts/inbreeding/run.nu --output data/inbreeding.nuon
-/// ./scripts/inbreeding/plot.nu data/inbreeding.nuon --save ~/inbreeding.pdf
+/// let opts = {
+///     nb_bytes: (10 * 1_024),
+///     k: 10,
+///     n: 20,
+///     nb_measurements: 10,
+///     nb_scenarii: 100,
+///     measurement_schedule: 1,
+///     max_t: 150,
+///     strategies: ["single:10", "single:5", "single:1", "single:2"],
+///     environment: "fixed:1",
+/// }
+/// use ./scripts/inbreeding/run.nu; run --output data/inbreeding.nuon --options $opts
+/// use ./scripts/inbreeding/plot.nu; plot data/inbreeding.nuon --save ~/inbreeding.pdf --options ($opts | select k)
 /// ```
 use std::process::exit;
 
