@@ -3,8 +3,9 @@
 /// - plot the results with [`./../../scripts/inbreeding/plot.nu`]
 ///
 /// # Example
-/// ```shell
-/// ./scripts/inbreeding/build.nu
+/// ```nushell
+/// use ./scripts/inbreeding
+///
 /// let opts = {
 ///     nb_bytes: (10 * 1_024),
 ///     k: 10,
@@ -13,11 +14,21 @@
 ///     nb_scenarii: 100,
 ///     measurement_schedule: 1,
 ///     max_t: 150,
-///     strategies: ["single:10", "single:5", "single:1", "single:2"],
-///     environment: "fixed:1",
+///     strategies: [
+///         "single:1",
+///         "double:0.5:1:2",
+///         "single:2"
+///         "double:0.5:2:3",
+///         "single:3"
+///         "single:5",
+///         "single:10",
+///     ],
+///     environment: "fixed:0",
 /// }
-/// use ./scripts/inbreeding/run.nu; run --output data/inbreeding.nuon --options $opts
-/// use ./scripts/inbreeding/plot.nu; plot data/inbreeding.nuon --save ~/inbreeding.pdf --options ($opts | select k)
+///
+/// inbreeding build
+/// inbreeding run --output data/inbreeding.nuon --options $opts
+/// inbreeding plot data/inbreeding.nuon --options { k: $opts.k }
 /// ```
 use std::process::exit;
 

@@ -1,3 +1,3 @@
-#!/usr/bin/env nu
-
-cargo build --release --example inbreeding
+export def main [] {
+    cargo build --release --example inbreeding
+}
