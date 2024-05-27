@@ -3,6 +3,7 @@
 use std repeat
 
 use ../plot.nu gplt
+use ../color.nu *
 
 def "parse strategy" []: string -> record<type: string> {
     let s = $in
@@ -21,6 +22,21 @@ def "parse strategy" []: string -> record<type: string> {
             | into int n
             | into int m
         { type: "double", p: $res.p, n: $res.n, m: $res.m }
+    }
+}
+
+def get-color []: int -> string {
+    match $in {
+        10 => "#d62728",
+        9 => "#ff7f0e",
+        8 => "#bcbd22",
+        7 => "#1f77b4",
+        6 => "#9467bd",
+        5 => "#2ca02c",
+        4 => "#17becf",
+        3 => "#8c564b",
+        2 => "#e377c2",
+        _ => "#7f7f7f",
     }
 }
 
@@ -58,20 +74,27 @@ export def main [data: path, --save: path, --options: record<k: int>] {
         }
         | rename --column { diversity: "points" }
         | insert style {|it|
-            let color = match $it.strategy.n {
-                10 => "tab:red",
-                9 => "tab:orange",
-                8 => "tab:olive",
-                7 => "tab:blue",
-                6 => "tab:purple",
-                5 => "tab:green",
-                4 => "tab:cyan",
-                3 => "tab:brown",
-                2 => "tab:pink",
-                _ => "tab:gray",
+            let color = match $it.strategy.type {
+                "single" => { $it.strategy.n | get-color },
+                "double" => {
+                    let c1 = $it.strategy.n | get-color | color from-string $in
+                    let c2 = $it.strategy.m | get-color | color from-string $in
+                    let c = $it.strategy.p
+
+                    color mix $c1 $c2 $c | color to-hex
+                },
             }
 
-            { color: $color, line: { alpha: ($it.strategy.p? | default 1.0) } }
+            let alpha = match $it.strategy.type {
+                "single" => 1.0,
+                "double" => 0.3,
+            }
+            let type = match $it.strategy.type {
+                "single" => "solid",
+                "double" => "dashed",
+            }
+
+            { color: $color, line: { alpha: $alpha, type: $type } }
         }
         | reject strategy
         | save --force /tmp/graphs.json
