@@ -10,6 +10,7 @@ export def main [
         nb_measurements: int,
         nb_scenarii: int,
         measurement_schedule: int,
+        measurement_schedule_start: int,
         max_t: int,
         strategies: list<string>,
         environment: string,
@@ -22,6 +23,7 @@ export def main [
             -n $options.n
             --nb-measurements $options.nb_measurements
             --measurement-schedule $options.measurement_schedule
+            --measurement-schedule-start $options.measurement_schedule_start
             -t $options.max_t
             --test-case end-to-end
         ] | lines | into float | save --force baseline.nuon
@@ -37,17 +39,25 @@ export def main [
                 -n $options.n
                 --nb-measurements $options.nb_measurements
                 --measurement-schedule $options.measurement_schedule
+                --measurement-schedule-start $options.measurement_schedule_start
                 -t $options.max_t
                 --test-case recoding
                 --strategy $s
                 --environment $options.environment
-            ] | lines | into float
+            ]
+                | lines
+                | parse "{t}, {diversity}"
+                | into float diversity
         }
 
         let diversity = $res
-            | skip 1
-            | reduce --fold $res.0 {|it, acc| $acc | zip $it | each { flatten }}
-            | each { math avg }
+            | flatten
+            | group-by t --to-table
+            | update items { get diversity | math avg }
+            | rename --column { group: "t", items: "diversity" }
+            | into int t # NOTE: $.t needs to be converted to int here because
+                         # `group-by --to-table` converts the grouping key to
+                         # string
 
         {
             strategy: $s,

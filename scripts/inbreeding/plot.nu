@@ -54,7 +54,7 @@ export def main [data: path, --save: path, --options: record<k: int>] {
         }
         | update diversity {|it|
             let l = $it.diversity | length
-            $it.diversity | wrap y | merge (seq 0 $l | wrap x) | insert e 0
+            $it.diversity | insert e 0 | rename --column { t: "x", diversity: "y" }
         }
         | rename --column { diversity: "points" }
         | insert style {|it|

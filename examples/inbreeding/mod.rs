@@ -114,7 +114,7 @@ where
     for t in 0..=max_t {
         if measurement_schedule(t) {
             let inbreeding = measure_inbreeding(&shards, k, nb_measurements, &mp, &sty, rng);
-            println!("{}", inbreeding);
+            println!("{}, {}", t, inbreeding);
         }
 
         // decode the data
@@ -164,7 +164,7 @@ where
 
         if measurement_schedule(t) {
             let inbreeding = measure_inbreeding(&shards, k, nb_measurements, &mp, &sty, rng);
-            println!("{}", inbreeding);
+            println!("{}, {}", t, inbreeding);
         }
 
         // recode a new random shard
@@ -220,6 +220,8 @@ struct Cli {
 
     #[arg(long)]
     measurement_schedule: usize,
+    #[arg(long)]
+    measurement_schedule_start: usize,
 }
 
 fn main() {
@@ -241,7 +243,10 @@ fn main() {
         "diversity will be measured every {} steps",
         cli.measurement_schedule
     );
-    let measurement_schedule = |t| t % cli.measurement_schedule == 0;
+    let measurement_schedule = |t| {
+        t >= cli.measurement_schedule_start
+            && (t - cli.measurement_schedule_start) % cli.measurement_schedule == 0
+    };
 
     match cli.test_case {
         TestCase::EndToEnd => {
