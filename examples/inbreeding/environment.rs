@@ -1,4 +1,4 @@
-use rand::{seq::SliceRandom, RngCore};
+use rand::{seq::SliceRandom, Rng, RngCore};
 
 #[derive(Debug, PartialEq)]
 pub(super) enum Environment {
@@ -20,13 +20,13 @@ impl Environment {
         match self {
             Environment::Fixed { n } => things.iter().take(things.len() - n),
             Environment::RandomFixed { p, n } => {
-                if rand::random::<f64>() > *p {
+                if rng.gen::<f64>() > *p {
                     return things;
                 }
                 things.iter().take(things.len() - n)
             }
             Environment::RandomDynamic { p, q } => {
-                if rand::random::<f64>() > *p {
+                if rng.gen::<f64>() > *p {
                     return things;
                 }
                 things

@@ -41,14 +41,14 @@ use komodo::{
     fec::{self, Shard},
     linalg::Matrix,
 };
-use rand::{rngs::ThreadRng, seq::SliceRandom, thread_rng, Rng, RngCore};
+use rand::{rngs::StdRng, seq::SliceRandom, Rng, RngCore, SeedableRng};
 
 mod environment;
 mod strategy;
 
 use crate::{environment::Environment, strategy::Strategy};
 
-fn random_bytes(n: usize, rng: &mut ThreadRng) -> Vec<u8> {
+fn random_bytes(n: usize, rng: &mut impl RngCore) -> Vec<u8> {
     (0..n).map(|_| rng.gen::<u8>()).collect()
 }
 
@@ -222,6 +222,9 @@ struct Cli {
     measurement_schedule: usize,
     #[arg(long)]
     measurement_schedule_start: usize,
+
+    #[arg(long)]
+    prng_seed: u8,
 }
 
 fn main() {
@@ -235,7 +238,9 @@ fn main() {
         exit(1);
     }
 
-    let mut rng = thread_rng();
+    let mut seed: [u8; 32] = [0; 32];
+    seed[0] = cli.prng_seed;
+    let mut rng = StdRng::from_seed(seed);
 
     let bytes = random_bytes(cli.nb_bytes, &mut rng);
 

@@ -14,7 +14,8 @@ export def main [
         max_t: int,
         strategies: list<string>,
         environment: string,
-    >
+    >,
+    --prng-seed: int = 0,
 ] {
     if $baseline {
         ^$BIN ...[
@@ -26,6 +27,7 @@ export def main [
             --measurement-schedule-start $options.measurement_schedule_start
             -t $options.max_t
             --test-case end-to-end
+            --prng-seed $prng_seed
         ] | lines | into float | save --force baseline.nuon
 
         print "baseline saved to `baseline.nuon`"
@@ -44,6 +46,7 @@ export def main [
                 --test-case recoding
                 --strategy $s
                 --environment $options.environment
+                --prng-seed $prng_seed
             ]
                 | lines
                 | parse "{t}, {diversity}"

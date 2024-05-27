@@ -1,4 +1,4 @@
-use rand::{seq::SliceRandom, RngCore};
+use rand::{seq::SliceRandom, Rng, RngCore};
 
 #[derive(Debug, PartialEq)]
 pub(super) enum Strategy {
@@ -14,7 +14,7 @@ impl Strategy {
         let nb_to_take = match self {
             Self::Single { n } => *n,
             Self::Double { p, n, m } => {
-                if rand::random::<f64>() < *p {
+                if rng.gen::<f64>() < *p {
                     *n
                 } else {
                     *m
