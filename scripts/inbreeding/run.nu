@@ -17,6 +17,12 @@ export def main [
     >,
     --prng-seed: int = 0,
 ] {
+    if $options.measurement_schedule_start > $options.max_t {
+        error make --unspanned {
+            msg: $"measurement schedule will start after the max t, ($options.measurement_schedule_start) > ($options.max_t)"
+        }
+    }
+
     if $baseline {
         ^$BIN ...[
             $options.nb_bytes,
