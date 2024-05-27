@@ -160,6 +160,10 @@ pub fn encode<F: PrimeField>(
 /// > - if there are too few shards
 /// > - if there are linear dependencies between shards
 pub fn decode<F: PrimeField>(shards: Vec<Shard<F>>) -> Result<Vec<u8>, KomodoError> {
+    if shards.is_empty() {
+        return Err(KomodoError::TooFewShards(0, 0));
+    }
+
     let k = shards[0].k;
     let np = shards.len();
 

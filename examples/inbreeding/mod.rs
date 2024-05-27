@@ -158,6 +158,10 @@ where
     pb.set_style(sty.clone());
     pb.set_message("main");
     for t in 0..=max_t {
+        if shards.len() < k {
+            break;
+        }
+
         if measurement_schedule(t) {
             let inbreeding = measure_inbreeding(&shards, k, nb_measurements, &mp, &sty, rng);
             println!("{}", inbreeding);
