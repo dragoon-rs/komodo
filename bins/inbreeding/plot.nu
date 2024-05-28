@@ -3,6 +3,7 @@ use std repeat
 use consts.nu
 use ../../.nushell/plot.nu gplt
 use ../../.nushell/color.nu *
+use ../../.nushell/error.nu "error throw"
 
 def "parse strategy" []: string -> record<type: string> {
     let s = $in
@@ -39,41 +40,11 @@ def get-color []: int -> string {
     }
 }
 
-def get-experiments []: nothing -> list<string> {
-    $consts.CACHE
-        | path join '*' '*' '*'
-        | into glob
-        | ls $in
-        | get name
-        | path split
-        | each { last 3 | str join "-" }
-}
-
 export def main [
-    experiment: string@get-experiments, # something of the form '<seed>-<timestamp>-<env>'
     --save: path,
     --options: record<k: int>
-] {
-    let data = [$consts.CACHE, ($experiment | str replace --all '-' (char path_sep)), '*' ]
-        | path join
-        | into glob
-        | ls $in
-        | insert strategy { get name | path split | last }
-        | select name strategy
-        | insert diversity {
-            ls $in.name
-                | each { get name | open | lines }
-                | flatten
-                | parse "{x}, {y}"
-                | into float y
-                | group-by x --to-table
-                | update items { get y | math avg }
-                | rename --column { group: "x", items: "y" }
-                | into int x # NOTE: $.x needs to be converted to int here because
-                             # `group-by --to-table` converts the grouping key to
-                             # string
-        }
-        | reject name
+]: table<strategy: string, diversity: table<x: int, y: float>> -> nothing {
+    let data = $in
     let l = $data.diversity.0 | length
 
     $data

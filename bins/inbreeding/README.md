@@ -34,5 +34,8 @@ inbreeding build
 ```
 ```bash
 inbreeding run --options $OPTS --prng-seed $PRNG_SEED
-inbreeding plot ... --options { k: $OPTS.K }
+```
+```bash
+let experiment = $"($PRNG_SEED)-($OPTS.environment)"
+inbreeding load $experiment | inbreeding plot --options { k: $OPTS.k }
 ```
