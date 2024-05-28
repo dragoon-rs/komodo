@@ -29,6 +29,22 @@ export def main [
         mkdir $output_dir
         print $"data will be dumped to `($output_dir)`"
 
+        # compute a unique seed for that strategy and global seed
+        let seed = $s + $"($prng_seed)"
+            | hash sha256
+            | split chars
+            | last 2
+            | str join
+            | $"0x($in)"
+            | into int
+        # compute all the seeds for that strategy, one per scenario
+        let seeds = cargo run --release --example rng -- ...[
+            -n $options.nb_scenarii
+            --prng-seed $prng_seed
+        ]
+            | lines
+            | into int
+
         for i in 1..$options.nb_scenarii {
             let output = [ $output_dir, $"($i)" ] | path join
 
@@ -43,7 +59,7 @@ export def main [
                 --test-case recoding
                 --strategy $s
                 --environment $options.environment
-                --prng-seed $prng_seed
+                --prng-seed ($seeds | get ($i - 1))
             ] out> $output
         }
 
