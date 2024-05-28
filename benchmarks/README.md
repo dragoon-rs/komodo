@@ -2,8 +2,8 @@
 - install [GPLT](https://gitlab.isae-supaero.fr/a.stevan/gplt)
 
 ```nushell
-use scripts/math.nu *
-use scripts/formats.nu *
+use .nushell/math.nu *
+use .nushell/formats.nu *
 ```
 
 ## atomic operations
@@ -12,7 +12,7 @@ cargo run --release --example bench_field_operations -- --nb-measurements 1000 o
 cargo run --release --example bench_curve_group_operations -- --nb-measurements 1000 out> curve_group.ndjson
 ```
 ```nushell
-use scripts/parse.nu read-atomic-ops
+use .nushell/parse.nu read-atomic-ops
 
 gplt multi_bar --title "simple field operations" -l "time (in ns)" (
     open field.ndjson
@@ -77,47 +77,47 @@ for graph in [
 
 ## trusted setup
 ```nushell
-use scripts/setup/run.nu; seq 0 13 | each { 2 ** $in } | run --output setup.ndjson --curves [ bls12381, pallas, bn254 ]
+use .nushell/setup/run.nu; seq 0 13 | each { 2 ** $in } | run --output setup.ndjson --curves [ bls12381, pallas, bn254 ]
 ```
 ```nushell
-use ./scripts/setup/plot.nu; plot setup.ndjson
+use ./.nushell/setup/plot.nu; plot setup.ndjson
 ```
 
 ## commit
 ```nushell
-use scripts/commit/run.nu; seq 0 13 | each { 2 ** $in } | run --output commit.ndjson --curves [bls12381, pallas, bn254 ]
+use .nushell/commit/run.nu; seq 0 13 | each { 2 ** $in } | run --output commit.ndjson --curves [bls12381, pallas, bn254 ]
 ```
 ```nushell
-use ./scripts/commit/plot.nu; plot commit.ndjson
+use ./.nushell/commit/plot.nu; plot commit.ndjson
 ```
 
 ## end-to-end benchmarks
 ### recoding
 ```nushell
-use scripts/recoding/run.nu
+use .nushell/recoding/run.nu
 seq 0 18 | each { 512 * 2 ** $in } | run --ks [2, 4, 8, 16] --output recoding.ndjson --curves [ bls12381 ]
 ```
 ```nushell
-use ./scripts/recoding/plot.nu; plot recoding.ndjson
+use ./.nushell/recoding/plot.nu; plot recoding.ndjson
 ```
 
 ### FEC
 ```nushell
-use scripts/fec/run.nu
+use .nushell/fec/run.nu
 seq 0 18 | each { 512 * 2 ** $in } | run --ks [2, 4, 8, 16] --output fec.ndjson --curves [ bls12381 ]
 ```
 ```nushell
-use ./scripts/fec/plot.nu; plot encoding fec.ndjson
-use ./scripts/fec/plot.nu; plot decoding fec.ndjson
-use ./scripts/fec/plot.nu; plot e2e fec.ndjson
+use ./.nushell/fec/plot.nu; plot encoding fec.ndjson
+use ./.nushell/fec/plot.nu; plot decoding fec.ndjson
+use ./.nushell/fec/plot.nu; plot e2e fec.ndjson
 ```
 
 ## combined graph
 ```nushell
-use ./scripts/fec/plot.nu; plot combined fec.ndjson --recoding recoding.ndjson
+use ./.nushell/fec/plot.nu; plot combined fec.ndjson --recoding recoding.ndjson
 ```
 
 ## ratio graph
 ```nushell
-use ./scripts/fec/plot.nu; plot ratio fec.ndjson --recoding recoding.ndjson
+use ./.nushell/fec/plot.nu; plot ratio fec.ndjson --recoding recoding.ndjson
 ```

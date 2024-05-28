@@ -1,7 +1,7 @@
-use ../formats.nu *
+use ../../../.nushell/formats.nu *
 
 export def main [
-    --output: path = "./fec.ndjson",
+    --output: path = "./recoding.ndjson",
     --nb-measurements: int = 10,
     --ks: list<int>,
     --curves: list<string>,
@@ -16,12 +16,11 @@ export def main [
     "" out> $output
 
     for k in $ks {
-        cargo run --release --example bench_fec -- ...[
+        cargo run --release --package benchmarks --bin recoding -- ...[
             --nb-measurements $nb_measurements
             ...$input
-            --encoding vandermonde
-            -k $k
-            -n 1
+            --shards $k
+            --ks $k
             --curves ...$curves
         ] | from ndnuon | to ndjson out>> $output
     }

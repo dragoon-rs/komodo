@@ -1,0 +1,14 @@
+[package]
+name = "rank"
+version = "0.1.0"
+edition = "2021"
+description = "Compute the rank of a matrix."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ark-bls12-381 = "0.4.0"
+ark-ff = "0.4.2"
+ark-std = "0.4.0"
+komodo = { version = "0.2.0", path = "../.." }
+rand = "0.8.5"

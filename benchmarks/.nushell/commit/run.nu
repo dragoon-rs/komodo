@@ -10,7 +10,7 @@ export def main [
         return
     }
 
-    cargo run --release --example bench_commit -- ...[
+    cargo run --release --package benchmarks --bin commit -- ...[
         --nb-measurements $nb_measurements
         ...$input
         --curves ...$curves

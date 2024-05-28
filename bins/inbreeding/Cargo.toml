@@ -1,0 +1,13 @@
+[package]
+name = "inbreeding"
+version = "0.1.0"
+edition = "2021"
+description = "Study the 'inbreeding' phenomenon in a system supporting 'recoding'."
+
+[dependencies]
+komodo = { version = "0.2.0", path = "../.." }
+ark-pallas = "0.4.0"
+clap = { version = "4.5.4", features = ["derive"] }
+rand = "0.8.5"
+indicatif = "0.17.8"
+ark-ff = "0.4.2"

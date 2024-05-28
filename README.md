@@ -20,5 +20,14 @@ tests for the binary application can also be run with
 nu tests/cli.nu
 ```
 
+## other binaries
+Komodo provides a bunch of other binaries that might be interesting of useful to use.
+
+The easiest is to use the `cargo.nu` Nushell module as follows
+```bash
+use .nushell/cargo.nu "cargo bin"
+help cargo bin
+```
+
 ## the benchmarks
-see [the `README`](examples/benches/README.md)
+see [the `README`](benchmarks/README.md)

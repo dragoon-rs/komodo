@@ -20,70 +20,11 @@ tracing-subscriber = "0.3.17"
 ark-bls12-381 = "0.4.0"
 rand = "0.8.5"
 
-[dev-dependencies]
-clap = { version = "4.5.4", features = ["derive"] }
-indicatif = "0.17.8"
-plnk = { git = "https://gitlab.isae-supaero.fr/a.stevan/plnk", tag = "0.7.0", version = "0.7.0" }
-# all the curve dependencies below are used by the `curves` example
-ark-bls12-377 = "0.4.0"
-ark-bls12-381 = "0.4.0"
-ark-bn254 = "0.4.0"
-ark-bw6-761 = "0.4.0"
-ark-cp6-782 = "0.4.0"
-ark-curve25519 = "0.4.0"
-ark-ed-on-bls12-377 = "0.4.0"
-ark-ed-on-bls12-381 = "0.4.0"
-ark-ed-on-bls12-381-bandersnatch = "0.4.0"
-ark-ed-on-bn254 = "0.4.0"
-ark-ed-on-bw6-761 = "0.4.0"
-ark-ed-on-cp6-782 = "0.4.0"
-ark-ed-on-mnt4-298 = "0.4.0"
-ark-ed-on-mnt4-753 = "0.4.0"
-ark-ed25519 = "0.4.0"
-ark-mnt4-298 = "0.4.0"
-ark-mnt4-753 = "0.4.0"
-ark-mnt6-298 = "0.4.0"
-ark-mnt6-753 = "0.4.0"
-ark-pallas = "0.4.0"
-ark-poly-commit = "0.4.0"
-ark-secp256k1 = "0.4.0"
-ark-secp256r1 = "0.4.0"
-ark-secp384r1 = "0.4.0"
-ark-secq256k1 = "0.4.0"
-ark-vesta = "0.4.0"
-
-[[example]]
-name = "bench_commit"
-path = "examples/benches/commit.rs"
-
-[[example]]
-name = "bench_setup_size"
-path = "examples/benches/setup_size.rs"
-
-[[example]]
-name = "bench_field_operations"
-path = "examples/benches/operations/field.rs"
-
-[[example]]
-name = "bench_curve_group_operations"
-path = "examples/benches/operations/curve_group.rs"
-
-[[example]]
-name = "bench_setup"
-path = "examples/benches/setup.rs"
-
-[[example]]
-name = "bench_linalg"
-path = "examples/benches/linalg.rs"
-
-[[example]]
-name = "bench_recoding"
-path = "examples/benches/recoding.rs"
-
-[[example]]
-name = "bench_fec"
-path = "examples/benches/fec.rs"
-
-[[example]]
-name = "inbreeding"
-path = "examples/inbreeding/mod.rs"
+[workspace]
+members = [
+    "benchmarks",
+    "bins/curves",
+    "bins/inbreeding",
+    "bins/rank",
+    "bins/rng",
+]

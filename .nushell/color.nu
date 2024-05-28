@@ -1,18 +1,10 @@
+use error.nu "error throw"
+
 export const WHITE = { r: 1.0, g: 1.0, b: 1.0 }
 export const BLACK = { r: 0.0, g: 0.0, b: 0.0 }
 export const RED = { r: 1.0, g: 0.0, b: 0.0 }
 export const GREEN = { r: 0.0, g: 1.0, b: 0.0 }
 export const BLUE = { r: 0.0, g: 0.0, b: 1.0 }
-
-def "error throw" [err: record<err: string, label: string, span: record<start: int, end: int>>] {
-    error make {
-        msg: $"(ansi red_bold)($err.err)(ansi reset)",
-        label: {
-            text: $err.label,
-            span: $err.span,
-        },
-    }
-}
 
 export def "color from-floats" [
     r: float,

@@ -1,20 +1,15 @@
-use ../math.nu *
-use ../fs.nu check-file
-use ../plot.nu [ into-axis-options, COMMON_OPTIONS, gplt ]
+use ../../../.nushell/math.nu *
+use ../../../.nushell/fs.nu check-file
+use ../../../.nushell/plot.nu [ into-axis-options, COMMON_OPTIONS, gplt ]
 
 export def main [data: path, --save: path] {
     check-file $data --span (metadata $data).span
 
     let graphs = open $data
-        | ns-to-ms times
-        | compute-stats times
-        | insert degree { get label | parse "degree {d}" | into record | get d | into int}
-        | update name {|it| if ($it.name | str starts-with  "ARK") {
-            let c = $it.name | parse "ARK setup on {curve}" | into record | get curve
-            $"($c)-ark"
-        } else {
-            $it.name | parse "setup on {curve}" | into record | get curve
-        }}
+        | where name !~ '^SEC'
+        | ns-to-ms $.times
+        | compute-stats $.times
+        | insert degree { get label | parse "degree {d}" | into record | get d | into int }
         | rename --column { degree: "x", mean: "y", stddev: "e" }
         | select name x y e
         | group-by name --to-table

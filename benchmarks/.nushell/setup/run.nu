@@ -10,7 +10,7 @@ export def main [
         return
     }
 
-    cargo run --release --example bench_setup -- ...[
+    cargo run --release --package benchmarks --bin setup -- ...[
         --nb-measurements $nb_measurements
         ...$input
         --curves ...$curves

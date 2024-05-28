@@ -1,5 +1,5 @@
-const BIN = "./target/release/examples/inbreeding"
-const CACHE = ($nu.home-path | path join .cache komodo inbreeding)
+use consts.nu
+use ../../.nushell/cargo.nu "cargo bin"
 
 export def main [
     --options: record<
@@ -25,7 +25,7 @@ export def main [
     let now = date now | format date "%s%f"
 
     for s in $options.strategies {
-        let output_dir = [ $CACHE, $"($prng_seed)", $now, $options.environment, $"($s)" ] | path join
+        let output_dir = [ $consts.CACHE, $"($prng_seed)", $now, $options.environment, $"($s)" ] | path join
         mkdir $output_dir
         print $"data will be dumped to `($output_dir)`"
 
@@ -38,17 +38,14 @@ export def main [
             | $"0x($in)"
             | into int
         # compute all the seeds for that strategy, one per scenario
-        let seeds = cargo run --release --example rng -- ...[
-            -n $options.nb_scenarii
-            --prng-seed $prng_seed
-        ]
+        let seeds = cargo bin rng ...[ -n $options.nb_scenarii --prng-seed $prng_seed ]
             | lines
             | into int
 
         for i in 1..$options.nb_scenarii {
             let output = [ $output_dir, $"($i)" ] | path join
 
-            ^$BIN ...[
+            ^$consts.BIN ...[
                 $options.nb_bytes,
                 -k $options.k
                 -n $options.n

@@ -2,7 +2,7 @@
 #
 # please run `komodo --help` or `komodo <tab>` to have a look at more information
 
-use binary.nu ["bytes from_int"]
+use .nushell/binary.nu ["bytes from_int"]
 
 const KOMODO_BINARY = "./target/release/komodo"
 const DEFAULT_LOG_LEVEL = "INFO"
