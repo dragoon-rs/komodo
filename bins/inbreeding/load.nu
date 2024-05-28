@@ -13,7 +13,7 @@ def get-experiments []: nothing -> list<string> {
 
 export def main [
     experiment: string@get-experiments, # something of the form '<seed>-<env>'
-]: nothing -> table<strategy: string, diversity: table<x: int, y: float>> {
+]: nothing -> table<strategy: string, diversity: table<x: int, y: float, e: float>> {
     let exp = $experiment | parse "{seed}-{env}" | into record
     if $exp == {} {
         error throw {
@@ -46,8 +46,10 @@ export def main [
                 | parse "{x}, {y}"
                 | into float y
                 | group-by x --to-table
-                | update items { get y | math avg }
-                | rename --column { group: "x", items: "y" }
+                | insert y { get items.y | math avg }
+                | insert e { get items.y | math stddev }
+                | rename --column { group: "x" }
+                | reject items
                 | into int x # NOTE: $.x needs to be converted to int here because
                              # `group-by --to-table` converts the grouping key to
                              # string

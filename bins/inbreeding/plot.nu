@@ -43,7 +43,7 @@ def get-color []: int -> string {
 export def main [
     --save: path,
     --options: record<k: int>
-]: table<strategy: string, diversity: table<x: int, y: float>> -> nothing {
+]: table<strategy: string, diversity: table<x: int, y: float, e: float>> -> nothing {
     let data = $in
     let l = $data.diversity.0 | length
 
@@ -70,10 +70,6 @@ export def main [
                 }
                 "double" => $"($it.strategy.p)? ($it.strategy.n) ; ($it.strategy.m)"
             }
-        }
-        | update diversity {|it|
-            let l = $it.diversity | length
-            $it.diversity | insert e 0 | rename --column { t: "x", diversity: "y" }
         }
         | rename --column { diversity: "points" }
         | insert style {|it|
