@@ -1,8 +1,7 @@
 const BIN = "./target/release/examples/inbreeding"
+const CACHE = ($nu.home-path | path join .cache komodo inbreeding)
 
 export def main [
-    --output: path = "./inbreeding.nuon",
-    --baseline,
     --options: record<
         nb_bytes: int,
         k: int,
@@ -23,24 +22,16 @@ export def main [
         }
     }
 
-    if $baseline {
-        ^$BIN ...[
-            $options.nb_bytes,
-            -k $options.k
-            -n $options.n
-            --nb-measurements $options.nb_measurements
-            --measurement-schedule $options.measurement_schedule
-            --measurement-schedule-start $options.measurement_schedule_start
-            -t $options.max_t
-            --test-case end-to-end
-            --prng-seed $prng_seed
-        ] | lines | into float | save --force baseline.nuon
+    let now = date now | format date "%s%f"
 
-        print "baseline saved to `baseline.nuon`"
-    }
+    for s in $options.strategies {
+        let output_dir = [ $CACHE, $"($prng_seed)", $now, $options.environment, $"($s)" ] | path join
+        mkdir $output_dir
+        print $"data will be dumped to `($output_dir)`"
 
-    $options.strategies | each {|s|
-        let res = 1..$options.nb_scenarii | each {
+        for i in 1..$options.nb_scenarii {
+            let output = [ $output_dir, $"($i)" ] | path join
+
             ^$BIN ...[
                 $options.nb_bytes,
                 -k $options.k
@@ -53,26 +44,9 @@ export def main [
                 --strategy $s
                 --environment $options.environment
                 --prng-seed $prng_seed
-            ]
-                | lines
-                | parse "{t}, {diversity}"
-                | into float diversity
+            ] out> $output
         }
 
-        let diversity = $res
-            | flatten
-            | group-by t --to-table
-            | update items { get diversity | math avg }
-            | rename --column { group: "t", items: "diversity" }
-            | into int t # NOTE: $.t needs to be converted to int here because
-                         # `group-by --to-table` converts the grouping key to
-                         # string
-
-        {
-            strategy: $s,
-            diversity: $diversity,
-        }
-    } | save --force $output
-
-    print $"results saved to `($output)`"
+        print $"data has been dumped to `($output_dir)`"
+    }
 }
