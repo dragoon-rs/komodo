@@ -25,7 +25,11 @@ export def main [
     let now = date now | format date "%s%f"
 
     for s in $options.strategies {
-        let output_dir = [ $consts.CACHE, $"($prng_seed)", $now, $options.environment, $"($s)" ] | path join
+        let output_dir = [
+            $consts.CACHE,
+            $"($prng_seed)",
+            ([$now, $options.environment, $s, $options.k, $options.n, $options.nb_bytes] | str join '-')
+        ] | path join
         mkdir $output_dir
         print $"data will be dumped to `($output_dir)`"
 

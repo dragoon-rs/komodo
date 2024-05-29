@@ -1,29 +1,45 @@
 use consts.nu
+use ../../.nushell error "error throw"
 
+const ARG_EXPERIMENT_FORMAT = "{seed}-{env}-{k}-{n}-{nb_bytes}"
+const EXPERIMENT_FORMAT = "{timestamp}-{env}-{strategy}-{k}-{n}-{nb_bytes}"
+const FULL_EXPERIMENT_FORMAT = $"{seed}(char path_sep)($EXPERIMENT_FORMAT)"
+
+def remove-cache-prefix []: path -> string {
+    str replace $"($consts.CACHE)(char path_sep)" ''
+}
+
+# return experiment names following `$ARG_EXPERIMENT_FORMAT`
 def get-experiments []: nothing -> list<string> {
     $consts.CACHE
-        | path join '*' '*' '*'
+        | path join '*' '*'
         | into glob
         | ls $in
         | get name
-        | path split
-        | each { last 3 | reject 1 | str join "-" }
+        | each { remove-cache-prefix }
+        | parse $FULL_EXPERIMENT_FORMAT
+        | reject timestamp strategy
+        | each { values | str join '-' }
         | uniq
 }
 
 export def main [
-    experiment: string@get-experiments, # something of the form '<seed>-<env>'
+    experiment: string@get-experiments,
 ]: nothing -> table<strategy: string, diversity: table<x: int, y: float, e: float>> {
-    let exp = $experiment | parse "{seed}-{env}" | into record
+    let exp = $experiment | parse $ARG_EXPERIMENT_FORMAT | into record
     if $exp == {} {
         error throw {
             err: "invalid experiment",
-            label: $"should have format '<seed>-<env>', found ($experiment)",
+            label: $"should have format '($ARG_EXPERIMENT_FORMAT)', found ($experiment)",
             span: (metadata $experiment).span,
         }
     }
 
-    let experiment_path = [$consts.CACHE, $exp.seed, '*', $exp.env, '*' ]
+    let experiment_path = [
+        $consts.CACHE,
+        $exp.seed,
+        (['*', $exp.env, '*', $exp.k, $exp.n, $exp.nb_bytes] | str join '-')
+    ]
         | path join
         | into glob
     let experiment_files = try {
@@ -37,8 +53,9 @@ export def main [
     }
 
     $experiment_files
-        | insert strategy { get name | path split | last }
-        | select name strategy
+        | select name
+        | insert . { get name | remove-cache-prefix | parse $EXPERIMENT_FORMAT }
+        | flatten --all
         | insert diversity {
             ls $in.name
                 | each { get name | open | lines }
