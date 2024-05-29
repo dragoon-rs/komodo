@@ -10,7 +10,7 @@ def get-experiments []: nothing -> list<string> {
         | ls $in
         | get name
         | each { remove-cache-prefix }
-        | parse $consts.FULL_EXPERIMENT_FORMAT
+        | parse --regex $consts.FULL_EXPERIMENT_FORMAT
         | reject timestamp strategy
         | each { values | str join '-' }
         | uniq
@@ -19,7 +19,7 @@ def get-experiments []: nothing -> list<string> {
 export def main [
     experiment: string@get-experiments,
 ]: nothing -> table<strategy: string, diversity: table<x: int, y: float, e: float>> {
-    let exp = $experiment | parse $consts.ARG_EXPERIMENT_FORMAT | into record
+    let exp = $experiment | parse --regex $consts.ARG_EXPERIMENT_FORMAT | into record
     if $exp == {} {
         error throw {
             err: "invalid experiment",
@@ -47,7 +47,7 @@ export def main [
 
     $experiment_files
         | select name
-        | insert . { get name | remove-cache-prefix | parse $consts.EXPERIMENT_FORMAT }
+        | insert . { get name | remove-cache-prefix | parse --regex $consts.EXPERIMENT_FORMAT }
         | flatten --all
         | insert diversity {
             ls $in.name

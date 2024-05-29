@@ -25,7 +25,8 @@ export def main [seed: int@get-seeds]: [
         | select name m
         | update name {
             remove-cache-prefix
-                | parse $consts.FULL_EXPERIMENT_FORMAT
+                | parse --regex $consts.FULL_EXPERIMENT_FORMAT
+                | reject seed
         }
         | flatten --all name
 }
