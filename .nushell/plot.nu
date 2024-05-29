@@ -1,5 +1,3 @@
-use venv.nu VENV
-
 export const COMMON_OPTIONS = [
     --x-scale log
     --x-scale-base 2
@@ -70,6 +68,5 @@ export def into-axis-options [-x: string, -y: string]: table<x: float, y: float>
 }
 
 export def --wrapped gplt [...args: string] {
-    overlay use $VENV
     ^gplt ...$args
 }

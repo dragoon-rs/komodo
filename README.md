@@ -25,7 +25,7 @@ Komodo provides a bunch of other binaries that might be interesting of useful to
 
 The easiest is to use the `cargo.nu` Nushell module as follows
 ```bash
-use .nushell/cargo.nu "cargo bin"
+use .nushell cargo "cargo bin"
 help cargo bin
 ```
 

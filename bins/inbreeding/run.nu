@@ -1,5 +1,5 @@
 use consts.nu
-use ../../.nushell/cargo.nu "cargo bin"
+use ../../.nushell cargo "cargo bin"
 
 export def main [
     --options: record<

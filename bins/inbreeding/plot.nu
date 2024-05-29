@@ -1,9 +1,9 @@
 use std repeat
 
 use consts.nu
-use ../../.nushell/plot.nu gplt
-use ../../.nushell/color.nu *
-use ../../.nushell/error.nu "error throw"
+use ../../.nushell plot gplt
+use ../../.nushell color *
+use ../../.nushell error "error throw"
 
 def "parse strategy" []: string -> record<type: string> {
     let s = $in

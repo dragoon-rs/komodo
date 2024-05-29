@@ -1,4 +1,4 @@
-use ../../../.nushell/formats.nu *
+use ../../../.nushell formats *
 
 export def main [
     --output: path = "./fec.ndjson",

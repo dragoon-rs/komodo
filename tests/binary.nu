@@ -1,4 +1,4 @@
-use ../.nushell/binary.nu [
+use ../.nushell binary [
     "bytes decode", "bytes encode", "bytes from_int", "bytes to_int"
 ]
 

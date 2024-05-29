@@ -1,7 +1,7 @@
-use ../../../.nushell/math.nu *
-use ../../../.nushell/plot.nu [ into-axis-options, COMMON_OPTIONS ]
-use ../../../.nushell/fs.nu check-file
-use ../../../.nushell/plot.nu gplt
+use ../../../.nushell math *
+use ../../../.nushell plot [ into-axis-options, COMMON_OPTIONS ]
+use ../../../.nushell fs check-file
+use ../../../.nushell plot gplt
 
 export def main [data: path, --save: path] {
     check-file $data --span (metadata $data).span
