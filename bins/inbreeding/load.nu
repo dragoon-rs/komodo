@@ -1,13 +1,6 @@
 use consts.nu
+use path.nu [ "remove-cache-prefix" ]
 use ../../.nushell error "error throw"
-
-const ARG_EXPERIMENT_FORMAT = "{seed}-{env}-{k}-{n}-{nb_bytes}"
-const EXPERIMENT_FORMAT = "{timestamp}-{env}-{strategy}-{k}-{n}-{nb_bytes}"
-const FULL_EXPERIMENT_FORMAT = $"{seed}(char path_sep)($EXPERIMENT_FORMAT)"
-
-def remove-cache-prefix []: path -> string {
-    str replace $"($consts.CACHE)(char path_sep)" ''
-}
 
 # return experiment names following `$ARG_EXPERIMENT_FORMAT`
 def get-experiments []: nothing -> list<string> {
@@ -17,7 +10,7 @@ def get-experiments []: nothing -> list<string> {
         | ls $in
         | get name
         | each { remove-cache-prefix }
-        | parse $FULL_EXPERIMENT_FORMAT
+        | parse $consts.FULL_EXPERIMENT_FORMAT
         | reject timestamp strategy
         | each { values | str join '-' }
         | uniq
@@ -26,11 +19,11 @@ def get-experiments []: nothing -> list<string> {
 export def main [
     experiment: string@get-experiments,
 ]: nothing -> table<strategy: string, diversity: table<x: int, y: float, e: float>> {
-    let exp = $experiment | parse $ARG_EXPERIMENT_FORMAT | into record
+    let exp = $experiment | parse $consts.ARG_EXPERIMENT_FORMAT | into record
     if $exp == {} {
         error throw {
             err: "invalid experiment",
-            label: $"should have format '($ARG_EXPERIMENT_FORMAT)', found ($experiment)",
+            label: $"should have format '($consts.ARG_EXPERIMENT_FORMAT)', found ($experiment)",
             span: (metadata $experiment).span,
         }
     }
@@ -54,7 +47,7 @@ export def main [
 
     $experiment_files
         | select name
-        | insert . { get name | remove-cache-prefix | parse $EXPERIMENT_FORMAT }
+        | insert . { get name | remove-cache-prefix | parse $consts.EXPERIMENT_FORMAT }
         | flatten --all
         | insert diversity {
             ls $in.name
