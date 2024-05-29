@@ -98,8 +98,8 @@ export def main [
         | reject strategy
         | save --force /tmp/graphs.json
 
-    let x_min = open /tmp/graphs.json | get points.0.x | math min
-    let x_max = open /tmp/graphs.json | get points.0.x | math max
+    let x_min = open /tmp/graphs.json | get points | flatten | get x | math min
+    let x_max = open /tmp/graphs.json | get points | flatten | get x | math max
 
     let args = [
         --json-data-file /tmp/graphs.json
