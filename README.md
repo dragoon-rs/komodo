@@ -13,7 +13,7 @@ below is an example of how to use the binary application with Nushell:
 ```
 
 > **Note**  
-> requires Nushell 0.89.0 or later
+> requires Nushell 0.93.0 or later
 
 tests for the binary application can also be run with
 ```bash

@@ -67,10 +67,16 @@ export def "color from-ints" [
 }
 
 def try-string-to-int []: string -> int {
+    let s = $in
     try {
-        $"0x($in)" | into int
-    } catch {
-        get debug | parse --regex 'CantConvert { to_type: "(?<to>.*)", from_type: "(?<from>.*)", span: Span { (?<span>.*) }, help: Some\("(?<help>.*)"\) }' | into record | error make --unspanned { msg: ($in.help | str replace --all '\"' '"') }
+        $"0x($s)" | into int
+    } catch { |e|
+        let err = $e.debug
+            | parse --regex 'CantConvert { to_type: "(?<to>.*)", from_type: "(?<from>.*)", span: Span { (?<span>.*) }, help: Some\("(?<help>.*)"\) }'
+            | into record
+
+        let msg = $err.help | str replace --all '\"' '"'
+        error make --unspanned { msg: $"($msg), found ($s)" }
     }
 }
 

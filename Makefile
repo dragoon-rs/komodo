@@ -19,6 +19,7 @@ test:
 	cargo test --examples --verbose
 	nu tests/cli.nu
 	nu tests/binary.nu
+	nu tests/color.nu
 
 example:
 	nu examples/cli.nu
