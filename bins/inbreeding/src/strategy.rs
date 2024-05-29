@@ -1,4 +1,6 @@
-use rand::{seq::SliceRandom, Rng, RngCore};
+use rand::{Rng, RngCore};
+
+use crate::random::draw_unique_elements;
 
 #[derive(Debug, PartialEq)]
 pub(super) enum Strategy {
@@ -8,9 +10,6 @@ pub(super) enum Strategy {
 
 impl Strategy {
     pub(super) fn draw<T: Clone>(&self, things: &[T], rng: &mut impl RngCore) -> Vec<T> {
-        let mut things = things.to_vec();
-        things.shuffle(rng);
-
         let nb_to_take = match self {
             Self::Single { n } => *n,
             Self::Double { p, n, m } => {
@@ -22,7 +21,7 @@ impl Strategy {
             }
         };
 
-        things.iter().take(nb_to_take).cloned().collect()
+        draw_unique_elements(things, nb_to_take, rng)
     }
 
     pub(super) fn from_str(s: &str) -> Result<Self, String> {

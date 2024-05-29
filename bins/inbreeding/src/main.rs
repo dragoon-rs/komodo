@@ -9,9 +9,11 @@ use komodo::{
     fec::{self, Shard},
     linalg::Matrix,
 };
-use rand::{rngs::StdRng, seq::SliceRandom, Rng, RngCore, SeedableRng};
+use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
+use random::draw_unique_elements;
 
 mod environment;
+mod random;
 mod strategy;
 
 use crate::{environment::Environment, strategy::Strategy};
@@ -38,16 +40,13 @@ fn measure_inbreeding<F: PrimeField>(
     sty: &ProgressStyle,
     rng: &mut impl RngCore,
 ) -> f64 {
-    let mut s: Vec<_> = shards.to_vec();
     let mut count = 0;
 
     let pb = mp.add(ProgressBar::new(nb_measurements as u64));
     pb.set_style(sty.clone());
     pb.set_message("measure");
     for _ in 0..nb_measurements {
-        // get any k of the shards
-        s.shuffle(rng);
-        if fec::decode(s.iter().take(k).cloned().collect()).is_ok() {
+        if fec::decode(draw_unique_elements(shards, k, rng)).is_ok() {
             count += 1;
         }
         pb.inc(1);

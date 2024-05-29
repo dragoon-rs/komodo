@@ -1,4 +1,6 @@
-use rand::{seq::SliceRandom, Rng, RngCore};
+use rand::{Rng, RngCore};
+
+use crate::random::draw_unique_elements;
 
 #[derive(Debug, PartialEq)]
 pub(super) enum Environment {
@@ -14,28 +16,23 @@ impl Environment {
     /// `update(things, rng)` is `things` with some elements potentially removed according to the
     /// [`Environment`] type
     pub(super) fn update<T: Clone>(&self, things: &[T], rng: &mut impl RngCore) -> Vec<T> {
-        let mut things = things.to_vec();
-        things.shuffle(rng);
-
-        match self {
-            Environment::Fixed { n } => things.iter().take(things.len() - n),
+        let nb_to_take = match self {
+            Environment::Fixed { n } => things.len() - n,
             Environment::RandomFixed { p, n } => {
                 if rng.gen::<f64>() > *p {
-                    return things;
+                    return things.to_vec();
                 }
-                things.iter().take(things.len() - n)
+                things.len() - n
             }
             Environment::RandomDynamic { p, q } => {
                 if rng.gen::<f64>() > *p {
-                    return things;
+                    return things.to_vec();
                 }
-                things
-                    .iter()
-                    .take((things.len() as f64 * (1.0 - q)) as usize)
+                (things.len() as f64 * (1.0 - q)) as usize
             }
-        }
-        .cloned()
-        .collect()
+        };
+
+        draw_unique_elements(things, nb_to_take, rng)
     }
 
     pub(super) fn from_str(s: &str) -> Result<Self, String> {
