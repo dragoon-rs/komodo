@@ -1,6 +1,7 @@
-use rand::{Rng, RngCore};
+use rand::{seq::SliceRandom, Rng, RngCore};
 use std::collections::HashSet;
 
+#[allow(dead_code)]
 fn draw_unique_indices(n: usize, vec_len: usize, rng: &mut impl RngCore) -> HashSet<usize> {
     let mut indices = HashSet::new();
 
@@ -17,9 +18,8 @@ pub(super) fn draw_unique_elements<T: Clone>(
     n: usize,
     rng: &mut impl RngCore,
 ) -> Vec<T> {
-    let mut res = vec![];
-    for i in draw_unique_indices(n, things.len(), rng) {
-        res.push(things[i].clone());
-    }
-    res
+    let mut things = things.to_vec();
+    things.shuffle(rng);
+
+    things.iter().take(n).cloned().collect()
 }
