@@ -233,7 +233,7 @@ fn main() {
 
     match cli.test_case {
         TestCase::EndToEnd => {
-            eprintln!("naive: k = {}, n = {}", cli.k, cli.n);
+            eprintln!("(k, 1)-re-encoding: k = {}, n = {}", cli.k, cli.n);
             let _ = end_to_end::<ark_pallas::Fr, _>(
                 &bytes,
                 cli.k,
@@ -258,7 +258,7 @@ fn main() {
             let strategy = Strategy::from_str(&cli.strategy.unwrap()).unwrap();
 
             eprintln!(
-                "true: k = {}, n = {}, strategy = {:?}, environment = {:?}",
+                "k-recoding: k = {}, n = {}, strategy = {:?}, environment = {:?}",
                 cli.k, cli.n, strategy, environment,
             );
             let _ = recoding::<ark_pallas::Fr, _>(

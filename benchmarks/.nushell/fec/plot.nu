@@ -100,7 +100,7 @@ export def combined [data: path, --recoding: path, --save: path] {
     check-file $data --span (metadata $data).span
     check-file $recoding --span (metadata $recoding).span
 
-    let true_recoding_graphs = open $recoding
+    let recoding_graphs = open $recoding
         | ns-to-ms $.times
         | compute-stats $.times
         | update label { from nuon }
@@ -124,7 +124,7 @@ export def combined [data: path, --recoding: path, --save: path] {
         | rename --column { group: "name", items: "points" }
         | update name { $"$k = ($in)$" }
 
-    let naive_recoding_graphs = open $data
+    let re_encoding_graphs = open $data
         | update label { from json }
         | flatten label
         | insert key { $"($in.name) / ($in.k) / ($in.bytes)" }
@@ -158,10 +158,10 @@ export def combined [data: path, --recoding: path, --save: path] {
         | rename --column { group: "name", items: "points" }
         | reject name
 
-    let graphs = $true_recoding_graphs
-        | append $naive_recoding_graphs
+    let graphs = $recoding_graphs
+        | append $re_encoding_graphs
         | append {
-            name: "naive recoding ($k$-decoding + $1$-encoding)",
+            name: "$(k, 1)$-re-encoding ($k$-decoding + $1$-encoding)",
             legend: "second",
             points: [],
             style: {
@@ -175,7 +175,7 @@ export def combined [data: path, --recoding: path, --save: path] {
             },
         }
         | append {
-            name: "true recoding ($k$-recoding)",
+            name: "$k$-recoding",
             legend: "second",
             points: [],
             style: {
@@ -203,7 +203,7 @@ export def ratio [data: path, --recoding: path, --save: path] {
     check-file $data --span (metadata $data).span
     check-file $recoding --span (metadata $recoding).span
 
-    let true_recoding_graphs = open $recoding
+    let recoding_graphs = open $recoding
         | ns-to-ms times
         | compute-stats $.times
         | update label { from nuon }
@@ -212,7 +212,7 @@ export def ratio [data: path, --recoding: path, --save: path] {
         | select shards bytes mean
         | rename --column { shards: "k" }
 
-    let naive_recoding_graphs = open $data
+    let re_encoding_graphs = open $data
         | update label { from json }
         | flatten label
         | insert key { $"($in.name) / ($in.k) / ($in.bytes)" }
@@ -230,13 +230,13 @@ export def ratio [data: path, --recoding: path, --save: path] {
         | select k bytes mean
         | uniq
 
-    let graphs = $true_recoding_graphs
-        | rename --column { mean: "true" }
+    let graphs = $recoding_graphs
+        | rename --column { mean: "recoding" }
         | insert key { $"($in.k) ($in.bytes)" }
-        | join ($naive_recoding_graphs | rename --column { mean: "naive" } | insert key { $"($in.k) ($in.bytes)" }) key
-        | select k bytes $.true naive
+        | join ($re_encoding_graphs | rename --column { mean: "re_encoding" } | insert key { $"($in.k) ($in.bytes)" }) key
+        | select k bytes $.recoding re_encoding
         | sort-by k bytes
-        | insert cmp { $in.naive / $in.true }
+        | insert cmp { $in.re_encoding / $in.recoding }
         | rename --column { bytes: "x", cmp: "y" }
         | select k x y
         | group-by k --to-table
