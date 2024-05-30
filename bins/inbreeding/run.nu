@@ -69,19 +69,20 @@ export def main [
         }
     }
 
-    let now = date now | format date "%s%f"
+    let exp_hash = $options | reject strategies | sort | to nuon | hash sha256
 
     for s in $options.strategies {
         let output_dir = [
             $consts.CACHE,
             $"($prng_seed)",
-            ([$now, $options.environment, $s, $options.k, $options.n, $options.nb_bytes] | str join '-')
+            ([$options.environment, $s, $options.k, $options.n, $options.nb_bytes] | str join '-')
         ] | path join
         mkdir $output_dir
         print $"data will be dumped to `($output_dir)`"
 
         for i in 1..$options.nb_scenarii {
-            let output = [ $output_dir, $"($i)" ] | path join
+            let seed = [ $prng_seed, $exp_hash, $s, $i ] | str join | hash sha256
+            let output = [ $output_dir, $seed ] | path join
 
             ^$consts.BIN ...[
                 $options.nb_bytes,
@@ -94,7 +95,7 @@ export def main [
                 --test-case recoding
                 --strategy $s
                 --environment $options.environment
-                --prng-seed ([$prng_seed, $s, $i] | str join | hash sha256)
+                --prng-seed $seed
             ] out> $output
         }
 

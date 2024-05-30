@@ -11,7 +11,7 @@ def get-experiments []: nothing -> list<string> {
         | get name
         | each { remove-cache-prefix }
         | parse --regex $consts.FULL_EXPERIMENT_FORMAT
-        | reject timestamp strategy
+        | reject strategy
         | each { values | str join '-' }
         | uniq
 }
@@ -31,7 +31,7 @@ export def main [
     let experiment_path = [
         $consts.CACHE,
         $exp.seed,
-        (['*', $exp.env, '*', $exp.k, $exp.n, $exp.nb_bytes] | str join '-')
+        ([$exp.env, '*', $exp.k, $exp.n, $exp.nb_bytes] | str join '-')
     ]
         | path join
         | into glob

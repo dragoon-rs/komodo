@@ -8,7 +8,6 @@ def get-seeds [] [ nothing -> list<string> ] {
 export def main [seed: string@get-seeds]: [
     nothing -> table<
         seed: string,
-        timestamp: string,
         env: string,
         strategy: string,
         k: string,
