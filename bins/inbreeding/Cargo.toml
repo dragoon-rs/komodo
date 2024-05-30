@@ -11,3 +11,4 @@ clap = { version = "4.5.4", features = ["derive"] }
 rand = "0.8.5"
 indicatif = "0.17.8"
 ark-ff = "0.4.2"
+hex = "0.4.3"

@@ -149,6 +149,19 @@ where
     Ok(())
 }
 
+fn parse_hex_string(s: &str) -> Result<[u8; 32], String> {
+    if s.len() != 64 {
+        return Err("Input string must be exactly 64 characters long".to_string());
+    }
+
+    match hex::decode(s) {
+        // `bytes` will be a `Vec<u8>` of size `32`, so it's safe to `unwrap`
+        // the conversion to `[u8: 32]`
+        Ok(bytes) => Ok(bytes.try_into().unwrap()),
+        Err(e) => Err(format!("Failed to decode hex string: {}", e)),
+    }
+}
+
 #[derive(ValueEnum, Clone)]
 enum TestCase {
     EndToEnd,
@@ -190,8 +203,8 @@ struct Cli {
     #[arg(long)]
     measurement_schedule_start: usize,
 
-    #[arg(long)]
-    prng_seed: u8,
+    #[arg(long, value_parser = parse_hex_string)]
+    prng_seed: [u8; 32],
 }
 
 fn main() {
@@ -205,9 +218,7 @@ fn main() {
         exit(1);
     }
 
-    let mut seed: [u8; 32] = [0; 32];
-    seed[0] = cli.prng_seed;
-    let mut rng = StdRng::from_seed(seed);
+    let mut rng = StdRng::from_seed(cli.prng_seed);
 
     let bytes = random_bytes(cli.nb_bytes, &mut rng);
 

@@ -1,5 +1,42 @@
 use consts.nu
-use ../../.nushell cargo "cargo bin"
+use ../../.nushell error "error throw"
+
+const VALID_HEX_CHARS = "abcdefABCDEF0123456789"
+
+def check-hex [-n: int]: [
+    string -> record<
+        ok: bool,
+        err: record<msg: string, label: string, help: string>,
+    >
+] {
+    let s = $in
+
+    if ($s | str length) != $n {
+        return {
+            ok: false,
+            err: {
+                msg: "invalid HEX length"
+                label : $"length is ($s | str length)",
+                help: "length should be 64",
+            },
+        }
+    }
+
+    for c in ($s | split chars | enumerate) {
+        if not ($VALID_HEX_CHARS | str contains $c.item) {
+            return {
+                ok: false,
+                err: {
+                    msg: "bad HEX character",
+                    label: $"found '($c.item)' at ($c.index)",
+                    help: $"expected one of '($VALID_HEX_CHARS)'",
+                },
+            }
+        }
+    }
+
+    { ok: true, err: {} }
+}
 
 export def main [
     --options: record<
@@ -14,11 +51,21 @@ export def main [
         strategies: list<string>,
         environment: string,
     >,
-    --prng-seed: int = 0,
+    --prng-seed: string = "0000000000000000000000000000000000000000000000000000000000000000",
 ] {
     if $options.measurement_schedule_start > $options.max_t {
         error make --unspanned {
             msg: $"measurement schedule will start after the max t, ($options.measurement_schedule_start) > ($options.max_t)"
+        }
+    }
+
+    let res = $prng_seed | check-hex -n 64
+    if not $res.ok {
+        error throw {
+            err: $res.err.msg,
+            label: $res.err.label,
+            span: (metadata $prng_seed).span,
+            help: $res.err.help,
         }
     }
 
@@ -32,19 +79,6 @@ export def main [
         ] | path join
         mkdir $output_dir
         print $"data will be dumped to `($output_dir)`"
-
-        # compute a unique seed for that strategy and global seed
-        let seed = $s + $"($prng_seed)"
-            | hash sha256
-            | split chars
-            | last 2
-            | str join
-            | $"0x($in)"
-            | into int
-        # compute all the seeds for that strategy, one per scenario
-        let seeds = cargo bin rng ...[ -n $options.nb_scenarii --prng-seed $prng_seed ]
-            | lines
-            | into int
 
         for i in 1..$options.nb_scenarii {
             let output = [ $output_dir, $"($i)" ] | path join
@@ -60,7 +94,7 @@ export def main [
                 --test-case recoding
                 --strategy $s
                 --environment $options.environment
-                --prng-seed ($seeds | get ($i - 1))
+                --prng-seed ([$prng_seed, $s, $i] | str join | hash sha256)
             ] out> $output
         }
 

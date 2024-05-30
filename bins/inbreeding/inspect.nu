@@ -5,7 +5,7 @@ def get-seeds [] [ nothing -> list<string> ] {
     $consts.CACHE | path join '*' | into glob | ls $in | get name | each { path split | last }
 }
 
-export def main [seed: int@get-seeds]: [
+export def main [seed: string@get-seeds]: [
     nothing -> table<
         seed: string,
         timestamp: string,

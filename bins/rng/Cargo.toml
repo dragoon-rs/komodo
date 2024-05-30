@@ -8,4 +8,5 @@ description = "Generate random numbers from a seed."
 
 [dependencies]
 clap = { version = "4.5.4", features = ["derive"] }
+hex = "0.4.3"
 rand = "0.8.5"

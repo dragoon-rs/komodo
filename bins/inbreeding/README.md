@@ -7,7 +7,7 @@
 use ./bins/inbreeding
 ```
 ```bash
-const PRNG_SEED = 123
+const PRNG_SEED = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 const OPTS = {
     nb_bytes: (10 * 1_024),
     k: 10,
