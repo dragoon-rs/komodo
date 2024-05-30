@@ -69,7 +69,7 @@ export def main [
         }
     }
 
-    let exp_hash = $options | reject strategies | sort | to nuon | hash sha256
+    let exp_hash = $options | select nb_bytes k n environment | sort | to nuon | hash sha256
 
     for s in $options.strategies {
         let output_dir = [
