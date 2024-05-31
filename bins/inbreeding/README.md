@@ -37,5 +37,5 @@ inbreeding run --options $OPTS --prng-seed $PRNG_SEED
 ```
 ```bash
 let experiment = $"($PRNG_SEED)-($OPTS.environment)-($OPTS.k)-($OPTS.n)-($OPTS.nb_bytes)"
-inbreeding load $experiment | inbreeding plot --options { k: $OPTS.k }
+inbreeding load $experiment | inbreeding plot
 ```

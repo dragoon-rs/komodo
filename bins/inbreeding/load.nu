@@ -18,8 +18,18 @@ def get-experiments []: nothing -> list<string> {
 
 export def main [
     experiment: string@get-experiments,
-]: nothing -> table<strategy: string, diversity: table<x: int, y: float, e: float>> {
-    let exp = $experiment | parse --regex $consts.ARG_EXPERIMENT_FORMAT | into record
+]: [
+    nothing -> record<
+        experiment: record<k: int, n: int, nb_bytes: int, env: string>,
+        measurements: table<strategy: string, diversity: table<x: int, y: float, e: float>>,
+    >
+] {
+    let exp = $experiment
+        | parse --regex $consts.ARG_EXPERIMENT_FORMAT
+        | into record
+        | into int k
+        | into int n
+        | into int nb_bytes
     if $exp == {} {
         error throw {
             err: "invalid experiment",
@@ -45,7 +55,7 @@ export def main [
         }
     }
 
-    $experiment_files
+    let measurements = $experiment_files
         | select name
         | insert . { get name | remove-cache-prefix | parse --regex $consts.EXPERIMENT_FORMAT }
         | flatten --all
@@ -71,4 +81,14 @@ export def main [
             $d | skip 1 | reduce --fold $d.0 {|it, acc| $acc | append $it}
         }
         | rename --column { group: "strategy", items: "diversity" }
+
+    {
+        experiment: {
+            env: $exp.env,
+            k: $exp.k,
+            n: $exp.n,
+            nb_bytes: $exp.nb_bytes,
+        },
+        measurements: $measurements,
+    }
 }

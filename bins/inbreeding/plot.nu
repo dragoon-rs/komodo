@@ -40,14 +40,16 @@ def get-color []: int -> string {
     }
 }
 
-export def main [
-    --save: path,
-    --options: record<k: int>
-]: table<strategy: string, diversity: table<x: int, y: float, e: float>> -> nothing {
-    let data = $in
-    let l = $data.diversity.0 | length
+export def main [ --save: path ]: [
+    record<
+        experiment: record<k: int, n: int, nb_bytes: int, env: string>,
+        measurements: table<strategy: string, diversity: table<x: int, y: float, e: float>>,
+    > -> nothing
+] {
+    let experiment = $in
+    let l = $experiment.measurements.diversity.0 | length
 
-    $data
+    $experiment.measurements
         | update strategy { parse strategy }
         | insert sort {|it|
             match $it.strategy.type {
@@ -61,10 +63,10 @@ export def main [
         | insert name {|it|
             match $it.strategy.type {
                 "single" => {
-                    let sigma = if $it.strategy.n == $options.k {
+                    let sigma = if $it.strategy.n == $experiment.experiment.k {
                         "k"
                     } else {
-                        $"k - ($options.k - $it.strategy.n)"
+                        $"k - ($experiment.experiment.k - $it.strategy.n)"
                     }
                     $"$\\sigma = ($sigma) = ($it.strategy.n)$"
                 }
