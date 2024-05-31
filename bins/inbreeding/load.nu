@@ -2,22 +2,10 @@ use consts.nu
 use path.nu [ "remove-cache-prefix" ]
 use ../../.nushell error "error throw"
 
-# return experiment names following `$ARG_EXPERIMENT_FORMAT`
-def get-experiments []: nothing -> list<string> {
-    $consts.CACHE
-        | path join '*' '*'
-        | into glob
-        | ls $in
-        | get name
-        | each { remove-cache-prefix }
-        | parse --regex $consts.FULL_EXPERIMENT_FORMAT
-        | reject strategy
-        | each { values | str join '-' }
-        | uniq
-}
+use list.nu
 
 export def main [
-    experiment: string@get-experiments,
+    experiment: string@list,
 ]: [
     nothing -> record<
         experiment: record<k: int, n: int, nb_bytes: int, env: string>,
