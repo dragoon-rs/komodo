@@ -38,15 +38,17 @@ fn measure_inbreeding<F: PrimeField>(
     nb_measurements: usize,
     mp: &MultiProgress,
     sty: &ProgressStyle,
-    rng: &mut impl RngCore,
+    rng: &(impl RngCore + Clone),
 ) -> f64 {
+    let mut rng = rng.clone();
+
     let mut count = 0;
 
     let pb = mp.add(ProgressBar::new(nb_measurements as u64));
     pb.set_style(sty.clone());
     pb.set_message("measure");
     for _ in 0..nb_measurements {
-        if fec::decode(draw_unique_elements(shards, k, rng)).is_ok() {
+        if fec::decode(draw_unique_elements(shards, k, &mut rng)).is_ok() {
             count += 1;
         }
         pb.inc(1);
@@ -62,7 +64,7 @@ fn end_to_end<F, Fun>(
     max_t: usize,
     nb_measurements: usize,
     measurement_schedule: Fun,
-    rng: &mut impl RngCore,
+    rng: &mut (impl RngCore + Clone),
 ) -> Result<(), KomodoError>
 where
     F: PrimeField,
@@ -109,7 +111,7 @@ fn recoding<F, Fun>(
     env: Environment,
     nb_measurements: usize,
     measurement_schedule: Fun,
-    rng: &mut impl RngCore,
+    rng: &mut (impl RngCore + Clone),
 ) -> Result<(), KomodoError>
 where
     F: PrimeField,
