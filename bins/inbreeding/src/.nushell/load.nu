@@ -1,7 +1,7 @@
 use consts.nu
 use parse.nu [ "parse arg-experiment", "parse experiment" ]
 use path.nu [ "remove-cache-prefix" ]
-use ../../.nushell error "error throw"
+use $consts.NUSHELL error "error throw"
 
 use list.nu
 

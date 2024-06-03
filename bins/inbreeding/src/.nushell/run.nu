@@ -1,5 +1,5 @@
 use consts.nu
-use ../../.nushell error "error throw"
+use $consts.NUSHELL error "error throw"
 
 const VALID_HEX_CHARS = "abcdefABCDEF0123456789"
 

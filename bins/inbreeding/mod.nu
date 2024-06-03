@@ -1,7 +1,7 @@
-export use build.nu
-export use watch.nu
-export use run.nu
-export use inspect.nu
-export use list.nu
-export use load.nu
-export use plot.nu
+export use src/.nushell/build.nu
+export use src/.nushell/watch.nu
+export use src/.nushell/run.nu
+export use src/.nushell/inspect.nu
+export use src/.nushell/list.nu
+export use src/.nushell/load.nu
+export use src/.nushell/plot.nu

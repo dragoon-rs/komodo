@@ -1,6 +1,6 @@
-- build the example for best performance with [`inbreeding build`](./build.nu)
-- run the experiment with [`inbreeding run`](./run.nu)
-- plot the results with [`inbreeding plot`](./plot.nu)
+- build the example for best performance with [`inbreeding build`](./src/.nushell/build.nu)
+- run the experiment with [`inbreeding run`](./src/.nushell/run.nu)
+- plot the results with [`inbreeding plot`](./src/.nushell/plot.nu)
 
 # Example
 ```bash
@@ -42,7 +42,7 @@ inbreeding load $experiment | inbreeding plot
 
 ## plot all experiments
 ```bash
-use bins/inbreeding/consts.nu CACHE
+use bins/inbreeding/src/.nushell/consts.nu CACHE
 use bins/inbreeding
 
 const FIGURES_DIR = ($CACHE | path join figures)
