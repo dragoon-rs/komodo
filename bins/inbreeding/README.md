@@ -39,3 +39,17 @@ inbreeding run --options $OPTS --prng-seed $PRNG_SEED
 let experiment = $"($PRNG_SEED)-($OPTS.environment)-($OPTS.k)-($OPTS.n)-($OPTS.nb_bytes)"
 inbreeding load $experiment | inbreeding plot
 ```
+
+## plot all experiments
+```bash
+use bins/inbreeding/consts.nu CACHE
+use bins/inbreeding
+
+const FIGURES_DIR = ($CACHE | path join figures)
+
+mkdir $FIGURES_DIR
+
+for exp in (inbreeding list) {
+    inbreeding load $exp | inbreeding plot --save ($FIGURES_DIR | path join $exp)
+}
+```
