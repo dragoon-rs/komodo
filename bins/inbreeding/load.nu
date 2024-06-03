@@ -1,4 +1,5 @@
 use consts.nu
+use parse.nu [ "parse arg-experiment", "parse experiment" ]
 use path.nu [ "remove-cache-prefix" ]
 use ../../.nushell error "error throw"
 
@@ -12,19 +13,7 @@ export def main [
         measurements: table<strategy: string, diversity: table<x: int, y: float, e: float>>,
     >
 ] {
-    let exp = $experiment
-        | parse --regex $consts.ARG_EXPERIMENT_FORMAT
-        | into record
-        | into int k
-        | into int n
-        | into int nb_bytes
-    if $exp == {} {
-        error throw {
-            err: "invalid experiment",
-            label: $"should have format '($consts.ARG_EXPERIMENT_FORMAT)', found ($experiment)",
-            span: (metadata $experiment).span,
-        }
-    }
+    let exp = $experiment | parse arg-experiment --span (metadata $experiment).span
 
     let experiment_path = [
         $consts.CACHE,
@@ -45,7 +34,7 @@ export def main [
 
     let measurements = $experiment_files
         | select name
-        | insert . { get name | remove-cache-prefix | parse --regex $consts.EXPERIMENT_FORMAT }
+        | insert . { get name | remove-cache-prefix | parse experiment }
         | flatten --all
         | insert diversity {
             ls $in.name

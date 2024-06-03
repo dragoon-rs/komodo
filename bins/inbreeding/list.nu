@@ -1,4 +1,5 @@
 use consts.nu
+use parse.nu [ "parse full-experiment" ]
 use path.nu [ "remove-cache-prefix" ]
 
 # return experiment names following `$ARG_EXPERIMENT_FORMAT`
@@ -9,8 +10,7 @@ export def main []: nothing -> list<string> {
         | ls $in
         | get name
         | each { remove-cache-prefix }
-        | parse --regex $consts.FULL_EXPERIMENT_FORMAT
-        | reject strategy
-        | each { values | str join '-' }
+        | where ($it | path split | first | str length) == 64
+        | each { parse full-experiment | reject strategy | values | str join '-' }
         | uniq
 }

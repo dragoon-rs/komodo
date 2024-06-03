@@ -1,4 +1,5 @@
 use consts.nu
+use parse.nu [ "parse full-experiment" ]
 use path.nu [ "remove-cache-prefix" ]
 
 def get-seeds [] [ nothing -> list<string> ] {
@@ -22,11 +23,7 @@ export def main [seed: string@get-seeds]: [
         | ls $in
         | insert m { ls $in.name | length }
         | select name m
-        | update name {
-            remove-cache-prefix
-                | parse --regex $consts.FULL_EXPERIMENT_FORMAT
-                | reject seed
-        }
+        | update name { remove-cache-prefix | parse full-experiment | reject seed }
         | flatten --all name
         | into int k
         | into int n
