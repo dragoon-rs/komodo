@@ -10,9 +10,9 @@ export def main [seed: string@get-seeds]: [
         seed: string,
         env: string,
         strategy: string,
-        k: string,
-        n: string,
-        nb_bytes: string,
+        k: int,
+        n: int,
+        nb_bytes: int,
         m: int,
     >
 ] {
@@ -28,5 +28,8 @@ export def main [seed: string@get-seeds]: [
                 | reject seed
         }
         | flatten --all name
+        | into int k
+        | into int n
+        | into int nb_bytes
 }
 
