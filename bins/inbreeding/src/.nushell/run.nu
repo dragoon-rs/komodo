@@ -92,7 +92,6 @@ export def main [
                 --measurement-schedule $options.measurement_schedule
                 --measurement-schedule-start $options.measurement_schedule_start
                 -t $options.max_t
-                --test-case recoding
                 --strategy $s
                 --environment $options.environment
                 --prng-seed $seed

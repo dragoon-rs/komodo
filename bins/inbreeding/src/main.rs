@@ -2,7 +2,7 @@ use std::process::exit;
 
 use ark_ff::PrimeField;
 
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use komodo::{
     error::KomodoError,
@@ -57,52 +57,8 @@ fn measure_inbreeding<F: PrimeField>(
     count as f64 / nb_measurements as f64
 }
 
-fn end_to_end<F, Fun>(
-    bytes: &[u8],
-    k: usize,
-    n: usize,
-    max_t: usize,
-    nb_measurements: usize,
-    measurement_schedule: Fun,
-    rng: &mut (impl RngCore + Clone),
-) -> Result<(), KomodoError>
-where
-    F: PrimeField,
-    Fun: Fn(usize) -> bool,
-{
-    let original_shards = setup(bytes, k, n)?;
-    let mut shards = original_shards.clone();
-
-    let mp = MultiProgress::new();
-    let sty = ProgressStyle::with_template("{msg}: {bar:40.cyan/blue} {pos:>7}/{len:7}")
-        .unwrap()
-        .progress_chars("##-");
-    let pb = mp.add(ProgressBar::new(max_t as u64));
-    pb.set_style(sty.clone());
-    pb.set_message("main");
-    for t in 0..=max_t {
-        if measurement_schedule(t) {
-            let inbreeding = measure_inbreeding(&shards, k, nb_measurements, &mp, &sty, rng);
-            println!("{}, {}", t, inbreeding);
-        }
-
-        // decode the data
-        let data = fec::decode(original_shards.clone())?;
-
-        // re-encode a new random shard
-        let encoding_mat = Matrix::vandermonde_unchecked(&[F::rand(rng)], k);
-        let new_shard = fec::encode(&data, &encoding_mat)?.first().unwrap().clone();
-        shards.push(new_shard);
-
-        pb.inc(1);
-    }
-    pb.finish_with_message("done");
-
-    Ok(())
-}
-
 #[allow(clippy::too_many_arguments)]
-fn recoding<F, Fun>(
+fn run<F, Fun>(
     bytes: &[u8],
     k: usize,
     n: usize,
@@ -164,12 +120,6 @@ fn parse_hex_string(s: &str) -> Result<[u8; 32], String> {
     }
 }
 
-#[derive(ValueEnum, Clone)]
-enum TestCase {
-    EndToEnd,
-    Recoding,
-}
-
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -186,14 +136,11 @@ struct Cli {
     /// at each time step, shard $i$ will be used for recoding with probability $p$, otherwise, $j$
     /// will be used with probability $1 - p$
     #[arg(long)]
-    strategy: Option<String>,
+    strategy: String,
     /// something of the form `random-dynamic:<p>:<q>` where a proportion $q$ of the shards will be removed at
     /// each step with probability $p$
     #[arg(long)]
-    environment: Option<String>,
-
-    #[arg(long)]
-    test_case: TestCase,
+    environment: String,
 
     /// the number of measurements to repeat each case, larger values will reduce the variance of
     /// the measurements
@@ -233,47 +180,22 @@ fn main() {
             && (t - cli.measurement_schedule_start) % cli.measurement_schedule == 0
     };
 
-    match cli.test_case {
-        TestCase::EndToEnd => {
-            eprintln!("(k, 1)-re-encoding: k = {}, n = {}", cli.k, cli.n);
-            let _ = end_to_end::<ark_pallas::Fr, _>(
-                &bytes,
-                cli.k,
-                cli.n,
-                cli.t,
-                cli.nb_measurements,
-                measurement_schedule,
-                &mut rng,
-            );
-        }
-        TestCase::Recoding => {
-            if cli.strategy.is_none() {
-                eprintln!("recoding needs --strategy");
-                exit(1);
-            }
-            if cli.environment.is_none() {
-                eprintln!("recoding needs --environment");
-                exit(1);
-            }
+    let environment = Environment::from_str(&cli.environment).unwrap();
+    let strategy = Strategy::from_str(&cli.strategy).unwrap();
 
-            let environment = Environment::from_str(&cli.environment.unwrap()).unwrap();
-            let strategy = Strategy::from_str(&cli.strategy.unwrap()).unwrap();
-
-            eprintln!(
-                "k-recoding: k = {}, n = {}, strategy = {:?}, environment = {:?}",
-                cli.k, cli.n, strategy, environment,
-            );
-            let _ = recoding::<ark_pallas::Fr, _>(
-                &bytes,
-                cli.k,
-                cli.n,
-                cli.t,
-                strategy,
-                environment,
-                cli.nb_measurements,
-                measurement_schedule,
-                &mut rng,
-            );
-        }
-    }
+    eprintln!(
+        "k-recoding: k = {}, n = {}, strategy = {:?}, environment = {:?}",
+        cli.k, cli.n, strategy, environment,
+    );
+    let _ = run::<ark_pallas::Fr, _>(
+        &bytes,
+        cli.k,
+        cli.n,
+        cli.t,
+        strategy,
+        environment,
+        cli.nb_measurements,
+        measurement_schedule,
+        &mut rng,
+    );
 }
