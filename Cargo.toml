@@ -23,8 +23,6 @@ rand = "0.8.5"
 [workspace]
 members = [
     "benchmarks",
-    "bins/curves",
     "bins/inbreeding",
     "bins/rank",
-    "bins/rng",
 ]
