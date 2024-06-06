@@ -200,10 +200,12 @@ mod tests {
     use ark_ff::PrimeField;
 
     use crate::{
-        fec::{decode, encode, Shard},
+        fec::{decode, encode, recode_random, Shard},
         field,
         linalg::Matrix,
     };
+
+    use itertools::Itertools;
 
     use super::recode_with_coeffs;
 
@@ -215,59 +217,144 @@ mod tests {
         F::from_le_bytes_mod_order(&n.to_le_bytes())
     }
 
+    /// `contains_one_of(x, set)` is true iif `x` fully contains one of the lists from `set`
+    ///
+    /// > **Note**  
+    /// > see [`containment`] for some example
+    fn contains_one_of(x: &[usize], set: &[Vec<usize>]) -> bool {
+        set.iter().any(|y| y.iter().all(|z| x.contains(z)))
+    }
+
+    #[test]
+    fn containment() {
+        assert!(contains_one_of(&[1, 2, 3], &[vec![1, 2, 3]]));
+        assert!(contains_one_of(
+            &[3, 6, 8],
+            &[vec![2, 4, 6], vec![1, 3, 7], vec![6, 7, 8], vec![3, 6, 8]],
+        ));
+        assert!(!contains_one_of(
+            &[1, 6, 8],
+            &[vec![2, 4, 6], vec![1, 3, 7], vec![6, 7, 8], vec![3, 6, 8]],
+        ));
+        assert!(contains_one_of(
+            &[3, 6, 8, 9, 10],
+            &[vec![2, 4, 6], vec![1, 3, 7], vec![6, 7, 8], vec![3, 6, 8]],
+        ));
+    }
+
+    fn try_all_decoding_combinations<F: PrimeField>(
+        data: &[u8],
+        shards: &[Shard<F>],
+        k: usize,
+        test_case: &str,
+        limit: Option<usize>,
+        should_not_be_decodable: Vec<Vec<usize>>,
+    ) {
+        for c in shards
+            .iter()
+            .cloned()
+            .enumerate()
+            .combinations(k)
+            .take(limit.unwrap_or(usize::MAX))
+        {
+            let s = c.iter().map(|(_, s)| s).cloned().collect();
+            let is: Vec<usize> = c.iter().map(|(i, _)| i).cloned().collect();
+
+            let actual = decode::<F>(s);
+
+            if contains_one_of(&is, &should_not_be_decodable) {
+                assert!(
+                    actual.is_err(),
+                    "should not decode with {:?} {test_case}",
+                    is
+                );
+                continue;
+            }
+
+            assert!(actual.is_ok(), "could not decode with {:?} {test_case}", is);
+
+            assert_eq!(
+                data,
+                actual.unwrap(),
+                "bad decoded data with {:?} {test_case}",
+                is,
+            );
+        }
+    }
+
     fn end_to_end_template<F: PrimeField>(data: &[u8], k: usize, n: usize) {
         let mut rng = ark_std::test_rng();
-
         let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", data.len(), k, n);
-        assert_eq!(
-            data,
-            decode::<F>(encode(data, &Matrix::random(k, n, &mut rng)).unwrap()).unwrap(),
-            "{test_case}"
-        );
+
+        let shards = encode::<F>(data, &Matrix::random(k, n, &mut rng))
+            .unwrap_or_else(|_| panic!("could not encode {test_case}"));
+
+        try_all_decoding_combinations(data, &shards, k, &test_case, None, vec![]);
     }
 
-    /// k should be at least 5
     fn end_to_end_with_recoding_template<F: PrimeField>(data: &[u8], k: usize, n: usize) {
+        assert!(n >= 5, "n should be at least 5, found {}", n);
+
         let mut rng = ark_std::test_rng();
+        let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", data.len(), k, n);
 
-        let mut shards = encode(data, &Matrix::random(k, n, &mut rng)).unwrap();
-        shards[1] = shards[2].recode_with(to_curve(7), &shards[4], to_curve(6));
-        shards[2] = shards[1].recode_with(to_curve(5), &shards[3], to_curve(4));
-        assert_eq!(
-            data,
-            decode::<F>(shards).unwrap(),
-            "TEST | data: {} bytes, k: {}, n: {}",
-            data.len(),
-            k,
-            n
-        );
-    }
+        let mut shards = encode::<F>(data, &Matrix::random(k, n, &mut rng))
+            .unwrap_or_else(|_| panic!("could not encode {test_case}"));
 
-    // NOTE: this is part of an experiment, to be honest, to be able to see how
-    // much these tests could be refactored and simplified
-    fn run_template<F, Fun>(test: Fun)
-    where
-        F: PrimeField,
-        Fun: Fn(&[u8], usize, usize),
-    {
-        let bytes = bytes();
-        let (k, n) = (3, 5);
+        let recoding_steps = [
+            vec![2, 4],       // =  n
+            vec![1, 3],       // = (n + 1)
+            vec![n, (n + 1)], // = (n + 2) = ((2, 4), (1, 3))
+            vec![0],          // = (n + 3) = (0)
+            vec![(n + 3)],    // = (n + 4) = (0)
+        ];
+        let should_not_be_decodable = vec![
+            vec![2, 4, n],
+            vec![1, 3, (n + 1)],
+            vec![n, (n + 1), (n + 2)],
+            vec![1, 3, n, (n + 2)],
+            vec![2, 4, (n + 1), (n + 2)],
+            vec![1, 2, 3, 4, (n + 2)],
+            vec![0, (n + 3)],
+            vec![0, (n + 4)],
+            vec![(n + 3), (n + 4)],
+        ];
 
-        let modulus_byte_size = F::MODULUS_BIT_SIZE as usize / 8;
-        // NOTE: starting at `modulus_byte_size * (k - 1) + 1` to include at least _k_ elements
-        for b in (modulus_byte_size * (k - 1) + 1)..bytes.len() {
-            test(&bytes[..b], k, n);
+        for step in recoding_steps {
+            let shards_to_recode: Vec<_> = shards
+                .iter()
+                .cloned()
+                .enumerate()
+                .filter_map(|(i, s)| if step.contains(&i) { Some(s) } else { None })
+                .collect();
+            shards.push(recode_random(&shards_to_recode, &mut rng).unwrap().unwrap());
         }
+
+        try_all_decoding_combinations(data, &shards, k, &test_case, None, should_not_be_decodable);
     }
 
     #[test]
     fn end_to_end() {
-        run_template::<Fr, _>(end_to_end_template::<Fr>);
+        let bytes = bytes();
+
+        for k in [3, 5] {
+            for rho in [0.5, 0.33] {
+                let n = (k as f64 / rho) as usize;
+                end_to_end_template::<Fr>(&bytes, k, n);
+            }
+        }
     }
 
     #[test]
     fn end_to_end_with_recoding() {
-        run_template::<Fr, _>(end_to_end_with_recoding_template::<Fr>);
+        let bytes = bytes();
+
+        for k in [3, 5] {
+            for rho in [0.50, 0.33] {
+                let n = (k as f64 / rho) as usize;
+                end_to_end_with_recoding_template::<Fr>(&bytes, k, n);
+            }
+        }
     }
 
     fn create_fake_shard<F: PrimeField>(linear_combination: &[F], bytes: &[u8]) -> Shard<F> {

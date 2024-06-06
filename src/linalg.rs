@@ -667,6 +667,20 @@ mod tests {
     }
 
     #[test]
+    fn random() {
+        let mut rng = ark_std::test_rng();
+
+        for n in 0..10 {
+            for m in 0..10 {
+                let mat = Matrix::<Fr>::random(n, m, &mut rng);
+                assert_eq!(mat.elements.len(), n * m);
+                assert_eq!(mat.width, m);
+                assert_eq!(mat.height, n);
+            }
+        }
+    }
+
+    #[test]
     fn inverse() {
         let mut rng = ark_std::test_rng();
 
@@ -679,11 +693,12 @@ mod tests {
         assert_eq!(matrix.mul(&inverse).unwrap(), Matrix::<Fr>::identity(3));
         assert_eq!(inverse.mul(&matrix).unwrap(), Matrix::<Fr>::identity(3));
 
-        let n = 20;
-        let matrix = Matrix::random(n, n, &mut rng);
-        let inverse = matrix.invert().unwrap();
-        assert_eq!(matrix.mul(&inverse).unwrap(), Matrix::<Fr>::identity(n));
-        assert_eq!(inverse.mul(&matrix).unwrap(), Matrix::<Fr>::identity(n));
+        for n in 1..20 {
+            let matrix = Matrix::random(n, n, &mut rng);
+            let inverse = matrix.invert().unwrap();
+            assert_eq!(matrix.mul(&inverse).unwrap(), Matrix::<Fr>::identity(n));
+            assert_eq!(inverse.mul(&matrix).unwrap(), Matrix::<Fr>::identity(n));
+        }
 
         let inverse =
             Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![vec![1, 0, 0], vec![0, 1, 0]]))

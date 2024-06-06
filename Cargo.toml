@@ -26,3 +26,6 @@ members = [
     "bins/inbreeding",
     "bins/rank",
 ]
+
+[dev-dependencies]
+itertools = "0.13.0"
