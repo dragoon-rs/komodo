@@ -206,6 +206,7 @@ mod tests {
     };
 
     use itertools::Itertools;
+    use rand::seq::SliceRandom;
 
     use super::recode_with_coeffs;
 
@@ -437,6 +438,49 @@ mod tests {
                     should_not_decode,
                     &name,
                 );
+            }
+        }
+    }
+
+    //   (encode) | (select k) |     (recode)    | (decode)
+    //            *
+    // *          *            *     * ... *     * \
+    // *  ------> * ---------> * --> * ... * --> *  |--> ?
+    // *          *            *     * ... *     * /
+    //            *                  \__(#steps)_/
+    //
+    // k          n            k     k     k     k
+    fn long_full_end_to_end_with_recoding_template<F: PrimeField>(
+        data: &[u8],
+        k: usize,
+        n: usize,
+        nb_steps: usize,
+    ) {
+        let mut rng = ark_std::test_rng();
+        let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", data.len(), k, n,);
+
+        let mut shards = encode::<F>(data, &Matrix::random(k, n, &mut rng))
+            .unwrap_or_else(|_| panic!("could not encode {test_case}"));
+        shards.shuffle(&mut rng);
+        shards.truncate(k);
+
+        for _ in 0..nb_steps {
+            shards = (0..k)
+                .map(|_| recode_random(&shards, &mut rng).unwrap().unwrap())
+                .collect();
+        }
+
+        let actual = decode::<F>(shards).unwrap_or_else(|_| panic!("could not decode {test_case}"));
+        assert_eq!(data, actual, "bad decoded data with {test_case}",);
+    }
+
+    #[test]
+    fn long_full_end_to_end_with_recoding() {
+        let bytes = bytes();
+
+        for (k, n) in [(3, 5), (5, 5), (8, 10)] {
+            for nb_steps in [10, 20, 100] {
+                long_full_end_to_end_with_recoding_template::<Fr>(&bytes, k, n, nb_steps);
             }
         }
     }
