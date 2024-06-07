@@ -17,6 +17,6 @@ ark-secp256r1 = "0.4.0"
 ark-std = "0.4.0"
 ark-vesta = "0.4.0"
 clap = { version = "4.5.4", features = ["derive"] }
-komodo = { version = "0.2.0", path = ".." }
+komodo = { version = "0.3.0", path = ".." }
 plnk = { git = "https://gitlab.isae-supaero.fr/a.stevan/plnk", tag = "0.7.0", version = "0.7.0" }
 rand = "0.8.5"
