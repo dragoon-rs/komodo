@@ -1,6 +1,4 @@
-use ../.nushell binary [
-    "bytes decode", "bytes encode", "bytes from_int", "bytes to_int"
-]
+use ../.nushell binary [ "bytes from_int", "bytes to_int" ]
 
 use std assert
 
@@ -18,8 +16,4 @@ def main [] {
 
     let bytes = random-bytes 1_000
     assert equal ($bytes | bytes from_int | bytes to_int) $bytes
-
-    const input = "hello world!"
-    assert equal ($input | bytes encode) $hello_world_int
-    assert equal ($input | bytes encode | bytes decode) $input
 }

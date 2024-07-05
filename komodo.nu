@@ -150,7 +150,7 @@ export def "komodo prove" [
     }
 
     let type = $fec_params | describe --detailed | update columns { sort }
-    let expected = { type: record, lazy: false, columns: { k: int, n: int } }
+    let expected = { type: record, columns: { k: int, n: int } }
     if $type != $expected {
         error make {
             msg: $"(ansi red_bold)invalid `--fec-params`(ansi reset)",
