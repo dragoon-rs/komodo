@@ -8,8 +8,8 @@ use .nushell/formats.nu *
 
 ## atomic operations
 ```nushell
-cargo run --release --example bench_field_operations -- --nb-measurements 1000 out> field.ndjson
-cargo run --release --example bench_curve_group_operations -- --nb-measurements 1000 out> curve_group.ndjson
+cargo run --release --package benchmarks --bin field_operations -- --nb-measurements 1000 out> field.ndjson
+cargo run --release --package benchmarks --bin curve_group_operations -- --nb-measurements 1000 out> curve_group.ndjson
 ```
 ```nushell
 use .nushell/parse.nu read-atomic-ops
@@ -39,10 +39,11 @@ gplt multi_bar --title "complex curve group operations" -l "time (in ns)" (
 ## linear algebra
 ```nushell
 let sizes = seq 0 7 | each { 2 ** $in }
-cargo run --release --example bench_linalg -- --nb-measurements 10 ...$sizes out> linalg.ndjson
-    | save --force linalg.ndjson
+cargo run --release --package benchmarks --bin linalg -- --nb-measurements 10 ...$sizes out> linalg.ndjson
 ```
 ```nushell
+use .nushell/plot.nu [ "into-axis-options", COMMON_OPTIONS ]
+
 let linalg = open linalg.ndjson
     | ns-to-ms $.times
     | compute-stats $.times
@@ -53,24 +54,23 @@ let linalg = open linalg.ndjson
 for graph in [
     [op, title];
 
-    ["inverse", "time to inverse an nxn matrix on certain curves"],
-    ["transpose", "time to transpose an nxn matrix on certain curves"],
-    ["mul", "time to multiply two nxn matrices on certain curves"]
+    ["inverse", "time to inverse an $n \\times n$ matrix"],
+    ["transpose", "time to transpose an $n \\times n$ matrix"],
+    ["mul", "time to multiply two $n \\times n$ matrices"]
 ] {
+    let graphs = $linalg
+            | where op == $graph.op
+            | rename --column { n: "x", mean: "y", stddev: "e" }
+            | group-by name --to-table
+            | rename --column { group: "name", items: "points" }
     gplt plot ...[
         --title $graph.title
-        --x-label "size"
-        --y-label "time (in ms)"
-        --x-scale "log"
-        --y-scale "log"
-        (
-            $linalg
-                | where op == $graph.op
-                | rename --column { n: "x", mean: "y", stddev: "e" }
-                | group-by name --to-table
-                | rename --column { group: "name", items: "points" }
-                | to json
-        )
+        --x-label "n"
+        --use-tex
+        ($graphs | to json)
+        ...$COMMON_OPTIONS
+        ...($graphs.points | flatten | into-axis-options -x "plain" -y "duration")
+        --x-ticks-rotation 0
     ]
 }
 ```

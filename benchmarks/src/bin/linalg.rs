@@ -55,13 +55,16 @@ fn main() {
         inverse_template::<ark_bls12_381::Fr>(&b.with_name("BLS12-381"), n);
         inverse_template::<ark_bn254::Fr>(&b.with_name("BN254"), n);
         inverse_template::<ark_pallas::Fr>(&b.with_name("PALLAS"), n);
+        inverse_template::<benchmarks::fields::Fq128>(&b.with_name("small"), n);
 
         transpose_template::<ark_bls12_381::Fr>(&b.with_name("BLS12-381"), n);
         transpose_template::<ark_bn254::Fr>(&b.with_name("BN254"), n);
         transpose_template::<ark_pallas::Fr>(&b.with_name("PALLAS"), n);
+        transpose_template::<benchmarks::fields::Fq128>(&b.with_name("small"), n);
 
         mul_template::<ark_bls12_381::Fr>(&b.with_name("BLS12-381"), n);
         mul_template::<ark_bn254::Fr>(&b.with_name("BN254"), n);
         mul_template::<ark_pallas::Fr>(&b.with_name("PALLAS"), n);
+        mul_template::<benchmarks::fields::Fq128>(&b.with_name("small"), n);
     }
 }

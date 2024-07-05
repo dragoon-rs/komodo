@@ -93,4 +93,5 @@ fn main() {
     bench_template::<ark_bls12_381::Fr>(&bencher.with_name("BLS12-381"));
     bench_template::<ark_bn254::Fr>(&bencher.with_name("BN254"));
     bench_template::<ark_pallas::Fr>(&bencher.with_name("PALLAS"));
+    bench_template::<benchmarks::fields::Fq128>(&bencher.with_name("small"));
 }
