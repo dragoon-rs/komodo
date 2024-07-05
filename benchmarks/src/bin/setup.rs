@@ -160,6 +160,9 @@ enum Curve {
     BLS12381,
     BN254,
     Pallas,
+    EDOnMnt4298,
+    CP6782,
+    MNT4753,
     ARKBLS12381,
     ARKBN254,
 }
@@ -214,6 +217,27 @@ fn main() {
                     &cli.degrees,
                     cli.nb_measurements,
                     "BLS12-381",
+                );
+            }
+            Curve::EDOnMnt4298 => {
+                setup::<ark_ed_on_mnt4_298::Fr, ark_ed_on_mnt4_298::EdwardsProjective>(
+                    &cli.degrees,
+                    cli.nb_measurements,
+                    "ED-MNT4-298",
+                );
+            }
+            Curve::CP6782 => {
+                setup::<ark_cp6_782::Fr, ark_cp6_782::G1Projective>(
+                    &cli.degrees,
+                    cli.nb_measurements,
+                    "CP6-782",
+                );
+            }
+            Curve::MNT4753 => {
+                setup::<ark_mnt4_753::Fr, ark_mnt4_753::G1Projective>(
+                    &cli.degrees,
+                    cli.nb_measurements,
+                    "MNT4-753",
                 );
             }
         }

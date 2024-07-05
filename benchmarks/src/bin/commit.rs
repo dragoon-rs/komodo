@@ -115,6 +115,9 @@ enum Curve {
     SECP256K1,
     SECP256R1,
     Vesta,
+    EDOnMnt4298,
+    CP6782,
+    MNT4753,
 }
 
 #[derive(Parser)]
@@ -211,6 +214,33 @@ fn main() {
                     cli.nb_measurements,
                     G1 = Projective,
                     name = "VESTA"
+                )
+            }
+            Curve::EDOnMnt4298 => {
+                measure!(
+                    ark_ed_on_mnt4_298,
+                    degrees,
+                    cli.nb_measurements,
+                    G1 = EdwardsProjective,
+                    name = "ED-MNT4-298"
+                )
+            }
+            Curve::CP6782 => {
+                measure!(
+                    ark_cp6_782,
+                    degrees,
+                    cli.nb_measurements,
+                    G1 = G1Projective,
+                    name = "CP6-782"
+                )
+            }
+            Curve::MNT4753 => {
+                measure!(
+                    ark_mnt4_753,
+                    degrees,
+                    cli.nb_measurements,
+                    G1 = G1Projective,
+                    name = "MNT4-753"
                 )
             }
         }
