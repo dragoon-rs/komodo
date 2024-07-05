@@ -56,15 +56,24 @@ fn main() {
         inverse_template::<ark_bn254::Fr>(&b.with_name("BN254"), n);
         inverse_template::<ark_pallas::Fr>(&b.with_name("PALLAS"), n);
         inverse_template::<benchmarks::fields::Fq128>(&b.with_name("small"), n);
+        inverse_template::<ark_ed_on_mnt4_298::Fr>(&b.with_name("ED-MNT4-298"), n);
+        inverse_template::<ark_cp6_782::Fr>(&b.with_name("CP6-782"), n);
+        inverse_template::<ark_mnt4_753::Fr>(&b.with_name("MNT4-753"), n);
 
         transpose_template::<ark_bls12_381::Fr>(&b.with_name("BLS12-381"), n);
         transpose_template::<ark_bn254::Fr>(&b.with_name("BN254"), n);
         transpose_template::<ark_pallas::Fr>(&b.with_name("PALLAS"), n);
         transpose_template::<benchmarks::fields::Fq128>(&b.with_name("small"), n);
+        transpose_template::<ark_ed_on_mnt4_298::Fr>(&b.with_name("ED-MNT4-298"), n);
+        transpose_template::<ark_cp6_782::Fr>(&b.with_name("CP6-782"), n);
+        transpose_template::<ark_mnt4_753::Fr>(&b.with_name("MNT4-753"), n);
 
         mul_template::<ark_bls12_381::Fr>(&b.with_name("BLS12-381"), n);
         mul_template::<ark_bn254::Fr>(&b.with_name("BN254"), n);
         mul_template::<ark_pallas::Fr>(&b.with_name("PALLAS"), n);
         mul_template::<benchmarks::fields::Fq128>(&b.with_name("small"), n);
+        mul_template::<ark_ed_on_mnt4_298::Fr>(&b.with_name("ED-MNT4-298"), n);
+        mul_template::<ark_cp6_782::Fr>(&b.with_name("CP6-782"), n);
+        mul_template::<ark_mnt4_753::Fr>(&b.with_name("MNT4-753"), n);
     }
 }
