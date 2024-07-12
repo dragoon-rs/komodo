@@ -7,7 +7,7 @@ use ../komodo.nu [
     "komodo reconstruct",
     "komodo ls",
 ]
-use ../.nushell binary [ "bytes from_int" ]
+use ../nu-utils binary [ "bytes from_int" ]
 
 use std assert
 

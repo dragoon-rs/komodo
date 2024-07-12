@@ -7,3 +7,4 @@ export module fs.nu
 export module math.nu
 export module parse.nu
 export module plot.nu
+export module log.nu

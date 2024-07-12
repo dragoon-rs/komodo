@@ -1,4 +1,4 @@
-use ../.nushell color [
+use ../nu-utils color [
     "color from-floats",
     "color from-ints",
     "color from-string",

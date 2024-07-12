@@ -1,12 +1,19 @@
-use ../../../.nushell math *
-use ../../../.nushell plot [ into-axis-options, COMMON_OPTIONS ]
-use ../../../.nushell fs check-file
-use ../../../.nushell plot gplt
+use ../../../nu-utils math *
+use ../../../nu-utils plot [ into-axis-options, COMMON_OPTIONS ]
+use ../../../nu-utils fs check-file
+use ../../../nu-utils plot gplt
 
-export def encoding [data: path, --save: path] {
+use std formats *
+
+# plot the "encoding" benchmark results
+export def encoding [
+    data: path, # where to load the data from
+    --save: path, # an optional path where to save the figure (defaults to showing the figure interactively)
+] {
     check-file $data --span (metadata $data).span
 
-    let graphs = open $data
+    let graphs = open --raw $data
+        | from ndjson
         | update label { from json }
         | flatten label
         | ns-to-ms times
@@ -30,10 +37,15 @@ export def encoding [data: path, --save: path] {
     gplt plot ($graphs | to json) ...($options | flatten | compact)
 }
 
-export def decoding [data: path, --save: path] {
+# plot the "decoding" benchmark results
+export def decoding [
+    data: path, # where to load the data from
+    --save: path, # an optional path where to save the figure (defaults to showing the figure interactively)
+] {
     check-file $data --span (metadata $data).span
 
-    let graphs = open $data
+    let graphs = open --raw $data
+        | from ndjson
         | update label { from json }
         | flatten label
         | ns-to-ms times
@@ -58,10 +70,15 @@ export def decoding [data: path, --save: path] {
     gplt plot ($graphs | to json) ...($options | flatten | compact)
 }
 
-export def e2e [data: path, --save: path] {
+# plot the "end to end" benchmark results, i.e. a $k$-decoding and a $1$-encoding
+export def e2e [
+    data: path, # where to load the data from
+    --save: path, # an optional path where to save the figure (defaults to showing the figure interactively)
+] {
     check-file $data --span (metadata $data).span
 
-    let graphs = open $data
+    let graphs = open --raw $data
+        | from ndjson
         | update label { from json }
         | flatten label
         | insert foo { $"($in.name) / ($in.k) / ($in.bytes)" }
@@ -96,11 +113,17 @@ export def e2e [data: path, --save: path] {
     gplt plot ($graphs | to json) ...($options | flatten | compact)
 }
 
-export def combined [data: path, --recoding: path, --save: path] {
+# plot the "combined" benchmark results, i.e. the "end to end" and "recoding" plots on the same figure
+export def combined [
+    data: path, # where to load the "fec" data from
+    --recoding: path,  # where to load the "recoding" data from
+    --save: path, # an optional path where to save the figure (defaults to showing the figure interactively)
+] {
     check-file $data --span (metadata $data).span
     check-file $recoding --span (metadata $recoding).span
 
-    let recoding_graphs = open $recoding
+    let recoding_graphs = open --raw $recoding
+        | from ndjson
         | ns-to-ms $.times
         | compute-stats $.times
         | update label { from nuon }
@@ -124,7 +147,8 @@ export def combined [data: path, --recoding: path, --save: path] {
         | rename --column { group: "name", items: "points" }
         | update name { $"$k = ($in)$" }
 
-    let re_encoding_graphs = open $data
+    let re_encoding_graphs = open --raw $data
+        | from ndjson
         | update label { from json }
         | flatten label
         | insert key { $"($in.name) / ($in.k) / ($in.bytes)" }
@@ -199,11 +223,17 @@ export def combined [data: path, --recoding: path, --save: path] {
     gplt plot ($graphs | to json) ...($options | flatten | compact)
 }
 
-export def ratio [data: path, --recoding: path, --save: path] {
+# plot the "ratio" benchmark results, i.e. the ratio between "end to end" and "recoding"
+export def ratio [
+    data: path, # where to load the "fec" data from
+    --recoding: path,  # where to load the "recoding" data from
+    --save: path, # an optional path where to save the figure (defaults to showing the figure interactively)
+] {
     check-file $data --span (metadata $data).span
     check-file $recoding --span (metadata $recoding).span
 
-    let recoding_graphs = open $recoding
+    let recoding_graphs = open --raw $recoding
+        | from ndjson
         | ns-to-ms times
         | compute-stats $.times
         | update label { from nuon }
@@ -212,7 +242,8 @@ export def ratio [data: path, --recoding: path, --save: path] {
         | select shards bytes mean
         | rename --column { shards: "k" }
 
-    let re_encoding_graphs = open $data
+    let re_encoding_graphs = open --raw $data
+        | from ndjson
         | update label { from json }
         | flatten label
         | insert key { $"($in.name) / ($in.k) / ($in.bytes)" }

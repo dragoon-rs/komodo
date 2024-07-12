@@ -1,4 +1,4 @@
-use ../.nushell binary [ "bytes from_int", "bytes to_int" ]
+use ../nu-utils binary [ "bytes from_int", "bytes to_int" ]
 
 use std assert
 

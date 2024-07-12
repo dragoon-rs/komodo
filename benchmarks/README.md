@@ -39,108 +39,43 @@ gplt multi_bar --title "complex curve group operations" -l "time (in ns)" (
 ## linear algebra
 ```nushell
 let sizes = seq 0 7 | each { 2 ** $in }
-cargo run --release --package benchmarks --bin linalg -- --nb-measurements 10 ...$sizes out> linalg.ndjson
-```
-```nushell
-use .nushell/plot.nu [ "into-axis-options", COMMON_OPTIONS ]
 
-let linalg = open linalg.ndjson
-    | ns-to-ms $.times
-    | compute-stats $.times
-    | update label { parse "{op} {n}"}
-    | flatten --all label
-    | into int n
+let out_linalg = $sizes | benchmarks linalg run
 
-for graph in [
-    [op, title];
-
-    ["inverse", "time to inverse an $n \\times n$ matrix"],
-    ["transpose", "time to transpose an $n \\times n$ matrix"],
-    ["mul", "time to multiply two $n \\times n$ matrices"]
-] {
-    let graphs = $linalg
-            | where op == $graph.op
-            | rename --column { n: "x", mean: "y", stddev: "e" }
-            | group-by name --to-table
-            | rename --column { group: "name", items: "points" }
-            | insert style.color {|it|
-                match $it.name {
-                    "BLS12-381" => "tab:blue"
-                    "PALLAS" => "tab:green"
-                    "BN254" => "tab:orange"
-                    "CP6-782" => "tab:olive"
-                    "ED-MNT4-298" => "tab:pink"
-                    "MNT4-753" => "tab:red"
-                    _ => "tab:grey"
-                }
-            }
-            | insert style.line.marker.shape {|it|
-                match $it.name {
-                    "BLS12-381" => "s"
-                    "PALLAS" => "o"
-                    "BN254" => "^"
-                    "CP6-782" => "*"
-                    "ED-MNT4-298" => "X"
-                    "MNT4-753" => "d"
-                    _ => null
-                }
-            }
-            | insert style.line.marker.size { 10 }
-    gplt plot ...[
-        --title $graph.title
-        --x-label "n"
-        --use-tex
-        ($graphs | to json)
-        ...$COMMON_OPTIONS
-        ...($graphs.points | flatten | into-axis-options -x "plain" -y "duration")
-        --x-ticks-rotation 0
-    ]
-}
+benchmarks linalg plot $out_linalg inverse
 ```
 
-## trusted setup
+## trusted setup and commit
 ```nushell
-use .nushell/setup/run.nu; seq 0 13 | each { 2 ** $in } | run --output setup.ndjson --curves [ bls12381, pallas, bn254 ]
-```
-```nushell
-use ./.nushell/setup/plot.nu; plot setup.ndjson
-```
+let degrees = seq 0 13 | each { 2 ** $in }
+let curves = [ bls12381, pallas, bn254 ]
 
-## commit
-```nushell
-use .nushell/commit/run.nu; seq 0 13 | each { 2 ** $in } | run --output commit.ndjson --curves [bls12381, pallas, bn254 ]
-```
-```nushell
-use ./.nushell/commit/plot.nu; plot commit.ndjson
+let out_setup = $degrees | benchmarks setup run --curves $curves
+let out_commit = $degrees | benchmarks commit run --curves $curves
+
+benchmarks setup plot $out_setup
+benchmarks commit plot $out_commit
 ```
 
 ## end-to-end benchmarks
-### recoding
 ```nushell
-use .nushell/recoding/run.nu
-seq 0 18 | each { 512 * 2 ** $in } | run --ks [2, 4, 8, 16] --output recoding.ndjson --curves [ bls12381 ]
-```
-```nushell
-use ./.nushell/recoding/plot.nu; plot recoding.ndjson
+let sizes = seq 0 18 | each { 512 * 2 ** $in }
+let ks = [2, 4, 8, 16]
+let curves = [ bls12381 ]
 ```
 
-### FEC
+### run
 ```nushell
-use .nushell/fec/run.nu
-seq 0 18 | each { 512 * 2 ** $in } | run --ks [2, 4, 8, 16] --output fec.ndjson --curves [ bls12381 ]
-```
-```nushell
-use ./.nushell/fec/plot.nu; plot encoding fec.ndjson
-use ./.nushell/fec/plot.nu; plot decoding fec.ndjson
-use ./.nushell/fec/plot.nu; plot e2e fec.ndjson
+let out_recoding = $sizes | benchmarks recoding run --ks $ks --curves $curves
+let out_fec = $sizes | benchmarks fec run --ks $ks --curves $curves
 ```
 
-## combined graph
+### plot
 ```nushell
-use ./.nushell/fec/plot.nu; plot combined fec.ndjson --recoding recoding.ndjson
-```
-
-## ratio graph
-```nushell
-use ./.nushell/fec/plot.nu; plot ratio fec.ndjson --recoding recoding.ndjson
+benchmarks recoding plot $out_recoding
+benchmarks fec plot encoding $out_fec
+benchmarks fec plot decoding $out_fec
+benchmarks fec plot e2e $out_fec
+benchmarks fec plot combined $out_fec --recoding $out_recoding
+benchmarks fec plot ratio $out_fec --recoding $out_recoding
 ```

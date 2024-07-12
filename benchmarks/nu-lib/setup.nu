@@ -1,11 +1,61 @@
-use ../../../.nushell math *
-use ../../../.nushell fs check-file
-use ../../../.nushell plot [ into-axis-options, COMMON_OPTIONS, gplt ]
+use ../../nu-utils log
+use ../../nu-utils math *
+use ../../nu-utils fs check-file
+use ../../nu-utils plot [ into-axis-options, COMMON_OPTIONS, gplt ]
 
-export def main [data: path, --save: path] {
+use std formats *
+
+# run the "trusted setup" benchmarks
+#
+# - input: the list of polynomial degrees
+# - output: the output path, as NDJSON
+export def run [
+    --output: path, # the output path (defaults to a random file in $nu.temp-path)
+    --curves: list<string>, # the curves to benchmark
+    --force, # does not ask for confirmation if the output file already exists, it will be overwritten
+    --nb-measurements: int = 10, # the number of measurements per benchmark run
+]: list<int> -> path {
+    let input = $in
+
+    if ($input | is-empty) or ($curves | is-empty) {
+        print "nothing to do"
+        return
+    }
+
+    let new_file = $output == null
+    let output = $output | default (mktemp --tmpdir komodo_setup.XXXXXX)
+    let pretty_output = $"(ansi purple)($output)(ansi reset)"
+    if ($output | path exists) and not $new_file {
+        log warning $"($pretty_output) already exists"
+        if not $force {
+            let res = ["no", "yes"] | input list $"Do you want to overwrite ($pretty_output)?"
+            if $res == null or $res == "no" {
+                log info "aborting"
+                return
+            }
+
+        }
+    }
+
+    cargo run --release --package benchmarks --bin setup -- ...[
+        --nb-measurements $nb_measurements
+        ...$input
+        --curves ...$curves
+    ] out> $output
+
+    log info $"results saved to ($pretty_output)"
+    $output
+}
+
+# plot the "trusted setup" benchmark results
+export def plot [
+    data: path, # where to load the data from
+    --save: path, # an optional path where to save the figure (defaults to showing the figure interactively)
+] {
     check-file $data --span (metadata $data).span
 
-    let raw = open $data
+    let raw = open --raw $data
+        | from ndjson
         | ns-to-ms times
         | compute-stats times
         | insert degree { get label | parse "degree {d}" | into record | get d | into int }
