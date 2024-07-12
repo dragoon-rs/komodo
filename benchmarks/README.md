@@ -63,6 +63,29 @@ for graph in [
             | rename --column { n: "x", mean: "y", stddev: "e" }
             | group-by name --to-table
             | rename --column { group: "name", items: "points" }
+            | insert style.color {|it|
+                match $it.name {
+                    "BLS12-381" => "tab:blue"
+                    "PALLAS" => "tab:green"
+                    "BN254" => "tab:orange"
+                    "CP6-782" => "tab:olive"
+                    "ED-MNT4-298" => "tab:pink"
+                    "MNT4-753" => "tab:red"
+                    _ => "tab:grey"
+                }
+            }
+            | insert style.line.marker.shape {|it|
+                match $it.name {
+                    "BLS12-381" => "s"
+                    "PALLAS" => "o"
+                    "BN254" => "^"
+                    "CP6-782" => "*"
+                    "ED-MNT4-298" => "X"
+                    "MNT4-753" => "d"
+                    _ => null
+                }
+            }
+            | insert style.line.marker.size { 10 }
     gplt plot ...[
         --title $graph.title
         --x-label "n"
