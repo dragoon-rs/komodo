@@ -1,4 +1,4 @@
-//! a module to encode, recode and decode shards of data with FEC methods
+//! a module to encode, recode and decode shards of data with FEC methods.
 
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -8,24 +8,34 @@ use rs_merkle::{algorithms::Sha256, Hasher};
 
 use crate::{error::KomodoError, field, linalg::Matrix};
 
-/// representation of a FEC shard of data
-///
-/// - `k` is the code parameter, required to decode
-/// - the _linear combination_ tells the decoded how the shard was constructed,
-///   with respect to the original source shards => this effectively allows
-///   support for _recoding_
-/// - the hash and the size represent the original data
+/// representation of a FEC shard of data.
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Shard<F: PrimeField> {
+    /// the code parameter, required to decode
     pub k: u32,
+    /// tells the decoder how the shard was constructed with respect to the original source shards
+    ///
+    /// this effectively allows support for _recoding_.
+    ///
+    /// If we denote the $k$ source shards by $(s_i)_{0 \le i \lt k}$, the linear combination by $k$
+    /// coefficients $(\alpha_i)_{0 \le i \lt k}$ and $s$ the shard itself, then
+    ///
+    /// $$ s = \sum\limits_{i = 0}^{k - 1} \alpha_i s_i$$
     pub linear_combination: Vec<F>,
+    /// the hash of the original data, used for validation
     pub hash: Vec<u8>,
+    /// the shard itself
     pub data: Vec<F>,
+    /// the size of the original data, used for padding
     pub size: usize,
 }
 
 impl<F: PrimeField> Shard<F> {
     /// compute the linear combination between two [`Shard`]s
+    ///
+    /// if we denote the [`Shard`] itself and the other [`Shard`] by $s$ and $o$ respectively, the
+    /// output is
+    /// $$ \alpha s + \beta o $$
     pub fn recode_with(&self, alpha: F, other: &Self, beta: F) -> Self {
         if alpha.is_zero() {
             return other.clone();
@@ -56,10 +66,16 @@ impl<F: PrimeField> Shard<F> {
 /// compute the linear combination between an arbitrary number of [`Shard`]s
 ///
 /// > **Note**
+/// >
 /// > this is basically a multi-[`Shard`] wrapper around [`Shard::recode_with`]
 /// >
-/// > returns [`None`] if number of shards is not the same as the number of
+/// > returns [`None`] if the number of shards is not the same as the number of
 /// > coefficients or if no shards are provided.
+///
+/// if the shards are the $(s_i)_{1 \le i \le n}$ and the coefficients the
+/// $(\alpha_i)_{0 \le i \le n}$, then the output will be
+///
+/// $$ \sum\limits_{i = 1}^{n} \alpha_i s_i$$
 pub fn recode_with_coeffs<F: PrimeField>(shards: &[Shard<F>], coeffs: &[F]) -> Option<Shard<F>> {
     if shards.len() != coeffs.len() {
         return None;
@@ -86,6 +102,7 @@ pub fn recode_with_coeffs<F: PrimeField>(shards: &[Shard<F>], coeffs: &[F]) -> O
 /// same or the hash of the data is different, an error will be returned.
 ///
 /// > **Note**
+/// >
 /// > this is a wrapper around [`recode_with_coeffs`].
 pub fn recode_random<F: PrimeField>(
     shards: &[Shard<F>],
@@ -119,8 +136,12 @@ pub fn recode_random<F: PrimeField>(
 /// applies a given encoding matrix to some data to generate encoded shards
 ///
 /// > **Note**
+/// >
 /// > the input data and the encoding matrix should have compatible shapes,
 /// > otherwise, an error might be thrown to the caller.
+///
+/// Padding might be applied depending on the size of the data compared to the size of the encoding
+/// matrix.
 pub fn encode<F: PrimeField>(
     data: &[u8],
     encoding_mat: &Matrix<F>,
@@ -152,10 +173,10 @@ pub fn encode<F: PrimeField>(
         .collect())
 }
 
-/// reconstruct the original data from a set of encoded, possibly recoded,
-/// shards
+/// reconstruct the original data from a set of encoded, possibly recoded, shards
 ///
 /// > **Note**
+/// >
 /// > this function might fail in a variety of cases
 /// > - if there are too few shards
 /// > - if there are linear dependencies between shards
@@ -224,6 +245,7 @@ mod tests {
     /// `contains_one_of(x, set)` is true iif `x` fully contains one of the lists from `set`
     ///
     /// > **Note**  
+    /// >
     /// > see [`containment`] for some example
     fn contains_one_of(x: &[usize], set: &[Vec<usize>]) -> bool {
         set.iter().any(|y| y.iter().all(|z| x.contains(z)))

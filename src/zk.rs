@@ -158,8 +158,8 @@ where
     Ok(commits)
 }
 
-// compute the number of elements that a _trusted setup_ should have for data of
-// a certain expected size
+/// compute the number of elements that a _trusted setup_ should have for data of
+/// a certain expected size
 pub fn nb_elements_in_setup<F: PrimeField>(nb_bytes: usize) -> usize {
     let bytes_per_element = (F::MODULUS_BIT_SIZE as usize) / 8;
     nb_bytes / bytes_per_element
