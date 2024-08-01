@@ -1,5 +1,5 @@
-use ../../../nu-utils log
-use ../../../nu-utils formats *
+use ../utils log
+use ../utils formats *
 
 use std formats *
 

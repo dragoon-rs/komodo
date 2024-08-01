@@ -1,33 +1,32 @@
 # Komodo: Cryptographically-proven Erasure Coding
 
-## Usage
-Komodo can either be used as a library or as a binary application.
-
 ## the library
-see `cargo doc`
+see `cargo doc` or [the library itself](src/)
 
-## the binary application
-below is an example of how to use the binary application with Nushell:
-```bash
-./examples/cli.nu
+## the tests
+```shell
+make
+```
+or
+```shell
+make check clippy test-rs
 ```
 
-> **Note**  
-> requires Nushell 0.95.0 or later
+### some extra tests
+this project defines some tests written in [Nushell](https://www.nushell.sh/) to test an
+[implementation of Komodo in a CLI application](bins/saclin/).
 
-tests for the binary application can also be run with
-```bash
-nu tests/cli.nu
+If you have [Nushell installed](https://www.nushell.sh/book/installation.html), you can run these
+with the following command:
+```shell
+make test-nu
 ```
 
-## other binaries
-Komodo provides a bunch of other binaries that might be interesting of useful to use.
-
-The easiest is to use the `cargo.nu` Nushell module as follows
-```bash
-use nu-utils cargo "cargo bin"
-help cargo bin
+## examples
+A [CLI example](bins/saclin/examples/cli.nu) is also provided and can be run with
+```shell
+make example
 ```
 
 ## the benchmarks
-see [the `README`](benchmarks/README.md)
+see [`benchmarks/`](benchmarks/README.md)

@@ -1,6 +1,6 @@
-.PHONY: fmt fmt-check check clippy test example show build-examples
+.PHONY: fmt fmt-check check clippy test-rs test-nu test example show build-examples
 
-DEFAULT_GOAL: fmt-check check clippy test
+DEFAULT_GOAL: fmt-check check clippy test-rs
 
 fmt-check:
 	cargo fmt --all -- --check
@@ -14,15 +14,18 @@ check:
 clippy:
 	cargo clippy --workspace --all-targets -- -D warnings
 
-test:
+test-rs:
 	cargo test --workspace --verbose
 	cargo test --examples --verbose
-	nu tests/cli.nu
-	nu tests/binary.nu
-	nu tests/color.nu
+
+test-nu:
+	nu bins/saclin/tests/cli.nu
+	nu bins/saclin/tests/binary.nu
+
+test: test-rs test-nu
 
 example:
-	nu examples/cli.nu
+	nu bins/saclin/examples/cli.nu
 
 show:
 	rustup --version

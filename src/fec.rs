@@ -235,7 +235,7 @@ mod tests {
     type LCExclusion = Vec<usize>;
 
     fn bytes() -> Vec<u8> {
-        include_bytes!("../tests/dragoon_32x32.png").to_vec()
+        include_bytes!("../assets/dragoon_32x32.png").to_vec()
     }
 
     fn to_curve<F: PrimeField>(n: u128) -> F {

@@ -206,7 +206,7 @@ mod tests {
     use super::{build, prove, recode, verify};
 
     fn bytes() -> Vec<u8> {
-        include_bytes!("../tests/dragoon_133x133.png").to_vec()
+        include_bytes!("../assets/dragoon_133x133.png").to_vec()
     }
 
     macro_rules! full {

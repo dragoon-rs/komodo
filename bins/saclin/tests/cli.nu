@@ -1,13 +1,13 @@
-use ../komodo.nu [
-    "komodo build",
-    "komodo setup",
-    "komodo prove",
-    "komodo verify",
-    "komodo reconstruct",
-    "komodo ls",
-    "komodo clean",
+use .. [
+    "saclin build",
+    "saclin setup",
+    "saclin prove",
+    "saclin verify",
+    "saclin reconstruct",
+    "saclin ls",
+    "saclin clean",
 ]
-use ../nu-utils binary [ "bytes from_int" ]
+use ../binary.nu [ "bytes from_int" ]
 
 use std assert
 
@@ -120,12 +120,12 @@ module math {
 
 use math
 
-const FILE = "tests/dragoon_32x32.png"
+const FILE = "assets/dragoon_32x32.png"
 const FEC_PARAMS = {k: 3, n: 5}
 
 def test [blocks: list<int>, --fail] {
     let actual = try {
-        komodo reconstruct ...(komodo ls)
+        saclin reconstruct ...(saclin ls)
     } catch {
         if not $fail {
             error make --unspanned { msg: "woopsie" }
@@ -139,14 +139,14 @@ def test [blocks: list<int>, --fail] {
 }
 
 def main [] {
-    komodo build
+    saclin build
 
-    komodo clean
+    saclin clean
 
-    komodo setup (open $FILE | into binary | bytes length)
-    komodo prove $FILE --fec-params $FEC_PARAMS
+    saclin setup (open $FILE | into binary | bytes length)
+    saclin prove $FILE --fec-params $FEC_PARAMS
 
-    komodo verify ...(komodo ls)
+    saclin verify ...(saclin ls)
 
     let all_k_choose_n_permutations = seq 1 $FEC_PARAMS.n
         | each {|ki|

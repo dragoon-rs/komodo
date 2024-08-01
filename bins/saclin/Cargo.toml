@@ -1,5 +1,5 @@
 [package]
-name = "komodo"
+name = "saclin"
 version = "0.3.0"
 edition = "2021"
 
@@ -7,24 +7,13 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.81"
+ark-bls12-381 = "0.4.0"
 ark-ec = "0.4.2"
 ark-ff = "0.4.2"
 ark-poly = "0.4.2"
 ark-serialize = "0.4.2"
 ark-std = "0.4.0"
-rs_merkle = "1.4.1"
-thiserror = "1.0.50"
+komodo = { path = "../../" }
+rand = "0.8.5"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.17"
-
-[workspace]
-members = [
-    "benchmarks",
-    "bins/rank",
-    "bins/saclin",
-]
-
-[dev-dependencies]
-ark-bls12-381 = "0.4.0"
-itertools = "0.13.0"
-rand = "0.8.5"

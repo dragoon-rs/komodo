@@ -42,7 +42,7 @@ mod tests {
     use crate::field::{self, merge_elements_into_bytes};
 
     fn bytes() -> Vec<u8> {
-        include_bytes!("../tests/dragoon_32x32.png").to_vec()
+        include_bytes!("../assets/dragoon_32x32.png").to_vec()
     }
 
     fn split_data_template<F: PrimeField>(

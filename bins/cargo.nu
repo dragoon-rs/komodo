@@ -1,5 +1,20 @@
 use std log
-use error.nu "error throw"
+
+def "error throw" [err: record<
+    err: string,
+    label: string,
+    span: record<start: int, end: int>,
+    # help: string?,
+>] {
+    error make {
+        msg: $"(ansi red_bold)($err.err)(ansi reset)",
+        label: {
+            text: $err.label,
+            span: $err.span,
+        },
+        help: $err.help?,
+    }
+}
 
 def get-workspace-bins []: nothing -> table<name: string, toml: path> {
     open Cargo.toml

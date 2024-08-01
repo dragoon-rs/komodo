@@ -1,7 +1,7 @@
-use ../../../nu-utils math *
-use ../../../nu-utils plot [ into-axis-options, COMMON_OPTIONS ]
-use ../../../nu-utils fs check-file
-use ../../../nu-utils plot gplt
+use ../utils math *
+use ../utils plot [ into-axis-options, COMMON_OPTIONS ]
+use ../utils fs check-file
+use ../utils plot gplt
 
 use std formats *
 
