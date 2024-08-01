@@ -13,7 +13,7 @@ use anyhow::Result;
 use rs_merkle::{algorithms::Sha256, Hasher};
 use tracing::info;
 
-use crate::Block;
+use crate::semi_avid::Block;
 
 /// dump any serializable object to the disk
 ///
