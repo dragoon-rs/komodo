@@ -5,6 +5,11 @@ use ark_poly::DenseUVPolynomial;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{end_timer, ops::Div, rand::RngCore, start_timer};
 
+#[cfg(feature = "kzg")]
+use ark_ec::pairing::Pairing;
+#[cfg(feature = "kzg")]
+use ark_poly_commit::kzg10;
+
 use crate::error::KomodoError;
 
 /// the representation of a ZK trusted setup
@@ -163,6 +168,36 @@ where
 pub fn nb_elements_in_setup<F: PrimeField>(nb_bytes: usize) -> usize {
     let bytes_per_element = (F::MODULUS_BIT_SIZE as usize) / 8;
     nb_bytes / bytes_per_element
+}
+
+/// Specializes the public parameters for a given maximum degree `d` for polynomials
+/// `d` should be less that `pp.max_degree()`.
+///
+/// > see [`ark-poly-commit::kzg10::tests::KZG10`](https://gitlab.isae-supaero.fr/a.stevan/poly-commit/-/blob/19fc0d4ad2bcff7df030c952d09649918dba7ddb/src/kzg10/mod.rs#L513-L538)
+#[cfg(feature = "kzg")]
+pub fn trim<E: Pairing>(
+    pp: kzg10::UniversalParams<E>,
+    supported_degree: usize,
+) -> (kzg10::Powers<'static, E>, kzg10::VerifierKey<E>) {
+    let powers_of_g = pp.powers_of_g[..=supported_degree].to_vec();
+    let powers_of_gamma_g = (0..=supported_degree)
+        .map(|i| pp.powers_of_gamma_g[&i])
+        .collect();
+
+    let powers = kzg10::Powers {
+        powers_of_g: ark_std::borrow::Cow::Owned(powers_of_g),
+        powers_of_gamma_g: ark_std::borrow::Cow::Owned(powers_of_gamma_g),
+    };
+    let vk = kzg10::VerifierKey {
+        g: pp.powers_of_g[0],
+        gamma_g: pp.powers_of_gamma_g[&0],
+        h: pp.h,
+        beta_h: pp.beta_h,
+        prepared_h: pp.prepared_h.clone(),
+        prepared_beta_h: pp.prepared_beta_h.clone(),
+    };
+
+    (powers, vk)
 }
 
 #[cfg(test)]

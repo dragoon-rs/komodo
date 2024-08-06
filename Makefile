@@ -9,13 +9,13 @@ fmt:
 	cargo fmt --all
 
 check:
-	cargo check --workspace --all-targets
+	cargo check --workspace --all-targets --all-features
 
 clippy:
-	cargo clippy --workspace --all-targets -- -D warnings
+	cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 test-rs:
-	cargo test --workspace --verbose
+	cargo test --workspace --verbose --all-features
 	cargo test --examples --verbose
 
 test-nu:
