@@ -211,7 +211,9 @@ mod tests {
     use ark_std::test_rng;
     use std::ops::{Div, Mul};
 
-    use crate::{conversions::u32_to_u8_vec, fec::encode, field, linalg::Matrix, zk::trim};
+    use crate::{
+        algebra, algebra::linalg::Matrix, conversions::u32_to_u8_vec, fec::encode, zk::trim,
+    };
 
     type UniPoly381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;
 
@@ -237,7 +239,7 @@ mod tests {
         let params = KZG10::<E, P>::setup(degree, false, rng)?;
         let (powers, verifier_key) = trim(params, degree);
 
-        let elements = field::split_data_into_field_elements::<E::ScalarField>(bytes, k);
+        let elements = algebra::split_data_into_field_elements::<E::ScalarField>(bytes, k);
         let mut polynomials = Vec::new();
         for chunk in elements.chunks(k) {
             polynomials.push(P::from_coefficients_vec(chunk.to_vec()))

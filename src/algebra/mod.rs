@@ -1,10 +1,53 @@
+//! manipulate finite field elements
+//!
+#[cfg(any(feature = "kzg", feature = "aplonk"))]
 use ark_ec::pairing::Pairing;
 #[cfg(feature = "aplonk")]
 use ark_ec::pairing::PairingOutput;
+use ark_ff::{BigInteger, PrimeField};
+#[cfg(any(feature = "kzg", feature = "aplonk"))]
 use ark_poly::DenseUVPolynomial;
+#[cfg(any(feature = "kzg", feature = "aplonk"))]
 use ark_std::One;
+#[cfg(any(feature = "kzg", feature = "aplonk"))]
 use std::ops::{Div, Mul};
 
+pub mod linalg;
+
+/// split a sequence of raw bytes into valid field elements
+///
+/// [`split_data_into_field_elements`] supports padding the output vector of
+/// elements by giving a number that needs to divide the length of the vector.
+pub fn split_data_into_field_elements<F: PrimeField>(bytes: &[u8], modulus: usize) -> Vec<F> {
+    let bytes_per_element = (F::MODULUS_BIT_SIZE as usize) / 8;
+
+    let mut elements = Vec::new();
+    for chunk in bytes.chunks(bytes_per_element) {
+        elements.push(F::from_le_bytes_mod_order(chunk));
+    }
+
+    if elements.len() % modulus != 0 {
+        elements.resize((elements.len() / modulus + 1) * modulus, F::one());
+    }
+
+    elements
+}
+
+/// merges elliptic curve elements back into a sequence of bytes
+///
+/// this is the inverse operation of [`split_data_into_field_elements`].
+pub(crate) fn merge_elements_into_bytes<F: PrimeField>(elements: &[F]) -> Vec<u8> {
+    let mut bytes = vec![];
+    for e in elements {
+        let mut b = e.into_bigint().to_bytes_le();
+        b.pop();
+        bytes.append(&mut b);
+    }
+
+    bytes
+}
+
+#[cfg(any(feature = "kzg", feature = "aplonk"))]
 pub(crate) fn scalar_product_polynomial<E, P>(lhs: &[E::ScalarField], rhs: &[P]) -> P
 where
     E: Pairing,
@@ -69,6 +112,7 @@ pub(super) mod vector {
 /// following vector:
 ///         [1, r, r^2, ..., r^(n-1)]
 /// where *n* is the number of powers
+#[cfg(any(feature = "kzg", feature = "aplonk"))]
 pub(crate) fn powers_of<E: Pairing>(step: E::ScalarField, nb_powers: usize) -> Vec<E::ScalarField> {
     let mut powers = Vec::with_capacity(nb_powers);
     powers.push(E::ScalarField::one());
@@ -81,12 +125,86 @@ pub(crate) fn powers_of<E: Pairing>(step: E::ScalarField, nb_powers: usize) -> V
 
 #[cfg(test)]
 mod tests {
+    #[cfg(any(feature = "kzg", feature = "aplonk"))]
     use ark_bls12_381::Bls12_381;
+    use ark_bls12_381::Fr;
+    #[cfg(any(feature = "kzg", feature = "aplonk"))]
     use ark_ec::pairing::Pairing;
+    #[cfg(any(feature = "kzg", feature = "aplonk"))]
     use ark_ff::Field;
-    use ark_std::test_rng;
-    use ark_std::UniformRand;
+    use ark_ff::PrimeField;
+    #[cfg(any(feature = "kzg", feature = "aplonk"))]
+    use ark_std::{test_rng, UniformRand};
 
+    fn bytes() -> Vec<u8> {
+        include_bytes!("../../assets/dragoon_32x32.png").to_vec()
+    }
+
+    fn split_data_template<F: PrimeField>(
+        bytes: &[u8],
+        modulus: usize,
+        exact_length: Option<usize>,
+    ) {
+        let test_case = format!(
+            "TEST | modulus: {}, exact_length: {:?}",
+            modulus, exact_length
+        );
+
+        let elements = super::split_data_into_field_elements::<F>(bytes, modulus);
+        assert!(
+            elements.len() % modulus == 0,
+            "number of elements should be divisible by {}, found {}\n{test_case}",
+            modulus,
+            elements.len(),
+        );
+
+        if let Some(length) = exact_length {
+            assert!(
+                elements.len() == length,
+                "number of elements should be exactly {}, found {}\n{test_case}",
+                length,
+                elements.len(),
+            );
+        }
+
+        assert!(
+            !elements.iter().any(|&e| e == F::zero()),
+            "elements should not contain any 0\n{test_case}"
+        );
+    }
+
+    #[test]
+    fn split_data() {
+        split_data_template::<Fr>(&bytes(), 1, None);
+        split_data_template::<Fr>(&bytes(), 8, None);
+        split_data_template::<Fr>(&[], 1, None);
+        split_data_template::<Fr>(&[], 8, None);
+
+        let nb_bytes = 11 * (Fr::MODULUS_BIT_SIZE as usize / 8);
+        split_data_template::<Fr>(&bytes()[..nb_bytes], 1, Some(11));
+        split_data_template::<Fr>(&bytes()[..nb_bytes], 8, Some(16));
+
+        let nb_bytes = 11 * (Fr::MODULUS_BIT_SIZE as usize / 8) - 10;
+        split_data_template::<Fr>(&bytes()[..nb_bytes], 1, Some(11));
+        split_data_template::<Fr>(&bytes()[..nb_bytes], 8, Some(16));
+    }
+
+    fn split_and_merge_template<F: PrimeField>(bytes: &[u8], modulus: usize) {
+        let elements: Vec<F> = super::split_data_into_field_elements(bytes, modulus);
+        let mut actual = super::merge_elements_into_bytes(&elements);
+        actual.resize(bytes.len(), 0);
+        assert_eq!(bytes, actual, "TEST | modulus: {modulus}");
+    }
+
+    #[test]
+    fn split_and_merge() {
+        split_and_merge_template::<Fr>(&bytes(), 1);
+        split_and_merge_template::<Fr>(&bytes(), 8);
+        split_and_merge_template::<Fr>(&bytes(), 64);
+        split_and_merge_template::<Fr>(&bytes(), 4096);
+    }
+
+    #[cfg(any(feature = "kzg", feature = "aplonk"))]
     fn powers_of_template<E: Pairing>() {
         let rng = &mut test_rng();
 
@@ -99,16 +217,19 @@ mod tests {
         );
     }
 
+    #[cfg(any(feature = "kzg", feature = "aplonk"))]
     #[test]
     fn powers_of() {
         powers_of_template::<Bls12_381>();
     }
 
+    #[cfg(any(feature = "kzg", feature = "aplonk"))]
     mod scalar_product {
         use ark_bls12_381::Bls12_381;
         use ark_ec::pairing::Pairing;
         use ark_ff::PrimeField;
-        use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
+        use ark_poly::univariate::DensePolynomial;
+        use ark_poly::DenseUVPolynomial;
         #[cfg(feature = "aplonk")]
         use ark_std::test_rng;
         #[cfg(feature = "aplonk")]

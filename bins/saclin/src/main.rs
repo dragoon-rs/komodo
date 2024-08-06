@@ -13,10 +13,10 @@ use ark_std::rand::RngCore;
 use tracing::{info, warn};
 
 use komodo::{
+    algebra::linalg::Matrix,
     error::KomodoError,
     fec::{self, decode, Shard},
     fs,
-    linalg::Matrix,
     semi_avid::{build, prove, recode, verify, Block},
     zk::{self, Powers},
 };

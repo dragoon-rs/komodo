@@ -79,7 +79,7 @@ impl<T: Field> Matrix<T> {
     /// # Example
     /// ```rust
     /// # use ark_ff::Field;
-    /// # use komodo::linalg::Matrix;
+    /// # use komodo::algebra::linalg::Matrix;
     /// // helper to convert integers to field elements
     /// fn vec_to_elements<T: Field>(elements: Vec<u128>) -> Vec<T>
     /// # {
@@ -160,7 +160,7 @@ impl<T: Field> Matrix<T> {
     ///
     /// # Example
     /// ```rust
-    /// # use komodo::linalg::Matrix;
+    /// # use komodo::algebra::linalg::Matrix;
     /// # use ark_ff::Field;
     /// // helper to convert integers to field elements
     /// fn vec_to_elements<T: Field>(elements: Vec<u128>) -> Vec<T>
@@ -250,7 +250,7 @@ impl<T: Field> Matrix<T> {
     ///
     /// > **Note**
     /// > returns `None` if the provided index is out of bounds
-    pub(super) fn get_col(&self, j: usize) -> Option<Vec<T>> {
+    pub(crate) fn get_col(&self, j: usize) -> Option<Vec<T>> {
         if j >= self.width {
             return None;
         }
@@ -438,7 +438,7 @@ impl<T: Field> Matrix<T> {
     /// # Example
     /// if a matrix has shape `(10, 11)` and is truncated to `(5, 7)`, the 5
     /// bottom rows and 4 right columns will be removed.
-    pub(super) fn truncate(&self, rows: Option<usize>, cols: Option<usize>) -> Self {
+    pub(crate) fn truncate(&self, rows: Option<usize>, cols: Option<usize>) -> Self {
         let width = if let Some(w) = cols {
             self.width - w
         } else {

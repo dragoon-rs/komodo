@@ -8,9 +8,9 @@ use ark_std::rand::RngCore;
 use tracing::{debug, info};
 
 use crate::{
+    algebra,
     error::KomodoError,
     fec::{self, Shard},
-    field,
     zk::{self, Commitment, Powers},
 };
 
@@ -123,7 +123,7 @@ where
     info!("encoding and proving {} bytes", bytes.len());
 
     debug!("splitting bytes into polynomials");
-    let elements = field::split_data_into_field_elements(bytes, k);
+    let elements = algebra::split_data_into_field_elements(bytes, k);
     let polynomials = elements
         .chunks(k)
         .map(|c| P::from_coefficients_vec(c.to_vec()))
@@ -197,9 +197,9 @@ mod tests {
     use ark_std::{ops::Div, test_rng};
 
     use crate::{
+        algebra::linalg::Matrix,
         error::KomodoError,
         fec::{decode, encode, Shard},
-        linalg::Matrix,
         zk::{setup, Commitment},
     };
 

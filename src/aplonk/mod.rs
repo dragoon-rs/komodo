@@ -387,7 +387,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::{commit, prove, setup, Block};
-    use crate::{conversions::u32_to_u8_vec, fec::encode, field, linalg::Matrix, zk::trim};
+    use crate::{
+        algebra, algebra::linalg::Matrix, conversions::u32_to_u8_vec, fec::encode, zk::trim,
+    };
 
     use ark_bls12_381::Bls12_381;
     use ark_ec::{pairing::Pairing, AffineRepr};
@@ -428,7 +430,7 @@ mod tests {
         let params = setup::<E, P>(degree, vector_length_bound)?;
         let (_, vk_psi) = trim(params.kzg.clone(), degree);
 
-        let elements = field::split_data_into_field_elements::<E::ScalarField>(bytes, k);
+        let elements = algebra::split_data_into_field_elements::<E::ScalarField>(bytes, k);
         let mut polynomials = Vec::new();
         for chunk in elements.chunks(k) {
             polynomials.push(P::from_coefficients_vec(chunk.to_vec()))

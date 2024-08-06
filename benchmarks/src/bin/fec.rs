@@ -2,7 +2,7 @@
 use ark_ff::PrimeField;
 
 use clap::{arg, command, Parser, ValueEnum};
-use komodo::{fec, linalg::Matrix};
+use komodo::{algebra::linalg::Matrix, fec};
 use plnk::Bencher;
 use rand::{rngs::ThreadRng, thread_rng, Rng, RngCore};
 

@@ -2,7 +2,7 @@ use ark_bls12_381::Fr;
 use ark_ff::Field;
 use ark_std::rand::{Rng, RngCore};
 
-use komodo::linalg::Matrix;
+use komodo::algebra::linalg::Matrix;
 
 fn rand<T: Field, R: RngCore>(rng: &mut R) -> T {
     let element: u128 = rng.gen();

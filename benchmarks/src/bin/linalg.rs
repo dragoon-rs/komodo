@@ -2,7 +2,7 @@
 use ark_ff::PrimeField;
 
 use clap::{arg, command, Parser};
-use komodo::linalg::Matrix;
+use komodo::algebra::linalg::Matrix;
 use plnk::Bencher;
 
 fn inverse_template<F: PrimeField>(b: &Bencher, n: usize) {

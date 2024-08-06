@@ -4,8 +4,8 @@ use ark_std::rand::Rng;
 
 use clap::{arg, command, Parser, ValueEnum};
 use komodo::{
+    algebra,
     fec::{recode_with_coeffs, Shard},
-    field,
 };
 use plnk::Bencher;
 
@@ -23,7 +23,7 @@ fn create_fake_shard<F: PrimeField>(nb_bytes: usize, k: usize) -> Shard<F> {
         k: k as u32,
         linear_combination,
         hash: vec![],
-        data: field::split_data_into_field_elements::<F>(&bytes, 1),
+        data: algebra::split_data_into_field_elements::<F>(&bytes, 1),
         size: 0,
     }
 }

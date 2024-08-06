@@ -6,7 +6,7 @@ use ark_std::rand::RngCore;
 
 use rs_merkle::{algorithms::Sha256, Hasher};
 
-use crate::{error::KomodoError, field, linalg::Matrix};
+use crate::{algebra, algebra::linalg::Matrix, error::KomodoError};
 
 /// representation of a FEC shard of data.
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
@@ -151,7 +151,7 @@ pub fn encode<F: PrimeField>(
     let k = encoding_mat.height;
 
     let source_shards = Matrix::from_vec_vec(
-        field::split_data_into_field_elements(data, k)
+        algebra::split_data_into_field_elements(data, k)
             .chunks(k)
             .map(|c| c.to_vec())
             .collect(),
@@ -210,7 +210,7 @@ pub fn decode<F: PrimeField>(shards: Vec<Shard<F>>) -> Result<Vec<u8>, KomodoErr
 
     let source_shards = encoding_mat.invert()?.mul(&shard_mat)?.transpose().elements;
 
-    let mut bytes = field::merge_elements_into_bytes(&source_shards);
+    let mut bytes = algebra::merge_elements_into_bytes(&source_shards);
     bytes.resize(shards[0].size, 0);
     Ok(bytes)
 }
@@ -221,9 +221,9 @@ mod tests {
     use ark_ff::PrimeField;
 
     use crate::{
+        algebra,
+        algebra::linalg::Matrix,
         fec::{decode, encode, recode_random, Shard},
-        field,
-        linalg::Matrix,
     };
 
     use itertools::Itertools;
@@ -512,7 +512,7 @@ mod tests {
             k: 2,
             linear_combination: linear_combination.to_vec(),
             hash: vec![],
-            data: field::split_data_into_field_elements(bytes, 1),
+            data: algebra::split_data_into_field_elements(bytes, 1),
             size: 0,
         }
     }
