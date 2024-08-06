@@ -1,6 +1,10 @@
 //! Komodo: Cryptographically-proven Erasure Coding
-#[cfg(feature = "kzg")]
+#[cfg(any(feature = "kzg", feature = "aplonk"))]
 mod algebra;
+#[cfg(feature = "aplonk")]
+pub mod aplonk;
+#[cfg(any(feature = "kzg", feature = "aplonk"))]
+mod conversions;
 pub mod error;
 pub mod fec;
 pub mod field;

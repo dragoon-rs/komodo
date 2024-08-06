@@ -229,31 +229,13 @@ mod tests {
     use ark_std::test_rng;
     use std::ops::{Div, Mul};
 
-    use crate::{fec::encode, field, linalg::Matrix, zk::trim};
+    use crate::{conversions::u32_to_u8_vec, fec::encode, field, linalg::Matrix, zk::trim};
 
     type UniPoly381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;
 
     fn bytes<E: Pairing>(k: usize, nb_polynomials: usize) -> Vec<u8> {
         let nb_bytes = k * nb_polynomials * (E::ScalarField::MODULUS_BIT_SIZE as usize / 8);
         include_bytes!("../assets/dragoon_133x133.png")[0..nb_bytes].to_vec()
-    }
-
-    fn u32_to_u8_vec(num: u32) -> Vec<u8> {
-        vec![
-            (num & 0xFF) as u8,
-            ((num >> 8) & 0xFF) as u8,
-            ((num >> 16) & 0xFF) as u8,
-            ((num >> 24) & 0xFF) as u8,
-        ]
-    }
-
-    #[test]
-    fn u32_to_u8_convertion() {
-        assert_eq!(u32_to_u8_vec(0u32), vec![0u8, 0u8, 0u8, 0u8]);
-        assert_eq!(u32_to_u8_vec(1u32), vec![1u8, 0u8, 0u8, 0u8]);
-        assert_eq!(u32_to_u8_vec(256u32), vec![0u8, 1u8, 0u8, 0u8]);
-        assert_eq!(u32_to_u8_vec(65536u32), vec![0u8, 0u8, 1u8, 0u8]);
-        assert_eq!(u32_to_u8_vec(16777216u32), vec![0u8, 0u8, 0u8, 1u8]);
     }
 
     fn test_setup<E, P>(
