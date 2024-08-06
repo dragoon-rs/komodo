@@ -1,9 +1,10 @@
-use ark_ec::pairing::{Pairing, PairingOutput};
+use ark_ec::pairing::Pairing;
+#[cfg(feature = "aplonk")]
+use ark_ec::pairing::PairingOutput;
 use ark_poly::DenseUVPolynomial;
 use ark_std::One;
 use std::ops::{Div, Mul};
 
-#[cfg(feature = "kzg")]
 pub(crate) fn scalar_product_polynomial<E, P>(lhs: &[E::ScalarField], rhs: &[P]) -> P
 where
     E: Pairing,
@@ -108,9 +109,13 @@ mod tests {
         use ark_ec::pairing::Pairing;
         use ark_ff::PrimeField;
         use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
+        #[cfg(feature = "aplonk")]
         use ark_std::test_rng;
+        #[cfg(feature = "aplonk")]
         use ark_std::UniformRand;
-        use std::ops::{Add, Div};
+        #[cfg(feature = "aplonk")]
+        use std::ops::Add;
+        use std::ops::Div;
 
         type UniPoly381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;
 
@@ -146,6 +151,7 @@ mod tests {
             polynomial_template::<Bls12_381, UniPoly381>();
         }
 
+        #[cfg(feature = "aplonk")]
         fn scalar_template<E: Pairing>(lhs: Vec<u8>, rhs: Vec<u8>, result: u8) {
             let lhs = lhs
                 .iter()
@@ -160,20 +166,24 @@ mod tests {
             assert_eq!(super::super::scalar_product::<E>(&lhs, &rhs), result);
         }
 
+        #[cfg(feature = "aplonk")]
         #[test]
         fn scalar() {
             scalar_template::<Bls12_381>(vec![1, 2], vec![3, 4], 11);
             scalar_template::<Bls12_381>(vec![5, 6], vec![7, 8], 83);
         }
 
+        #[cfg(feature = "aplonk")]
         #[ignore = "scalar_product_g1 is a clone of scalar_product"]
         #[test]
         fn g_1() {}
 
+        #[cfg(feature = "aplonk")]
         #[ignore = "scalar_product_g2 is a clone of scalar_product"]
         #[test]
         fn g_2() {}
 
+        #[cfg(feature = "aplonk")]
         fn pairing_template<E: Pairing>() {
             let rng = &mut test_rng();
 
@@ -189,6 +199,7 @@ mod tests {
             );
         }
 
+        #[cfg(feature = "aplonk")]
         #[test]
         fn pairing() {
             pairing_template::<Bls12_381>();

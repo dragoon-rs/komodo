@@ -19,7 +19,12 @@ use rs_merkle::Hasher;
 use std::marker::PhantomData;
 use std::ops::{Div, Mul};
 
-use crate::{algebra, error::KomodoError, fec::Shard, kzg, zk::trim};
+use crate::{
+    algebra,
+    error::KomodoError,
+    fec::Shard,
+    zk::{ark_commit, trim},
+};
 
 mod ipa;
 mod polynomial;
@@ -122,7 +127,7 @@ where
     }
 
     // commit.1.
-    let mu = match kzg::commit(&powers, &polynomials) {
+    let mu = match ark_commit(&powers, &polynomials) {
         Ok((mu, _)) => mu,
         Err(error) => return Err(KomodoError::Other(error.to_string())),
     };

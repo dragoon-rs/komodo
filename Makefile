@@ -9,6 +9,9 @@ fmt:
 	cargo fmt --all
 
 check:
+	cargo check --workspace --all-targets
+	cargo check --workspace --all-targets --features kzg
+	cargo check --workspace --all-targets --features aplonk
 	cargo check --workspace --all-targets --all-features
 
 clippy:

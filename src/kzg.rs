@@ -6,10 +6,7 @@
 use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
-use ark_poly_commit::{
-    kzg10::{Commitment, Powers, Proof, Randomness, VerifierKey, KZG10},
-    PCRandomness,
-};
+use ark_poly_commit::{kzg10, PCRandomness};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
 use ark_std::{ops::Div, Zero};
 use rs_merkle::{algorithms::Sha256, Hasher};
@@ -19,32 +16,13 @@ use crate::algebra;
 use crate::error::KomodoError;
 use crate::fec::Shard;
 
-#[allow(clippy::type_complexity)]
-pub fn commit<E, P>(
-    powers: &Powers<E>,
-    polynomials: &[P],
-) -> Result<(Vec<Commitment<E>>, Vec<Randomness<E::ScalarField, P>>), ark_poly_commit::Error>
-where
-    E: Pairing,
-    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
-    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
-{
-    let mut commits = Vec::new();
-    let mut randomnesses = Vec::new();
-    for polynomial in polynomials {
-        let (commit, randomness) = KZG10::<E, P>::commit(powers, polynomial, None, None)?;
-        commits.push(commit);
-        randomnesses.push(randomness);
-    }
-
-    Ok((commits, randomnesses))
-}
+pub use crate::zk::ark_commit as commit;
 
 #[derive(Debug, Clone, Default, PartialEq, CanonicalDeserialize, CanonicalSerialize)]
 pub struct Block<E: Pairing> {
     pub shard: Shard<E::ScalarField>,
-    commit: Vec<Commitment<E>>,
-    proof: Proof<E>,
+    commit: Vec<kzg10::Commitment<E>>,
+    proof: kzg10::Proof<E>,
 }
 
 /// this function splits the data (bytes) into k shards and generates n shards with a proof for each.
@@ -56,11 +34,11 @@ pub struct Block<E: Pairing> {
 ///     prove this polynomial with KZG10
 ///     store in the n Block the proof, the m commits and the m P_i evaluations
 pub fn prove<E, P>(
-    commits: Vec<Commitment<E>>,
+    commits: Vec<kzg10::Commitment<E>>,
     polynomials: Vec<P>,
     shards: Vec<Shard<E::ScalarField>>,
     points: Vec<E::ScalarField>,
-    powers: Powers<E>,
+    powers: kzg10::Powers<E>,
 ) -> Result<Vec<Block<E>>, KomodoError>
 where
     E: Pairing,
@@ -99,11 +77,11 @@ where
         let r_vec = algebra::powers_of::<E>(r, polynomials.len());
         let poly_q = algebra::scalar_product_polynomial::<E, P>(&r_vec, &polynomials);
 
-        match KZG10::<E, P>::open(
+        match kzg10::KZG10::<E, P>::open(
             &powers,
             &poly_q,
             *pt,
-            &Randomness::<E::ScalarField, P>::empty(),
+            &kzg10::Randomness::<E::ScalarField, P>::empty(),
         ) {
             Ok(proof) => proofs.push(Block {
                 shard: s.clone(),
@@ -151,7 +129,11 @@ where
 /// compute y as a combination of the shards: y = sum(r^i * Shard_i) for i=[0..m[
 /// compute c as a combination of the commitments: c = sum(r^i * Commit_i) for i=[0..m[
 /// Check if e(c - yG1,G2) == e(proof,(T-alpha)G2)
-pub fn verify<E, P>(block: &Block<E>, pt: E::ScalarField, verifier_key: &VerifierKey<E>) -> bool
+pub fn verify<E, P>(
+    block: &Block<E>,
+    pt: E::ScalarField,
+    verifier_key: &kzg10::VerifierKey<E>,
+) -> bool
 where
     E: Pairing,
     P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
@@ -188,7 +170,7 @@ where
 pub fn batch_verify<E, P>(
     blocks: &[Block<E>],
     pts: &[E::ScalarField],
-    verifier_key: &VerifierKey<E>,
+    verifier_key: &kzg10::VerifierKey<E>,
 ) -> Result<bool, SerializationError>
 where
     E: Pairing,

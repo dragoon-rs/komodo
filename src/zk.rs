@@ -5,9 +5,9 @@ use ark_poly::DenseUVPolynomial;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{end_timer, ops::Div, rand::RngCore, start_timer};
 
-#[cfg(feature = "kzg")]
+#[cfg(any(feature = "kzg", feature = "aplonk"))]
 use ark_ec::pairing::Pairing;
-#[cfg(feature = "kzg")]
+#[cfg(any(feature = "kzg", feature = "aplonk"))]
 use ark_poly_commit::kzg10;
 
 use crate::error::KomodoError;
@@ -174,7 +174,7 @@ pub fn nb_elements_in_setup<F: PrimeField>(nb_bytes: usize) -> usize {
 /// `d` should be less that `pp.max_degree()`.
 ///
 /// > see [`ark-poly-commit::kzg10::tests::KZG10`](https://gitlab.isae-supaero.fr/a.stevan/poly-commit/-/blob/19fc0d4ad2bcff7df030c952d09649918dba7ddb/src/kzg10/mod.rs#L513-L538)
-#[cfg(feature = "kzg")]
+#[cfg(any(feature = "kzg", feature = "aplonk"))]
 pub fn trim<E: Pairing>(
     pp: kzg10::UniversalParams<E>,
     supported_degree: usize,
@@ -198,6 +198,34 @@ pub fn trim<E: Pairing>(
     };
 
     (powers, vk)
+}
+
+#[cfg(any(feature = "kzg", feature = "aplonk"))]
+#[allow(clippy::type_complexity)]
+pub fn ark_commit<E, P>(
+    powers: &kzg10::Powers<E>,
+    polynomials: &[P],
+) -> Result<
+    (
+        Vec<kzg10::Commitment<E>>,
+        Vec<kzg10::Randomness<E::ScalarField, P>>,
+    ),
+    ark_poly_commit::Error,
+>
+where
+    E: Pairing,
+    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    let mut commits = Vec::new();
+    let mut randomnesses = Vec::new();
+    for polynomial in polynomials {
+        let (commit, randomness) = kzg10::KZG10::<E, P>::commit(powers, polynomial, None, None)?;
+        commits.push(commit);
+        randomnesses.push(randomness);
+    }
+
+    Ok((commits, randomnesses))
 }
 
 #[cfg(test)]

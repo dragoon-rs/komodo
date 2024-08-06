@@ -32,4 +32,4 @@ rand = "0.8.5"
 
 [features]
 kzg = ["dep:ark-poly-commit"]
-aplonk = []
+aplonk = ["dep:ark-poly-commit"]
