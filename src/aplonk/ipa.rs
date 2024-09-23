@@ -57,7 +57,7 @@ fn is_power_of_two(n: usize) -> bool {
 /// prove a sequence of commits with a modified IPA
 ///
 /// > **Note**  
-/// > when we say *page xx* or *<name of algorithm>*, we refer to the following
+/// > when we say *page xx* or *\<name of algorithm\>*, we refer to the following
 /// > paper: [aPlonk from [Ambrona et al.]][aPlonK]
 ///
 /// the following algorithm
@@ -86,9 +86,10 @@ pub(super) fn prove<E: Pairing>(
     mu: &[E::G1],
 ) -> Result<(Proof<E>, Vec<E::ScalarField>), KomodoError> {
     if !is_power_of_two(k) {
-        return Err(KomodoError::Other(
-            "PolynomialCountIpaError: not a power of 2".to_string(),
-        ));
+        return Err(KomodoError::Other(format!(
+            "PolynomialCountIpaError: expected $k$ to be a power of 2, found {}",
+            k
+        )));
     }
     let kappa = f64::log2(k as f64) as usize;
     let mut l_g = vector::zero::<PairingOutput<E>>(kappa);
@@ -133,7 +134,10 @@ pub(super) fn prove<E: Pairing>(
         let u_j_inv = if let Some(inverse) = u[j].inverse() {
             inverse
         } else {
-            return Err(KomodoError::Other("EllipticInverseError".to_string()));
+            return Err(KomodoError::Other(format!(
+                "EllipticInverseError: could not inverse {:?}",
+                u[j],
+            )));
         };
 
         // 6.
@@ -173,7 +177,7 @@ pub(super) fn prove<E: Pairing>(
 /// verify the integrity of a proven sequence of commits with a modified IPA
 ///
 /// > **Note**  
-/// > when we say *page xx* or *<name of algorithm>*, we refer to the following
+/// > when we say *page xx* or *\<name of algorithm\>*, we refer to the following
 /// > paper: [aPlonk from [Ambrona et al.]][aPlonK]
 ///
 /// the following algorithm
@@ -210,9 +214,10 @@ where
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     if !is_power_of_two(k) {
-        return Err(KomodoError::Other(
-            "PolynomialCountIpaError: not a power of 2".to_string(),
-        ));
+        return Err(KomodoError::Other(format!(
+            "PolynomialCountIpaError: expected $k$ to be a power of 2, found {}",
+            k,
+        )));
     }
     let kappa = f64::log2(k as f64) as usize;
     let mut ts = match transcript::initialize(c_g, r, p) {
@@ -247,7 +252,10 @@ where
         if let Some(inverse) = u_i.inverse() {
             u_inv.push(inverse)
         } else {
-            return Err(KomodoError::Other("EllipticInverseError".to_string()));
+            return Err(KomodoError::Other(format!(
+                "EllipticInverseError: could not inverse {:?}",
+                u_i,
+            )));
         }
     }
 

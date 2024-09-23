@@ -1,4 +1,9 @@
 //! a replacement of Arkworks' KZG10 module
+//!
+//! this module mostly redefines [`ark_poly_commit::kzg10::KZG10::setup`] and
+//! [`ark_poly_commit::kzg10::KZG10::commit`] to be used with [`crate::semi_avid`].
+//!
+//! also defines some tool functions such as [`trim`] or [`nb_elements_in_setup`].
 use ark_ec::{scalar_mul::fixed_base::FixedBase, CurveGroup, VariableBaseMSM};
 use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
@@ -12,9 +17,13 @@ use ark_poly_commit::kzg10;
 
 use crate::error::KomodoError;
 
-/// the representation of a ZK trusted setup
+/// a ZK trusted setup
 ///
 /// this is a simple wrapper around a sequence of elements of the curve.
+///
+/// > **Note**
+/// >
+/// > this is a simpler version of [`ark_poly_commit::kzg10::UniversalParams`]
 #[derive(Debug, Clone, Default, CanonicalSerialize, CanonicalDeserialize, PartialEq)]
 pub struct Powers<F: PrimeField, G: CurveGroup<ScalarField = F>>(Vec<G::Affine>);
 
@@ -33,13 +42,21 @@ impl<F: PrimeField, G: CurveGroup<ScalarField = F>> IntoIterator for Powers<F, G
     }
 }
 
-/// a ZK commitment, i.e. an evaluatio of a given polynomial on a secret
+/// a ZK commitment, i.e. an evaluation of a given polynomial on a secret element
 ///
-/// this is a simpler wrapper around a single elemenf of the curve.
+/// this is a simple wrapper around a single elemenf of the curve.
+///
+/// > **Note**
+/// >
+/// > this is a simpler version of [`ark_poly_commit::kzg10::Commitment`]
 #[derive(Debug, Clone, Copy, Default, CanonicalSerialize, CanonicalDeserialize, PartialEq)]
 pub struct Commitment<F: PrimeField, G: CurveGroup<ScalarField = F>>(pub G::Affine);
 
 /// create a trusted setup of a given size, the expected maximum degree of the data
+///
+/// > **Note**
+/// >
+/// > this is a simpler version of [`ark_poly_commit::kzg10::KZG10::setup`]
 pub fn setup<F: PrimeField, G: CurveGroup<ScalarField = F>>(
     max_degree: usize,
     rng: &mut impl RngCore,
@@ -106,6 +123,10 @@ fn convert_to_bigints<F: PrimeField>(p: &[F]) -> Vec<F::BigInt> {
 }
 
 /// compute a commitment of a polynomial on a trusted setup
+///
+/// > **Note**
+/// >
+/// > this is a simpler version of [`ark_poly_commit::kzg10::KZG10::commit`]
 pub fn commit<F, G, P>(
     powers: &Powers<F, G>,
     polynomial: &P,
@@ -140,8 +161,8 @@ where
 ///
 /// > **Note**
 /// > - `powers` can be generated with functions like [`setup`]
-/// > - if `polynomials` has length `n`, then [`commit`] will generate `n`
-/// >   commits.
+/// > - if `polynomials` has length `m`, then [`batch_commit`] will generate `m` commits
+/// > - see [`commit`] for the individual _commit_ operations
 #[allow(clippy::type_complexity)]
 #[inline(always)]
 pub fn batch_commit<F, G, P>(
@@ -202,6 +223,7 @@ pub fn trim<E: Pairing>(
 
 #[cfg(any(feature = "kzg", feature = "aplonk"))]
 #[allow(clippy::type_complexity)]
+/// same as [`batch_commit`] but uses [`ark_poly_commit::kzg10::KZG10::commit`] instead of [`commit`]
 pub fn ark_commit<E, P>(
     powers: &kzg10::Powers<E>,
     polynomials: &[P],

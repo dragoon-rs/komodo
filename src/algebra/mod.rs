@@ -1,5 +1,4 @@
-//! manipulate finite field elements
-//!
+//! Manipulate finite field elements
 #[cfg(any(feature = "kzg", feature = "aplonk"))]
 use ark_ec::pairing::Pairing;
 #[cfg(feature = "aplonk")]
@@ -18,6 +17,55 @@ pub mod linalg;
 ///
 /// [`split_data_into_field_elements`] supports padding the output vector of
 /// elements by giving a number that needs to divide the length of the vector.
+///
+/// # Example
+/// In the following example `Fp` is a small finite field with prime order $65537$ and which
+/// requires only two bytes to represent elements.
+///
+/// 1. splitting `0x02000300`, which contains 4 bytes, will result in two elements of `Fp`, i.e. 2
+///    and 3
+/// ```
+/// # #[derive(ark_ff::MontConfig)]
+/// # #[modulus = "65537"]
+/// # #[generator = "3"]
+/// # struct FpConfig_;
+/// # type Fp = ark_ff::Fp64<ark_ff::MontBackend<FpConfig_, 1>>;
+/// #
+/// # use komodo::algebra::split_data_into_field_elements;
+/// # use ark_ff::PrimeField;
+/// # fn main() {
+/// assert_eq!(
+///     split_data_into_field_elements::<Fp>(&[2, 0, 3, 0], 1),
+///     vec![Fp::from(2), Fp::from(3)],
+/// );
+/// # }
+/// ```
+/// 2. splitting `0x0200030004000500`, which contains 8 bytes, and asking for a multiple of 3
+///    elements, will result in 6 elements of `Fp`, i.e. 2, 3, 4 and 5 which come from the data and
+///    two padding elements, set to 1.
+/// ```
+/// # #[derive(ark_ff::MontConfig)]
+/// # #[modulus = "65537"]
+/// # #[generator = "3"]
+/// # struct FpConfig_;
+/// # type Fp = ark_ff::Fp64<ark_ff::MontBackend<FpConfig_, 1>>;
+/// #
+/// # use komodo::algebra::split_data_into_field_elements;
+/// # use ark_ff::PrimeField;
+/// # fn main() {
+/// assert_eq!(
+///     split_data_into_field_elements::<Fp>(&[2, 0, 3, 0, 4, 0, 5, 0], 3),
+///     vec![
+///         Fp::from(2),
+///         Fp::from(3),
+///         Fp::from(4),
+///         Fp::from(5),
+///         Fp::from(1),
+///         Fp::from(1),
+///     ],
+/// );
+/// # }
+/// ```
 pub fn split_data_into_field_elements<F: PrimeField>(bytes: &[u8], modulus: usize) -> Vec<F> {
     let bytes_per_element = (F::MODULUS_BIT_SIZE as usize) / 8;
 
@@ -48,6 +96,11 @@ pub(crate) fn merge_elements_into_bytes<F: PrimeField>(elements: &[F]) -> Vec<u8
 }
 
 #[cfg(any(feature = "kzg", feature = "aplonk"))]
+/// compute the linear combination of polynomials
+///
+/// if the _lhs_ are the coefficients, $(c_i)$ in a field $\mathbb{F}$, and the _rhs_ are the
+/// polynomials, $(p_i)$ with coefficients in $\mathbb{F}$, then the result of this is
+/// $$P(X) = \sum\limits_{i = 0}^{n - 1} c_i p_i(X)$$
 pub(crate) fn scalar_product_polynomial<E, P>(lhs: &[E::ScalarField], rhs: &[P]) -> P
 where
     E: Pairing,
@@ -68,6 +121,12 @@ where
 }
 
 #[cfg(feature = "aplonk")]
+/// compute the scalar product between vectors of elements in $G_1$ and in $G_2$ respectively
+///
+/// if the _lhs_ are the elements of $G_1$, $(a_i)$, and the _rhs_ are the ones from $G_2$, $(b_i)$,
+/// then the result of this is
+/// $$c = \sum\limits_{i = 0}^{n - 1} E(a_i, b_i)$$
+/// where $E$ is a bilinear mapping from $G_1 \times G_2 \rightarrow G_T$
 pub(super) fn scalar_product_pairing<E: Pairing>(lhs: &[E::G1], rhs: &[E::G2]) -> PairingOutput<E> {
     lhs.iter()
         .zip(rhs.iter())
@@ -76,6 +135,11 @@ pub(super) fn scalar_product_pairing<E: Pairing>(lhs: &[E::G1], rhs: &[E::G2]) -
 }
 
 #[cfg(feature = "aplonk")]
+/// compute the scalar product between vectors of elements of a finite field $\mathbb{F}$
+///
+/// if _lhs_ is the first vector, $(a_i)$, and _rhs_ is the second, $(b_i)$, then the result of this
+/// is
+/// $$c = \sum\limits_{i = 0}^{n - 1} a_i b_i$$
 pub(super) fn scalar_product<E: Pairing>(
     lhs: &[E::ScalarField],
     rhs: &[E::ScalarField],
@@ -84,11 +148,13 @@ pub(super) fn scalar_product<E: Pairing>(
 }
 
 #[cfg(feature = "aplonk")]
+/// see [`scalar_product`], but with _lhs_ a vector from $G_1$
 pub(super) fn scalar_product_g1<E: Pairing>(lhs: &[E::G1], rhs: &[E::ScalarField]) -> E::G1 {
     lhs.iter().zip(rhs.iter()).map(|(l, r)| l.mul(r)).sum()
 }
 
 #[cfg(feature = "aplonk")]
+/// see [`scalar_product`], but with _lhs_ a vector from $G_2$
 pub(super) fn scalar_product_g2<E: Pairing>(lhs: &[E::G2], rhs: &[E::ScalarField]) -> E::G2 {
     lhs.iter().zip(rhs.iter()).map(|(l, r)| l.mul(r)).sum()
 }

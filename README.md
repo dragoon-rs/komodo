@@ -28,5 +28,7 @@ A [CLI example](bins/saclin/examples/cli.nu) is also provided and can be run wit
 make example
 ```
 
+Other examples that showcase the Komodo API are available in [`examples/`](examples/).
+
 ## the benchmarks
 see [`benchmarks/`](benchmarks/README.md)

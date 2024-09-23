@@ -141,7 +141,9 @@ pub fn recode_random<F: PrimeField>(
 /// > otherwise, an error might be thrown to the caller.
 ///
 /// Padding might be applied depending on the size of the data compared to the size of the encoding
-/// matrix.
+/// matrix. (see [`algebra::split_data_into_field_elements`])
+///
+/// This is the inverse of [`decode`].
 pub fn encode<F: PrimeField>(
     data: &[u8],
     encoding_mat: &Matrix<F>,
@@ -180,6 +182,8 @@ pub fn encode<F: PrimeField>(
 /// > this function might fail in a variety of cases
 /// > - if there are too few shards
 /// > - if there are linear dependencies between shards
+///
+/// This is the inverse of [`encode`].
 pub fn decode<F: PrimeField>(shards: Vec<Shard<F>>) -> Result<Vec<u8>, KomodoError> {
     if shards.is_empty() {
         return Err(KomodoError::TooFewShards(0, 0));

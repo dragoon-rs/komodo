@@ -1,4 +1,4 @@
-.PHONY: fmt fmt-check check clippy test-rs test-nu test example show build-examples
+.PHONY: fmt fmt-check check clippy test-rs test-nu test example show doc build-examples
 
 DEFAULT_GOAL: fmt-check check clippy test-rs
 

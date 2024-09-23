@@ -63,7 +63,7 @@ where
         for p in &polynomials {
             let elt = p.evaluate(pt);
             if let Err(error) = elt.serialize_with_mode(&mut eval_bytes, Compress::Yes) {
-                return Err(KomodoError::Other(error.to_string()));
+                return Err(KomodoError::Other(format!("Serialization: {}", error)));
             }
         }
 
@@ -88,7 +88,7 @@ where
                 commit: commits.clone(),
                 proof,
             }),
-            Err(error) => return Err(KomodoError::Other(error.to_string())),
+            Err(error) => return Err(KomodoError::Other(format!("kzg open error: {}", error))),
         };
     }
 

@@ -33,3 +33,12 @@ rand = "0.8.5"
 [features]
 kzg = ["dep:ark-poly-commit"]
 aplonk = ["dep:ark-poly-commit"]
+fs = []
+
+[[example]]
+name = "kzg"
+required-features = ["kzg"]
+
+[[example]]
+name = "aplonk"
+required-features = ["aplonk"]

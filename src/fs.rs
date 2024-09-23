@@ -52,8 +52,19 @@ pub fn dump(
     Ok(filename)
 }
 
-/// dump a bunch of blocks to the disk and return a JSON / NUON compatible table
+/// dump a bunch of blocks to the disk and return a JSON / NUON compatible list
 /// of all the hashes that have been dumped
+///
+/// > **Note**
+/// >
+/// > this is a wrapper around [`dump`]
+///
+/// # Example
+/// let's say we give three blocks to [`dump_blocks`] and their hashes are `aaaa`, `bbbb` and
+/// `cccc` respectively, then this function will return
+/// ```json
+/// '["aaaa", "bbbb", "cccc"]'
+/// ```
 pub fn dump_blocks<F: PrimeField, G: CurveGroup<ScalarField = F>>(
     blocks: &[Block<F, G>],
     block_dir: &PathBuf,
@@ -77,6 +88,19 @@ pub fn dump_blocks<F: PrimeField, G: CurveGroup<ScalarField = F>>(
 }
 
 /// read blocks from a list of block hashes
+///
+/// > **Note**
+/// >
+/// > this is a basically the inverse of [`dump_blocks`]
+///
+/// # Example
+/// let's say we have three blocks `A`, `B` and `C` whose hashes are `aaaa`, `bbbb` and `cccc`
+/// respectively.
+/// if one calls [`read_blocks`] with `aaaa` and `cccc` as the queried block hashes, the output of
+/// this function will be
+/// ```ignore
+/// Ok(vec![("aaaa", A), ("cccc", C)])
+/// ```
 pub fn read_blocks<F: PrimeField, G: CurveGroup<ScalarField = F>>(
     block_hashes: &[String],
     block_dir: &Path,

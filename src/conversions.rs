@@ -1,4 +1,3 @@
-#[cfg(test)]
 pub(crate) fn u32_to_u8_vec(num: u32) -> Vec<u8> {
     vec![
         (num & 0xFF) as u8,
@@ -8,7 +7,6 @@ pub(crate) fn u32_to_u8_vec(num: u32) -> Vec<u8> {
     ]
 }
 
-#[cfg(test)]
 mod tests {
     #[test]
     fn u32_to_u8_convertion() {

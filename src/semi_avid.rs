@@ -1,3 +1,136 @@
+//! Semi-AVID: a proving scheme suited for an _information dispersal_ context
+//!
+//! In their paper, [Nazirkhanova et al.](https://arxiv.org/abs/2111.12323) introduce a new proving
+//! scheme.
+//!
+//! In opposition to how it is commonly done in protocols such as
+//! [KZG](https://link.springer.com/chapter/10.1007/978-3-642-17373-8_11), the data is interpreted
+//! as column-oriented polynomials.
+//!
+//! Using FEC notations, there are $k$ such column-oriented polynomials, i.e. the $k$ source shards.
+//! They are all commited using a common trusted setup and these $k$ commitments are used to prove
+//! the integrity of encoded shards.
+//!
+//! In order to verify this property, i.e. that a given shard has been computed as a linear
+//! combination of the $k$ source shards, the _homomorphic_ property of the commit operation is
+//! used: _the commitment of a linear combination of polynomials is equal to the same linear
+//! combination of the commiments of the same polynomials_.
+//!
+//! This give us a simple, lightweight and fast commitment scheme.
+//!
+//! # Example
+//! > **Note**
+//! >
+//! > below, `F`, `G` and `DP<F>` are explicitely specified everywhere but, in _real_ code, i.e.
+//! > using generic types as it's commonly done in Arkworks, it should be possible to specify them
+//! > once and Rust will take care of _carrying_ the types in the rest of the code. Also, `DP<F>`
+//! > will likely be its own generic type, usually written `P` in this code base.
+//!
+//! - first, let's import some types...
+//! ```
+//! use ark_bls12_381::{Fr as F, G1Projective as G};
+//! use ark_poly::univariate::DensePolynomial as DP;
+//! ```
+//! - and setup the input data
+//! ```
+//! # fn main() {
+//! let mut rng = ark_std::test_rng();
+//!
+//! let (k, n) = (3, 6_usize);
+//! let bytes = include_bytes!("../assets/dragoon_133x133.png").to_vec();
+//! # }
+//! ```
+//! - then, Semi-AVID requires a trusted setup to prove and verify
+//! ```
+//! # use ark_bls12_381::{Fr as F, G1Projective as G};
+//! # fn main() {
+//! # let mut rng = ark_std::test_rng();
+//! #
+//! # let (k, n) = (3, 6_usize);
+//! # let bytes = include_bytes!("../assets/dragoon_133x133.png").to_vec();
+//! #
+//! let powers = komodo::zk::setup::<F, G>(bytes.len(), &mut rng).unwrap();
+//! # }
+//! ```
+//! - we can now build an encoding matrix, encode the data, prove the shards and build [`Block`]s
+//! ```
+//! # use ark_bls12_381::{Fr as F, G1Projective as G};
+//! # use ark_poly::univariate::DensePolynomial as DP;
+//! #
+//! # use komodo::semi_avid::{build, prove, verify};
+//! #
+//! # fn main() {
+//! # let mut rng = ark_std::test_rng();
+//! #
+//! # let (k, n) = (3, 6_usize);
+//! # let bytes = include_bytes!("../assets/dragoon_133x133.png").to_vec();
+//! #
+//! # let powers = komodo::zk::setup::<F, G>(bytes.len(), &mut rng).unwrap();
+//! #
+//! let encoding_mat = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
+//! let shards = komodo::fec::encode(&bytes, encoding_mat).unwrap();
+//! let proof = prove::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
+//! let blocks = build::<F, G, DP<F>>(&shards, &proof);
+//! # }
+//! ```
+//! - finally, each [`Block`] can be verified individually
+//! ```
+//! # use ark_bls12_381::{Fr as F, G1Projective as G};
+//! # use ark_poly::univariate::DensePolynomial as DP;
+//! #
+//! # use komodo::semi_avid::{build, prove, verify};
+//! #
+//! # fn main() {
+//! # let mut rng = ark_std::test_rng();
+//! #
+//! # let (k, n) = (3, 6_usize);
+//! # let bytes = include_bytes!("../assets/dragoon_133x133.png").to_vec();
+//! #
+//! # let powers = komodo::zk::setup::<F, G>(bytes.len(), &mut rng).unwrap();
+//! #
+//! # let encoding_mat = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
+//! # let shards = komodo::fec::encode(&bytes, encoding_mat).unwrap();
+//! # let proof = prove::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
+//! # let blocks = build::<F, G, DP<F>>(&shards, &proof);
+//! #
+//! for block in &blocks {
+//!     assert!(verify::<F, G, DP<F>>(block, &powers).unwrap());
+//! }
+//! # }
+//! ```
+//! - and decoded using any $k$ of the shards
+//! ```
+//! # use ark_bls12_381::{Fr as F, G1Projective as G};
+//! # use ark_poly::univariate::DensePolynomial as DP;
+//! #
+//! # use komodo::semi_avid::{build, prove};
+//! #
+//! # fn main() {
+//! # let mut rng = ark_std::test_rng();
+//! #
+//! # let (k, n) = (3, 6_usize);
+//! # let bytes = include_bytes!("../assets/dragoon_133x133.png").to_vec();
+//! #
+//! # let powers = komodo::zk::setup::<F, G>(bytes.len(), &mut rng).unwrap();
+//! #
+//! # let encoding_mat = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
+//! # let shards = komodo::fec::encode(&bytes, encoding_mat).unwrap();
+//! # let proof = prove::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
+//! # let blocks = build::<F, G, DP<F>>(&shards, &proof);
+//! #
+//! let shards = blocks[0..k].iter().cloned().map(|b| b.shard).collect();
+//! assert_eq!(bytes, komodo::fec::decode(shards).unwrap());
+//! # }
+//! ```
+//!
+//! # Recoding
+//! By constrution, Semi-AVID supports an operation on shards known as _recoding_. This allows to
+//! combine an arbitrary number of shards together on the fly, without decoding the data and then
+//! re-encoding brand new shards.
+//!
+//! This is great because any node in the system can locally augment its local pool of shards.
+//! However, this operation will introduce linear dependencies between recoded shards and their
+//! _parents_, which might decrease the diversity of shards and harm the decoding process.
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
@@ -81,6 +214,7 @@ impl<F: PrimeField, G: CurveGroup<ScalarField = F>> std::fmt::Display for Block<
 /// different, an error will be returned.
 ///
 /// > **Note**
+/// >
 /// > this is a wrapper around [`fec::recode_random`].
 pub fn recode<F: PrimeField, G: CurveGroup<ScalarField = F>>(
     blocks: &[Block<F, G>],

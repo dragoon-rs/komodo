@@ -117,19 +117,27 @@ where
     let supported_degree = polynomials.iter().map(|p| p.degree()).max().unwrap_or(0);
 
     if setup.ipa.ck_tau.len() < polynomials.len() {
-        return Err(KomodoError::Other("setup error".to_string()));
+        return Err(KomodoError::Other(format!(
+            "setup error: expected at least {} powers of ck_tau for IPA, found {}",
+            polynomials.len(),
+            setup.ipa.ck_tau.len(),
+        )));
     }
 
     let (powers, _) = trim(setup.kzg, supported_degree);
 
     if powers.powers_of_g.len() <= supported_degree {
-        return Err(KomodoError::Other("setup error".to_string()));
+        return Err(KomodoError::Other(format!(
+            "setup error: expected at least {} powers of g for KZG, found {}",
+            supported_degree,
+            powers.powers_of_g.len(),
+        )));
     }
 
     // commit.1.
     let mu = match ark_commit(&powers, &polynomials) {
         Ok((mu, _)) => mu,
-        Err(error) => return Err(KomodoError::Other(error.to_string())),
+        Err(error) => return Err(KomodoError::Other(format!("commit error: {}", error))),
     };
     let mu: Vec<E::G1> = mu.iter().map(|c| c.0.into_group()).collect();
 
@@ -205,7 +213,7 @@ where
             &Randomness::<E::ScalarField, P>::empty(),
         ) {
             Ok(proof) => proof,
-            Err(error) => return Err(KomodoError::Other(format!("ark error: {}", error))),
+            Err(error) => return Err(KomodoError::Other(format!("kzg open error: {}", error))),
         };
 
         // open.5.
@@ -222,7 +230,10 @@ where
             if let Some(inverse) = u_i.inverse() {
                 u_inv.push(inverse)
             } else {
-                return Err(KomodoError::Other("EllipticInverseError".to_string()));
+                return Err(KomodoError::Other(format!(
+                    "EllipticInverseError: could not inverse {:?}",
+                    u_i
+                )));
             }
         }
 
@@ -245,7 +256,7 @@ where
             &Randomness::<E::ScalarField, P>::empty(),
         ) {
             Ok((h, _)) => h,
-            Err(error) => return Err(KomodoError::Other(format!("ArkError: {}", error))),
+            Err(error) => return Err(KomodoError::Other(format!("kzg witness error: {}", error))),
         };
         // open.8.2.
         let aplonk_proof = h
@@ -360,7 +371,10 @@ where
         if let Some(inverse) = u_i.inverse() {
             u_inv.push(inverse)
         } else {
-            return Err(KomodoError::Other("EllipticInverseError".to_string()));
+            return Err(KomodoError::Other(format!(
+                "EllipticInverseError: could not inverse {:?}",
+                u_i
+            )));
         }
     }
 
