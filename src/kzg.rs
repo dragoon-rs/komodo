@@ -3,6 +3,40 @@
 //! > references:
 //! > - [Kate et al., 2010](https://link.springer.com/chapter/10.1007/978-3-642-17373-8_11)
 //! > - [Boneh et al., 2020](https://eprint.iacr.org/2020/081)
+//!
+//! # The protocol
+//! Here, we assume that the input data has been encoded with a _Reed-Solomon_ encoding, as can be
+//! done with the [crate::fec] module.
+//!
+//! Conveniently, each one of the $n$ encoded shards is a linear combination of the $k$ source
+//! shards. More precisely, it is the evaluation of the input data seen as a polynomial on some
+//! evalution point.
+//!
+//! We would like to prove that this evaluation has been done correctly and not corrupted. More
+//! formally, we want to prove that a shard $s$ is the evaluation of a polynomial $P$, the input
+//! data, on some evaluation point $\alpha$.
+//!
+//! KZG+ will unfold as follows:
+//! - the prover: evaluates $P$ on a secret point $\tau$ and generates a commitment $c$
+//! - the prover: computes the quotient between $A(X) = P(X) - P(\alpha)$ and $B(X) = X - \alpha$.
+//!   Because $A(X)$ has $\alpha$ as a root by definition, $A(X)$ is divisible by $B(X)$ and the
+//!   result $Q(X) = \frac{A(X)}{B(X)}$ makes sense. A proof $\pi$ is then crafted by evaluting the
+//!   polynomial $Q(X)$ on $\tau$
+//! - the prover: attaches the commit $c$ and the proof $\pi$ to the shard $s$ and shares this
+//!   block onto the network
+//! - the verifier: verifies the validity of the commit $c$, the proof $\pi$ and the shard $s$ with
+//!   a _pairing_ operator defined on an appropriate elliptic curve
+//!
+//! ## Some details
+//! - each shard $s$ is associated to a unique evaluation point $\alpha$
+//! - because $k$ is a fixed code parameter and the data can be of arbitrary size, the bytes are
+//!   arranged in an $m \times k$ matrix of finite field elements. Then, instead of computing $m$
+//!   proofs per shard, KZG+ will _aggregate_ the $m$ polynomials, one per row in the data, into a
+//!   single polynomial $P$. This is done by computing a random linear combination of the $m$ input
+//!   polynomials
+//!
+//! # Example
+//! see the KZG example.
 use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
@@ -18,6 +52,10 @@ use crate::fec::Shard;
 
 pub use crate::zk::ark_commit as commit;
 
+/// representation of a block of proven data.
+///
+/// this is a wrapper around a [`fec::Shard`] with some additional cryptographic
+/// information that allows to prove the integrity of said shard.
 #[derive(Debug, Clone, Default, PartialEq, CanonicalDeserialize, CanonicalSerialize)]
 pub struct Block<E: Pairing> {
     pub shard: Shard<E::ScalarField>,
@@ -25,14 +63,7 @@ pub struct Block<E: Pairing> {
     proof: kzg10::Proof<E>,
 }
 
-/// this function splits the data (bytes) into k shards and generates n shards with a proof for each.
-/// First, generate m polynomials with k coefficients (meaning degree is k-1)
-/// Then, for each shard (n):
-///     evaluate the m polynomials in one point (alpha)
-///     compute a hash of the concatenated evaluations
-///     compute Q(X) = sum_{i=0}^{m-1}{r^i * P_i(X)}
-///     prove this polynomial with KZG10
-///     store in the n Block the proof, the m commits and the m P_i evaluations
+/// proves $n$ encoded shards by computing one proof for each of them and attaching the commitment
 pub fn prove<E, P>(
     commits: Vec<kzg10::Commitment<E>>,
     polynomials: Vec<P>,
@@ -124,6 +155,7 @@ where
 }
 
 /// for a given Block, verify that the data has been correctly generated
+///
 /// First, transform data bytes into m polynomial evaluation
 /// compute the hash of the concatenation of these evaluations
 /// compute y as a combination of the shards: y = sum(r^i * Shard_i) for i=[0..m[

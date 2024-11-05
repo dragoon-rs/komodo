@@ -25,6 +25,8 @@
 //! > using generic types as it's commonly done in Arkworks, it should be possible to specify them
 //! > once and Rust will take care of _carrying_ the types in the rest of the code. Also, `DP<F>`
 //! > will likely be its own generic type, usually written `P` in this code base.
+//! >
+//! > see the Semi-AVID example for a fully-typed code.
 //!
 //! - first, let's import some types...
 //! ```
