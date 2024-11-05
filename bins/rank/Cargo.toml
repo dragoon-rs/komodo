@@ -1,6 +1,6 @@
 [package]
 name = "rank"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 description = "Compute the rank of a matrix."
 
@@ -10,5 +10,5 @@ description = "Compute the rank of a matrix."
 ark-bls12-381 = "0.4.0"
 ark-ff = "0.4.2"
 ark-std = "0.4.0"
-komodo = { version = "0.3.0", path = "../.." }
+komodo = { path = "../.." }
 rand = "0.8.5"

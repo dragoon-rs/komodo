@@ -1,6 +1,6 @@
 [package]
 name = "benchmarks"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 
 [dependencies]
@@ -20,6 +20,6 @@ ark-secp256r1 = "0.4.0"
 ark-std = "0.4.0"
 ark-vesta = "0.4.0"
 clap = { version = "4.5.4", features = ["derive"] }
-komodo = { version = "0.3.0", path = ".." }
+komodo = { path = ".." }
 plnk = { git = "https://gitlab.isae-supaero.fr/a.stevan/plnk", tag = "0.7.0", version = "0.7.0" }
 rand = "0.8.5"

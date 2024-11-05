@@ -1,7 +1,10 @@
 [package]
 name = "komodo"
-version = "0.3.0"
+version = "1.0.0"
 edition = "2021"
+description = "Komodo: cryptographically-proven erasure coding for distributed systems"
+repository = "https://gitlab.isae-supaero.fr/dragoon/komodo"
+readme = "README.md"
 license = "MIT"
 authors = [
     "Antoine Stevan <antoine.stevan@isae-supaero.fr>",
