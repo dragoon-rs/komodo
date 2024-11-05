@@ -3,6 +3,10 @@ name = "komodo"
 version = "0.3.0"
 edition = "2021"
 license = "MIT"
+authors = [
+    "Antoine Stevan <antoine.stevan@isae-supaero.fr>",
+    "Jonathan Detchart <jonathan.detchart@isae-supaero.fr>",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

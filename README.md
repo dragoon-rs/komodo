@@ -32,3 +32,16 @@ Other examples that showcase the Komodo API are available in [`examples/`](examp
 
 ## the benchmarks
 see [`benchmarks/`](benchmarks/README.md)
+
+## contributors
+
+Because the code for this project has been originally extracted from
+[`dragoon/pcs-fec-id`][pcs-fec-id] by @a.stevan, some contributors might be
+missing from the Git tree.
+
+Please consult the original Git tree from [`dragoon/pcs-fec-id`][pcs-fec-id] or
+note that the following people have contributed to this code base:
+- @a.stevan
+- @j.detchart
+
+[pcs-fec-id]: https://gitlab.isae-supaero.fr/dragoon/pcs-fec-id
