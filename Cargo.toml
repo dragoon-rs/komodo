@@ -43,6 +43,9 @@ kzg = ["dep:ark-poly-commit"]
 aplonk = ["dep:ark-poly-commit"]
 fs = []
 
+[package.metadata.docs.rs]
+features = ["kzg", "aplonk"]
+
 [[example]]
 name = "kzg"
 required-features = ["kzg"]
