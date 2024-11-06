@@ -1,4 +1,9 @@
+# Rust
 target/
 Cargo.lock
 
 *.ndjson
+
+# IDEs
+.idea
+.vscode
