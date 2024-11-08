@@ -7,3 +7,5 @@ Cargo.lock
 # IDEs
 .idea
 .vscode
+
+paper.pdf
