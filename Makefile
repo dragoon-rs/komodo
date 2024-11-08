@@ -44,11 +44,19 @@ doc:
 build-examples:
 	cargo build --examples --release
 
-.PHONY: paper
+.PHONY: draft paper
+draft:
+	docker run --rm -it \
+		-v ${PWD}:/data \
+		-u $(id -u):$(id -g) \
+		openjournals/inara \
+		-o pdf \
+		paper.md
 paper:
 	docker run --rm -it \
 		-v ${PWD}:/data \
 		-u $(id -u):$(id -g) \
 		openjournals/inara \
 		-o pdf \
+		-p \
 		paper.md
