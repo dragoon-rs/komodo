@@ -1,59 +1,119 @@
-@article{Pearson:2017,
-  	url = {http://adsabs.harvard.edu/abs/2017arXiv170304627P},
-  	Archiveprefix = {arXiv},
-  	Author = {{Pearson}, S. and {Price-Whelan}, A.~M. and {Johnston}, K.~V.},
-  	Eprint = {1703.04627},
-  	Journal = {ArXiv e-prints},
-  	Keywords = {Astrophysics - Astrophysics of Galaxies},
-  	Month = mar,
-  	Title = {{Gaps in Globular Cluster Streams: Pal 5 and the Galactic Bar}},
-  	Year = 2017
+% our paper
+@article{stevan2024performance,
+    author = {Stevan, A. and Lavaur, T. and Lacan, J. and Detchart, J. and Pérennou, T},
+    title = {Performance Evaluation of Polynomial Commitments for Erasure Code Based Information Dispersal},
+    journal = {10th International Conference on Information Systems Security and Privacy},
+    year = {2024}
 }
 
-@book{Binney:2008,
-  	url = {http://adsabs.harvard.edu/abs/2008gady.book.....B},
-  	Author = {{Binney}, J. and {Tremaine}, S.},
-  	Booktitle = {Galactic Dynamics: Second Edition, by James Binney and Scott Tremaine.~ISBN 978-0-691-13026-2 (HB).~Published by Princeton University Press, Princeton, NJ USA, 2008.},
-  	Publisher = {Princeton University Press},
-  	Title = {{Galactic Dynamics: Second Edition}},
-  	Year = 2008
+% building blocks
+@software{arkworks,
+  author = {arkworks contributors},
+  title = {\texttt{arkworks} zkSNARK ecosystem},
+  url = {https://arkworks.rs},
+  year = {2022},
 }
 
-@article{gaia,
-    author = {{Gaia Collaboration}},
-    title = "{The Gaia mission}",
-    journal = {Astronomy and Astrophysics},
-    archivePrefix = "arXiv",
-    eprint = {1609.04153},
-    primaryClass = "astro-ph.IM",
-    keywords = {space vehicles: instruments, Galaxy: structure, astrometry, parallaxes, proper motions, telescopes},
-    year = 2016,
-    month = nov,
-    volume = 595,
-    doi = {10.1051/0004-6361/201629272},
-    url = {http://adsabs.harvard.edu/abs/2016A%26A...595A...1G},
+@inproceedings{merkle1987digital,
+  title={A digital signature based on a conventional encryption function},
+  author={Merkle, Ralph C},
+  booktitle={Conference on the theory and application of cryptographic techniques},
+  pages={369--378},
+  year={1987},
+  organization={Springer}
 }
 
-@article{astropy,
-    author = {{Astropy Collaboration}},
-    title = "{Astropy: A community Python package for astronomy}",
-    journal = {Astronomy and Astrophysics},
-    archivePrefix = "arXiv",
-    eprint = {1307.6212},
-    primaryClass = "astro-ph.IM",
-    keywords = {methods: data analysis, methods: miscellaneous, virtual observatory tools},
-    year = 2013,
-    month = oct,
-    volume = 558,
-    doi = {10.1051/0004-6361/201322068},
-    url = {http://adsabs.harvard.edu/abs/2013A%26A...558A..33A}
+@inproceedings{fiat1986prove,
+  title={How to prove yourself: Practical solutions to identification and signature problems},
+  author={Fiat, Amos and Shamir, Adi},
+  booktitle={Conference on the theory and application of cryptographic techniques},
+  pages={186--194},
+  year={1986},
+  organization={Springer},
+  url={https://link.springer.com/content/pdf/10.1007/3-540-47721-7.pdf?pdf=button},
 }
 
-@misc{fidgit,
-  author = {A. M. Smith and K. Thaney and M. Hahnel},
-  title = {Fidgit: An ungodly union of GitHub and Figshare},
-  year = {2020},
-  publisher = {GitHub},
-  journal = {GitHub repository},
-  url = {https://github.com/arfon/fidgit}
+% KZG
+@inproceedings{groth2016size,
+  title={On the size of pairing-based non-interactive arguments},
+  author={Groth, Jens},
+  booktitle={Advances in Cryptology--EUROCRYPT 2016: 35th Annual International Conference on the Theory and Applications of Cryptographic Techniques, Vienna, Austria, May 8-12, 2016, Proceedings, Part II 35},
+  pages={305--326},
+  year={2016},
+  organization={Springer},
+  url = {https://eprint.iacr.org/2016/260.pdf},
+}
+
+@inproceedings{kate2010constant,
+  title={Constant-size commitments to polynomials and their applications},
+  author={Kate, Aniket and Zaverucha, Gregory M and Goldberg, Ian},
+  booktitle={Advances in Cryptology-ASIACRYPT 2010: 16th International Conference on the Theory and Application of Cryptology and Information Security, Singapore, December 5-9, 2010. Proceedings 16},
+  pages={177--194},
+  year={2010},
+  organization={Springer},
+  url = {https://iacr.org/archive/asiacrypt2010/6477178/6477178.pdf},
+}
+
+@article{boneh2020efficient,
+  title={Efficient polynomial commitment schemes for multiple points and polynomials},
+  author={Boneh, Dan and Drake, Justin and Fisch, Ben and Gabizon, Ariel},
+  journal={Cryptology ePrint Archive},
+  year={2020},
+  url={https://eprint.iacr.org/2020/081.pdf},
+}
+
+% aPlonK
+@article{gabizon2019plonk,
+  title={{PLONK: Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of Knowledge}},
+  author={Gabizon, Ariel and Williamson, Zachary J and Ciobotaru, Oana},
+  journal={Cryptology ePrint Archive},
+  year={2019},
+  url={https://eprint.iacr.org/2019/953.pdf}
+}
+
+@article{ambrona2022aplonk,
+  title={{aPlonK: Aggregated PlonK from Multi-Polynomial Commitment Schemes}},
+  author={Ambrona, Miguel and Beunardeau, Marc and Schmitt, Anne-Laure and Toledo, Rapha{\"e}l R},
+  journal={Cryptology ePrint Archive},
+  year={2022},
+  url={https://eprint.iacr.org/2022/1352.pdf},
+}
+
+@misc{tezos2024aplonk,
+  author={Tezos},
+  title={Tezos lib\_aplonk},
+  year={2024},
+  url={https://gitlab.com/tezos/tezos/-/tree/master/src/lib_aplonk},
+}
+
+% Semi-AVID
+@inproceedings{nazirkhanova2022information,
+  title={Information dispersal with provable retrievability for rollups},
+  author={Nazirkhanova, Kamilla and Neu, Joachim and Tse, David},
+  booktitle={Proceedings of the 4th ACM Conference on Advances in Financial Technologies},
+  pages={180--197},
+  year={2022},
+  url={https://arxiv.org/pdf/2111.12323.pdf},
+}
+
+% Data Availability Sampling (DAS) in the wild
+@online{scroll2024,
+  title  = {KZG in Practice: Polynomial Commitment Schemes and Their Usage in Scaling Ethereum},
+  author = {Andy Arditi},
+  year   = {2024},
+  url    = {https://scroll.io/blog/kzg},
+}
+
+@online{avail2024,
+  title  = {avail: The essential base layer for modern blockchains.},
+  author = {avail},
+  year   = {2024},
+  url    = {https://www.availproject.org/da},
+}
+
+@online{danksharding2024,
+  title  = {Danksharding},
+  author = {Ethereum},
+  year   = {2024},
+  url    = {https://ethereum.org/en/roadmap/danksharding/#what-is-protodanksharding},
 }

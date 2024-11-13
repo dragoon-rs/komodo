@@ -1,120 +1,191 @@
 ---
-title: 'Gala: A Python package for galactic dynamics'
+title: 'Komodo: Cryptographically-proven Erasure Coding'
 tags:
-  - Python
-  - astronomy
-  - dynamics
-  - galactic dynamics
-  - milky way
+  - Rust
+  - cryptography
+  - erasure codes
+  - distributed systems
+  - data availability sampling
 authors:
-  - name: Adrian M. Price-Whelan
-    orcid: 0000-0000-0000-0000
+  - name: Antoine Stevan
+    orcid: 0009-0003-5684-5862
     equal-contrib: true
-    affiliation: "1, 2" # (Multiple affiliations must be quoted)
-  - name: Author Without ORCID
-    equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
-    affiliation: 2
-  - name: Author with no affiliation
-    corresponding: true # (This is how to denote the corresponding author)
-    affiliation: 3
-  - given-names: Ludwig
-    dropping-particle: van
-    surname: Beethoven
-    affiliation: 3
+    affiliation: 1
+  - name: Jonathan Detchart
+    orcid: 0000-0002-4237-5981
+    equal-contrib: true
+    affiliation: 1
+  - name: Tanguy Pérennou
+    orcid: 0009-0002-2542-0004
+    equal-contrib: false
+    affiliation: 1
+  - name: Jérôme Lacan
+    orcid: 0000-0002-3121-4824
+    equal-contrib: false
+    affiliation: 1
 affiliations:
- - name: Lyman Spitzer, Jr. Fellow, Princeton University, USA
+ - name: ISAE-SUPAERO, France
    index: 1
-   ror: 00hx57361
- - name: Institution Name, Country
-   index: 2
- - name: Independent Researcher, Country
-   index: 3
-date: 13 August 2017
+date: 01 January 1970
 bibliography: paper.bib
-
-# Optional fields if submitting to a AAS journal too, see this blog post:
-# https://blog.joss.theoj.org/2018/12/a-new-collaboration-with-aas-publishing
-aas-doi: 10.3847/xxxxx <- update this with the DOI from AAS once you know it.
-aas-journal: Astrophysical Journal <- The name of the AAS journal.
 ---
+
+# Abstract
+
+We present **Komodo**, a library that allows to encode data using with
+erasure-code techniques such as Reed-Solomon encoding, prove the resulting
+shards with cryptographic protocols, verify their integrity on the other end
+and decode the original data from a subset of shards.
+The library is implemented in the _Rust_ programming language and
+available on the ISAE-SUPAERO GitLab instance [^1] with a mirror on GitHub [^2].
+**Komodo** should be of interest for people willing to explore the field of
+cryptographically-proven shards of data in distributed systems or data
+availability sampling.
+
+[^1]: GitLab source code: [https://gitlab.isae-supaero.fr/dragoon/komodo](https://gitlab.isae-supaero.fr/dragoon/komodo)
+[^2]: GitHub mirror for issues and pull requests: [https://github.com/dragoon-rs/komodo](https://github.com/dragoon-rs/komodo)
+
+# Keywords
+
+Cryptography; Erasure codes; Distributed systems; Data availability sampling;
 
 # Summary
 
-The forces on stars, galaxies, and dark matter under external gravitational
-fields lead to the dynamical evolution of structures in the universe. The orbits
-of these bodies are therefore key to understanding the formation, history, and
-future state of galaxies. The field of "galactic dynamics," which aims to model
-the gravitating components of galaxies to study their structure and evolution,
-is now well-established, commonly taught, and frequently used in astronomy.
-Aside from toy problems and demonstrations, the majority of problems require
-efficient numerical tools, many of which require the same base code (e.g., for
-performing numerical orbit integration).
+- encode data into shards with $(k, n)$ code
+- prove all $n$ encoded shards with one of three cryptographic protocols
+- verify any shard individually for its validity
+- decode the original data using any subset of $k$ valid shards
+
+the three methods:
+
+- **KZG+**: Groth16 [@groth2016size],
+  **KZG** [@kate2010constant; @boneh2020efficient]
+- **aPlonK**: PlonK [@gabizon2019plonk] and **aPlonK** [@ambrona2022aplonk]
+- **Semi-AVID**: **Semi-AVID** [@nazirkhanova2022information]
+
+beta version used in the first performance evaluation paper
+[@stevan2024performance] and available at
+[https://gitlab.isae-supaero.fr/dragoon/pcs-fec-id](https://gitlab.isae-supaero.fr/dragoon/pcs-fec-id).
+
+compare to Arkworks [@arkworks] and
+[https://github.com/arkworks-rs](https://github.com/arkworks-rs) and Tezos
+[@tezos2024aplonk].
+
+mention Merkle trees [@merkle1987digital] and Fiat-Shamir [@fiat1986prove]?
+
+## Implementation and architecture
+
+show the code tree?
+
+no variants or associated implementation differences.
+
+## Quality control
+
+all matrix operations are tested.
+
+the encoding and decoding is tested.
+
+all steps of the three protocols are tested.
+
+run `make check clippy test`.
+
+examples for the three protocols are provided in `examples/`.
+
+```rust
+use ark_bls12_381::{Fr as F, G1Projective as G};
+use ark_poly::univariate::DensePolynomial as DP;
+
+let mut rng = ark_std::test_rng();
+
+let (k, n) = (3, 6_usize);
+let bts = ...;
+
+let ps = komodo::zk::setup::<F, G>(bts.len(), &mut rng).unwrap();
+
+let m = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
+let ss = komodo::fec::encode(&bts, m).unwrap();
+let p = prove::<F, G, DP<F>>(&bts, &ps, m.height).unwrap();
+let bs = build::<F, G, DP<F>>(&ss, &p);
+
+for b in &bs {
+    assert!(verify::<F, G, DP<F>>(b, &ps).unwrap());
+}
+
+let s = bs[0..k].iter().cloned().map(|b| b.shard).collect();
+assert_eq!(bts, komodo::fec::decode(ss).unwrap());
+```
+
+a more complete CLI application of **Semi-AVID** is available in `bins/saclin/`.
 
 # Statement of need
 
-`Gala` is an Astropy-affiliated Python package for galactic dynamics. Python
-enables wrapping low-level languages (e.g., C) for speed without losing
-flexibility or ease-of-use in the user-interface. The API for `Gala` was
-designed to provide a class-based and user-friendly interface to fast (C or
-Cython-optimized) implementations of common operations such as gravitational
-potential and force evaluation, orbit integration, dynamical transformations,
-and chaos indicators for nonlinear dynamics. `Gala` also relies heavily on and
-interfaces well with the implementations of physical units and astronomical
-coordinate systems in the `Astropy` package [@astropy] (`astropy.units` and
-`astropy.coordinates`).
+the use case is any system that meet the following criteria
 
-`Gala` was designed to be used by both astronomical researchers and by
-students in courses on gravitational dynamics or astronomy. It has already been
-used in a number of scientific publications [@Pearson:2017] and has also been
-used in graduate courses on Galactic dynamics to, e.g., provide interactive
-visualizations of textbook material [@Binney:2008]. The combination of speed,
-design, and support for Astropy functionality in `Gala` will enable exciting
-scientific explorations of forthcoming data releases from the *Gaia* mission
-[@gaia] by students and experts alike.
+- distributed, e.g. drones
+- need for data robustness, e.g. by introducing redundancy
+- no trust in others nor the environment, need to prove the integrity of the data
 
-# Mathematics
+Scroll [@scroll2024], Avail [@avail2024] and Danksharding [@danksharding2024].
 
-Single dollars ($) are required for inline mathematics e.g. $f(x) = e^{\pi/x}$
+**Komodo** can be extended with either
 
-Double dollars make self-standing equations:
+new encoding methods in the `fec` module
+proof protocols, just as with the `kzg`, `aplonk` and `semi_avid` modules
 
-$$\Theta(x) = \left\{\begin{array}{l}
-0\textrm{ if } x < 0\cr
-1\textrm{ else}
-\end{array}\right.$$
+contact us at `firstname.lastname@isae-supaero.fr` or at one of the
+_support pages_ below
 
-You can also use plain \LaTeX for equations
-\begin{equation}\label{eq:fourier}
-\hat f(\omega) = \int_{-\infty}^{\infty} f(x) e^{i\omega x} dx
-\end{equation}
-and refer to \autoref{eq:fourier} from text.
+**support**: we provide support on GitHub
 
-# Citations
+- bug reports and feature requests [https://gitlab.isae-supaero.fr/dragoon/komodo/-/issues](https://gitlab.isae-supaero.fr/dragoon/komodo/-/issues)
+- contributions [https://gitlab.isae-supaero.fr/dragoon/komodo/-/merge_requests](https://gitlab.isae-supaero.fr/dragoon/komodo/-/merge_requests)
 
-Citations to entries in paper.bib should be in
-[rMarkdown](http://rmarkdown.rstudio.com/authoring_bibliographies_and_citations.html)
-format.
+# Availability
+## Operating system
 
-If you want to cite a software repository URL (e.g. something on GitHub without a preferred
-citation) then you can do it with the example BibTeX entry below for @fidgit.
+Linux, untested on other OSs
 
-For a quick reference, the following citation commands can be used:
-- `@author:2001`  ->  "Author et al. (2001)"
-- `[@author:2001]` -> "(Author et al., 2001)"
-- `[@author1:2001; @author2:2001]` -> "(Author1 et al., 2001; Author2 et al., 2002)"
+## Programming language
 
-# Figures
+install _Cargo_ [^3], e.g. with _rustup_ [^4]
 
-Figures can be included like this:
-![Caption for example figure.\label{fig:example}](figure.png)
-and referenced from text using \autoref{fig:example}.
+[^3]: _Cargo_: [https://doc.rust-lang.org/cargo/](https://doc.rust-lang.org/cargo/)
+[^4]: `rustup`: [https://rustup.rs/](https://rustup.rs/)
 
-Figure sizes can be customized by adding an optional second parameter:
-![Caption for example figure.](figure.png){ width=20% }
+exact version taken care of by `rust-toolchain.toml`
+
+## Additional system requirements
+
+depends on the data for the memory usage
+
+## Dependencies
+
+all taken care of by Cargo and `Cargo.toml`
+
+## Software location:
+
+**Code repository**: GitLab
+
+- Name: **Komodo**
+- Persistent identifier: [https://gitlab.isae-supaero.fr/dragoon/komodo](https://gitlab.isae-supaero.fr/dragoon/komodo)
+- Licence: MIT
+- Date published: 05/11/2024
+
+**Mirror**: GitHub
+
+- Name: **Komodo**
+- Persistent identifier: [https://github.com/dragoon-rs/komodo](https://github.com/dragoon-rs/komodo)
+- Licence: MIT
+- Date published: 05/11/2024
+
+## Language
+
+all written in english
 
 # Acknowledgements
 
-We acknowledge contributions from Brigitta Sipocz, Syrtis Major, and Semyeong
-Oh, and support from Kathryn Johnston during the genesis of this project.
+This work was supported by the Defense Innovation Agency (AID) of the French
+Ministry of Defense through the Research Project DRAGOON: Dependable distRibuted
+storAGe fOr mObile Nodes (2022 65 0082).
 
 # References
