@@ -289,26 +289,32 @@ _support pages_ below
 - contributions [https://gitlab.isae-supaero.fr/dragoon/komodo/-/merge_requests](https://gitlab.isae-supaero.fr/dragoon/komodo/-/merge_requests)
 
 # Availability
+
+This section details requirements for **Komodo** to work properly and
+information about where the source code is hosted.
+
 ## Operating system
 
-Linux, untested on other OSs
+**Komodo** has been made on Linux but should be crossplatform by construction.
 
 ## Programming language
 
-install _Cargo_ [^3], e.g. with _rustup_ [^4]
+**Komodo** is fully written in _Rust_.
+
+One can install _Cargo_ [^3], e.g. with _rustup_ [^4], and the exact version
+is taken care of by `rust-toolchain.toml`
 
 [^3]: _Cargo_: [https://doc.rust-lang.org/cargo/](https://doc.rust-lang.org/cargo/)
 [^4]: `rustup`: [https://rustup.rs/](https://rustup.rs/)
 
-exact version taken care of by `rust-toolchain.toml`
-
 ## Additional system requirements
 
-depends on the data for the memory usage
+This depends on the data for the memory usage but all experiments and
+measurements have been conducted on regular _home_ computers.
 
 ## Dependencies
 
-all taken care of by Cargo and `Cargo.toml`
+All dependencies are taken care of by _Cargo_ and `Cargo.toml`.
 
 ## Software location:
 
@@ -328,7 +334,7 @@ all taken care of by Cargo and `Cargo.toml`
 
 ## Language
 
-all written in english
+Everything is written in english.
 
 # Acknowledgements
 
