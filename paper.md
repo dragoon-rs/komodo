@@ -148,9 +148,9 @@ worst than **Semi-AVID** for committing and proving.
     \node [block, right of=commitment,node distance=1.5cm] (blocks) {$(b_j)$};
     \node [block, right of=blocks,node distance=3cm] (verified) {$(b^*_j)$};
     \node [block, below of=verified,node distance=2cm] (decoded) {$(\tilde{s}_i)$};
-    \draw [->] (source) -- node{$S \times E$} (encoded);
-    \draw [->] (encoded) -- node[name=a,anchor=north]{\texttt{commit}} (commitment);
-    \draw [->] (a) |- node{\texttt{prove}} (proof);
+    \draw [->] (source) -- node{\texttt{encode}} (encoded);
+    \draw [->] (encoded) -- node[name=a,anchor=south]{\texttt{commit}} (commitment);
+    \draw [->] (a) |- node[anchor=north]{\texttt{prove}} (proof);
     \draw [->] (commitment) -- (blocks);
     \draw [->] (proof) -| (blocks);
     \draw [->] (blocks) -- node{\texttt{verify}} (verified);
