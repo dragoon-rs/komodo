@@ -141,28 +141,20 @@ worst than **Semi-AVID** for committing and proving.
 }
 
 \begin{tikzpicture}[auto, node distance=2cm,>=latex']
-    \node [input, name=rinput] (rinput) {};
-    \node [sum, right of=rinput] (sum1) {};
-    \node [block, right of=sum1] (controller) {$k_{p\beta}$};
-    \node [block, above of=controller,node distance=1.3cm] (up){$\frac{k_{i\beta}}{s}$};
-    \node [block, below of=controller,node distance=1.3cm] (rate) {$sk_{d\beta}$};
-    \node [sum, right of=controller,node distance=2cm] (sum2) {};
-    \node [block, above = 2cm of sum2](extra){$\frac{1}{\alpha_{\beta2}}$};  %
-    \node [block, right of=sum2,node distance=2cm] (system) {$\frac{a_{\beta 2}}{s+a_{\beta 1}}$};
-    \node [output, right of=system, node distance=2cm] (output) {};
-    \node [tmp, below of=controller] (tmp1){$H(s)$};
-    \draw [->] (rinput) -- node{$R(s)$} (sum1);
-    \draw [->] (sum1) --node[name=z,anchor=north]{$E(s)$} (controller);
-    \draw [->] (controller) -- (sum2);
-    \draw [->] (sum2) -- node{$U(s)$} (system);
-    \draw [->] (system) -- node [name=y] {$Y(s)$}(output);
-    \draw [->] (z) |- (rate);
-    \draw [->] (rate) -| (sum2);
-    \draw [->] (z) |- (up);
-    \draw [->] (up) -| (sum2);
-    \draw [->] (y) |- (tmp1)-| node[pos=0.99] {$-$} (sum1);
-    \draw [->] (extra)--(sum2);
-    \draw [->] ($(0,1.5cm)+(extra)$)node[above]{$d_{\beta 2}$} -- (extra);
+    \node [block] (source) {$(s_i)_{1 \leq i \leq k}$};
+    \node [block, right of=source,node distance=3cm] (encoded) {$(e_j)_{1 \leq j \leq n}$};
+    \node [block, right of=encoded,node distance=3cm] (commitment) {$c$};
+    \node [block, below of=commitment,node distance=1.3cm] (proof) {$(\pi_j)$};
+    \node [block, right of=commitment,node distance=1.5cm] (blocks) {$(b_j)$};
+    \node [block, right of=blocks,node distance=3cm] (verified) {$(b^*_j)$};
+    \node [block, below of=verified,node distance=2cm] (decoded) {$(\tilde{s}_i)$};
+    \draw [->] (source) -- node{$S \times E$} (encoded);
+    \draw [->] (encoded) -- node[name=a,anchor=north]{\texttt{commit}} (commitment);
+    \draw [->] (a) |- node{\texttt{prove}} (proof);
+    \draw [->] (commitment) -- (blocks);
+    \draw [->] (proof) -| (blocks);
+    \draw [->] (blocks) -- node{\texttt{verify}} (verified);
+    \draw [->] (verified) -- node{\texttt{decode}} (decoded);
 \end{tikzpicture}
 
 # Statement of need
