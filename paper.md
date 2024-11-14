@@ -92,71 +92,17 @@ integrity of encoded data:
   combination of commitments is equal to the commitment of the same linear
   combination_.
 
-beta version used in the first performance evaluation paper
-[@stevan2024performance] and available at
+A beta version of **Komodo** has been used in a previous evaluation paper
+[@stevan2024performance] and is still available for reference at
 [https://gitlab.isae-supaero.fr/dragoon/pcs-fec-id](https://gitlab.isae-supaero.fr/dragoon/pcs-fec-id).
 
-compare to Arkworks [@arkworks] and
-[https://github.com/arkworks-rs](https://github.com/arkworks-rs) and Tezos
-[@tezos2024aplonk].
+**Komodo** is based on the Arkworks library [@arkworks] which provides
+implementations of elliptic curves, fields and polynomial algebra used in all
+the proving protocols.
 
-mention Merkle trees [@merkle1987digital] and Fiat-Shamir [@fiat1986prove]?
+> mention Merkle trees [@merkle1987digital] and Fiat-Shamir [@fiat1986prove]?
 
-## Implementation and architecture
-
-show the code tree?
-
-no variants or associated implementation differences.
-
-## Quality control
-
-all matrix operations are tested.
-
-the encoding and decoding is tested.
-
-all steps of the three protocols are tested.
-
-run `make check clippy test`.
-
-examples for the three protocols are provided in `examples/`.
-
-```rust
-use ark_bls12_381::{Fr as F, G1Projective as G};
-use ark_poly::univariate::DensePolynomial as DP;
-
-let mut rng = ark_std::test_rng();
-
-let (k, n) = (3, 6_usize);
-let bts = ...;
-
-let ps = komodo::zk::setup::<F, G>(bts.len(), &mut rng).unwrap();
-
-let m = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
-let ss = komodo::fec::encode(&bts, m).unwrap();
-let p = prove::<F, G, DP<F>>(&bts, &ps, m.height).unwrap();
-let bs = build::<F, G, DP<F>>(&ss, &p);
-
-for b in &bs {
-    assert!(verify::<F, G, DP<F>>(b, &ps).unwrap());
-}
-
-let s = bs[0..k].iter().cloned().map(|b| b.shard).collect();
-assert_eq!(bts, komodo::fec::decode(ss).unwrap());
-```
-
-a more complete CLI application of **Semi-AVID** is available in `bins/saclin/`.
-
-![Performance for small files.\label{fig:small}](figures/small.png)
-
-**Semi-AVID** is the best for small files as can be seen in \autoref{fig:small}.
-
-![Performance for large files.\label{fig:large}](figures/large.png)
-
-**aPlonK** is slightly better for verifying large files, see
-\autoref{fig:large}, but still suffers from performance orders of magnitude
-worst than **Semi-AVID** for committing and proving.
-
-**KZG+** is neither good nor too bad.
+## General data flow in **Komodo**
 
 \tikzset{
     block/.style = {draw, fill=white, rectangle, minimum height=3em, minimum width=3em},
@@ -186,18 +132,136 @@ worst than **Semi-AVID** for committing and proving.
 
 where
 
-- $S = (s_i)_{1 \leq i \leq k} \in \mathcal{M}_{m \times k}(\mathbb{F})$ is the matrix of source shards
+- $S = (s_i)_{1 \leq i \leq k} \in \mathcal{M}_{m \times k}(\mathbb{F})$ is the
+  matrix of source shards
 - $M \in \mathcal{M}_{k \times n}(\mathbb{F})$ is the encoding matrix
-- $E = (e_j)_{1 \leq j \leq n} \in \mathcal{M}_{m \times n}(\mathbb{F})$ is the matrix of encoded shards
-- $c \in \mathbb{F}$ is the common _commiment_
+- $E = (e_j)_{1 \leq j \leq n} = S \times M \in \mathcal{M}_{m \times n}(\mathbb{F})$
+  is the matrix of encoded shards
+- $c \in \mathbb{F}$ is the common _commitment_
 - $(\pi_j)_{1 \leq j \leq n} \in \mathbb{F}^{n}$ are the proofs for each _shard_
 - $(b_j)_{1 \leq j \leq n}$ are the final proven blocks, i.e. $(e_j, c, \pi_j)$
 
-$$E = S \times M$$
-$$(\tilde{s}_i) \stackrel{?}{=} (s_i)$$
+A valid and robust system should satisfy and guarantee the two following
+properties:
 
-in the case of **Semi-AVID**, there could be more steps before the
-\texttt{verify} stage: shards could be recoded together
+- all blocks $(b^*_j)$ are valid and all other blocks are invalid
+- $(\tilde{s}_i) \stackrel{?}{=} (s_i)$
+
+> **Note**
+>
+> In the case of **Semi-AVID**, there could be more steps before the
+> \texttt{verify} stage. Indeed, because it is the only method that does not
+> require the full original data to produce proofs, it does support a technic
+> that we call _recoding_, i.e. generating new shards on the fly with any amount
+> of other shards, including strictly less than $k$ shards.
+
+## Examples
+
+We provide full examples for the three protocols in `examples/`. Below is a
+simplified version of these examples that follows the diagram from the previous
+section.
+
+> **Note**
+>
+> The following snippets of code are not fully-valid _Rust_ code. They have been
+> slightly simplified for the sake of readability in this document. An example
+> of such simplification is that we have ommitted the use of a `main` function,
+> which is mandatory in a _Rust_ program.
+>
+> All dependencies used below are defined unambiguously in `Cargo.toml`.
+
+First, some definitions need to be imported.
+
+```rust
+// definitions used to specify generic types
+use ark_bls12_381::{Fr as F, G1Projective as G};
+use ark_poly::univariate::DensePolynomial as DP;
+
+// the code from the Komodo library
+use komodo::{algebra::linalg::Matrix, fec::{decode, encode}, zk::setup}
+```
+
+Then we can define a pseudo-random number generator, the parameters of our code
+$(k, n)$, the input bytes and a _trusted setup_, which is a sequence of powers
+of a secret element of $\mathbb{F}$.
+
+```rust
+let mut rng = ark_std::test_rng();
+
+let (k, n) = (3, 6);
+let bytes: Vec<u8> = vec![
+  // fill with real data
+];
+
+let powers = setup::<F, G>(bytes.len(), &mut rng)?;
+```
+
+The next step, following the diagram above is to encode and prove the data to
+generate $n$ encoded and proven blocks.
+
+```rust
+let encoding_matrix = Matrix::random(k, n, &mut rng);
+let shards = encode(&bytes, &encoding_matrix)?;
+let proofs = prove::<F, G, DP<F>>(&bytes, &powers, encoding_matrix.height)?;
+let blocks = build::<F, G, DP<F>>(&shards, &proofs);
+```
+
+Finally, these blocks can be verified with `verify`.
+
+```rust
+// we assume here that all blocks are still valid
+for b in &blocks {
+    assert!(verify::<F, G, DP<F>>(b, &powers)?);
+}
+```
+
+And the original data can be decoded using any subset of $k$ valid blocks
+```rust
+assert_eq!(
+    bytes,
+    decode(blocks[0..k].iter().cloned().map(|b| b.shard).collect())?;
+);
+```
+
+> **Note**
+>
+> A more complete CLI application of **Semi-AVID** is available in
+> `bins/saclin/`.
+
+## Quality control
+
+**Komodo** provides a test suite to give the highest confidence possible in the
+validity of the source code.
+
+To achieve this goal, all matrix operations are tested as well as the encoding
+and decoding process and the three cryptographic protocols.
+
+To run the test suite, please run
+
+```bash
+make check clippy test
+```
+
+## Some measurements
+
+Building on the work from [@stevan2024performance], we have conducted some
+measurements of the performance of the three methods.
+
+The time to run `commit`, `prove` and `verify` has been measured for $k = 8$ and
+a code rate $\rho = \frac{1}{2}$, i.e. $n = 16$ on the BN-254 elliptic curve and
+for small and large input data.
+
+![Performance for small files.\label{fig:small}](figures/small.png)
+
+**Semi-AVID** is the best for small files as can be seen in \autoref{fig:small}.
+
+![Performance for large files.\label{fig:large}](figures/large.png)
+
+**aPlonK** is slightly better for verifying large files, see
+\autoref{fig:large}, but still suffers from performance orders of magnitude
+worst than **Semi-AVID** for committing and proving.
+
+**KZG+** is neither good nor too bad.
 
 # Statement of need
 
@@ -213,6 +277,8 @@ Scroll [@scroll2024], Avail [@avail2024] and Danksharding [@danksharding2024].
 
 new encoding methods in the `fec` module
 proof protocols, just as with the `kzg`, `aplonk` and `semi_avid` modules
+
+and Tezos [@tezos2024aplonk].
 
 contact us at `firstname.lastname@isae-supaero.fr` or at one of the
 _support pages_ below
