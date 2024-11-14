@@ -117,6 +117,18 @@ assert_eq!(bts, komodo::fec::decode(ss).unwrap());
 
 a more complete CLI application of **Semi-AVID** is available in `bins/saclin/`.
 
+![Performance for small files.\label{fig:small}](figures/small.png)
+
+**Semi-AVID** is the best for small files as can be seen in \autoref{fig:small}.
+
+![Performance for large files.\label{fig:large}](figures/large.png)
+
+**aPlonK** is slightly better for verifying large files, see
+\autoref{fig:large}, but still suffers from performance orders of magnitude
+worst than **Semi-AVID** for committing and proving.
+
+**KZG+** is neither good nor too bad.
+
 # Statement of need
 
 the use case is any system that meet the following criteria
