@@ -53,17 +53,44 @@ Cryptography; Erasure codes; Distributed systems; Data availability sampling;
 
 # Summary
 
-- encode data into shards with $(k, n)$ code
-- prove all $n$ encoded shards with one of three cryptographic protocols
-- verify any shard individually for its validity
-- decode the original data using any subset of $k$ valid shards
+**Komodo** is a software library that provides a _Rust_ API to achieve the
+following on any input data in a distributed network or setup:
 
-the three methods:
+- `encode`: data is encoded into _shards_ with a $(k, n)$ code. This adds
+  redundancy to the data, making the network more resilient to failure,
+  fragmentation, partitioning, loss or corruption.
+- `commit` and `prove`: all $n$ encoded shards are proven with one of three
+  available cryptographic protocols (see below for more information. This step
+  consists of attaching extra information to them and sharing augmented _blocks_
+  of data onto the network. This extra information should guarantee, maybe only
+  with a very high probability, that a given shard has been generated indeed
+  though an expected encoding process, namely a polynomial evaluation or vector
+  innner-product encoding such as Reed-Solomon.
+- `verify`: any shard is verified individually for its validity. This allows to
+  discriminate invalid or corrupted shards without requiring a full decoding of
+  the original data.
+- `decode`: the original data is decoded using any subset of $k$ valid shards.
 
-- **KZG+**: Groth16 [@groth2016size],
-  **KZG** [@kate2010constant; @boneh2020efficient]
-- **aPlonK**: PlonK [@gabizon2019plonk] and **aPlonK** [@ambrona2022aplonk]
-- **Semi-AVID**: **Semi-AVID** [@nazirkhanova2022information]
+This version of **Komodo** ships three cryptographic methods to prove the
+integrity of encoded data:
+
+- **KZG+**: This method is based on the well-known _zero-knowledge_ protocol
+  **KZG** [@kate2010constant] and its multi-polynomial extension
+  [@boneh2020efficient]. In **KZG**, the data is interpreted as a polynomial.
+  Then a commitment of this polynomial, common to all shards, is computed.
+  Finally, a proof, unique per shard, is computed and attached to the associated
+  shard. The multi-polynomial extension allows to scale to bigger data by still
+  computing a single proof per shard regardless of the size of the input data.
+- **aPlonK**: This method is based on the following work: PlonK
+  [@gabizon2019plonk] and **aPlonK** [@ambrona2022aplonk]. Through recursion and
+  tree _folding_, it achieves smaller commitment sizes as compared to **KZG+**
+  at the cost of very expensive proving times.
+- **Semi-AVID**: This last method is the simplest and the fastest. It is based
+  on the work of **Semi-AVID-PR** [@nazirkhanova2022information]. Instead of
+  computing proofs as extra cryptographic elements, **Semi-AVID** leverages the
+  _homomorphic_ property of the `commit` operation which makes sure _the linear
+  combination of commitments is equal to the commitment of the same linear
+  combination_.
 
 beta version used in the first performance evaluation paper
 [@stevan2024performance] and available at
