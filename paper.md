@@ -164,6 +164,7 @@ where
 - $E = (e_j)_{1 \leq j \leq n} \in \mathcal{M}_{m \times n}(\mathbb{F})$ is the matrix of encoded shards
 - $c \in \mathbb{F}$ is the common _commiment_
 - $(\pi_j)_{1 \leq j \leq n} \in \mathbb{F}^{n}$ are the proofs for each _shard_
+- $(b_j)_{1 \leq j \leq n}$ are the final proven blocks, i.e. $(e_j, c, \pi_j)$
 
 $$E = S \times M$$
 $$(\tilde{s}_i) \stackrel{?}{=} (s_i)$$
