@@ -34,15 +34,15 @@ bibliography: paper.bib
 
 # Abstract
 
-We present **Komodo**, a library that allows to encode data using with
-erasure-code techniques such as Reed-Solomon encoding, prove the resulting
-shards with cryptographic protocols, verify their integrity on the other end
-and decode the original data from a subset of shards.
+We present **Komodo**, a library that allows to encode data with erasure-code
+techniques such as Reed-Solomon encoding, prove the resulting shards with
+cryptographic protocols, verify their integrity on the other end of any
+distributed network and decode the original data from a subset of said shards.
 The library is implemented in the _Rust_ programming language and
 available on the ISAE-SUPAERO GitLab instance [^1] with a mirror on GitHub [^2].
 **Komodo** should be of interest for people willing to explore the field of
 cryptographically-proven shards of data in distributed systems or data
-availability sampling.
+availability sampling settings.
 
 [^1]: GitLab source code: [https://gitlab.isae-supaero.fr/dragoon/komodo](https://gitlab.isae-supaero.fr/dragoon/komodo)
 [^2]: GitHub mirror for issues and pull requests: [https://github.com/dragoon-rs/komodo](https://github.com/dragoon-rs/komodo)
