@@ -141,14 +141,14 @@ worst than **Semi-AVID** for committing and proving.
 }
 
 \begin{tikzpicture}[auto, node distance=2cm,>=latex']
-    \node [block, fill=red!50] (source) {$(s_i)_{1 \leq i \leq k}$};
-    \node [block, right of=source, node distance=3cm] (encoded) {$(e_j)_{1 \leq j \leq n}$};
+    \node [block, fill=red!50] (source) {$(s_i)$};
+    \node [block, right of=source, node distance=4cm] (encoded) {$(e_j)$};
     \node [block, right of=encoded, node distance=3cm, fill=yellow!20] (commitment) {$c$};
     \node [block, below of=commitment, node distance=1.3cm, fill=yellow!30] (proof) {$(\pi_j)$};
     \node [block, right of=commitment, node distance=1.5cm, fill=blue!50] (blocks) {$(b_j)$};
     \node [block, right of=blocks, node distance=3cm, fill=blue!20] (verified) {$(b^*_j)$};
     \node [block, below of=verified, node distance=2cm, fill=red!20] (decoded) {$(\tilde{s}_i)$};
-    \draw [->] (source) -- node{\texttt{encode}} (encoded);
+    \draw [->] (source) -- node{\texttt{encode(k, n)}} (encoded);
     \draw [->] (encoded) -- node[name=a,anchor=south]{\texttt{commit}} (commitment);
     \draw [->] (a) |- node[anchor=north]{\texttt{prove}} (proof);
     \draw [->] (commitment) -- (blocks);
@@ -156,6 +156,20 @@ worst than **Semi-AVID** for committing and proving.
     \draw [->] (blocks) -- node{\texttt{verify}} (verified);
     \draw [->] (verified) -- node{\texttt{decode}} (decoded);
 \end{tikzpicture}
+
+where
+
+- $S = (s_i)_{1 \leq i \leq k} \in \mathcal{M}_{m \times k}(\mathbb{F})$ is the matrix of source shards
+- $M \in \mathcal{M}_{k \times n}(\mathbb{F})$ is the encoding matrix
+- $E = (e_j)_{1 \leq j \leq n} \in \mathcal{M}_{m \times n}(\mathbb{F})$ is the matrix of encoded shards
+- $c \in \mathbb{F}$ is the common _commiment_
+- $(\pi_j)_{1 \leq j \leq n} \in \mathbb{F}^{n}$ are the proofs for each _shard_
+
+$$E = S \times M$$
+$$(\tilde{s}_i) \stackrel{?}{=} (s_i)$$
+
+in the case of **Semi-AVID**, there could be more steps before the
+\texttt{verify} stage: shards could be recoded together
 
 # Statement of need
 
