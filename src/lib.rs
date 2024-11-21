@@ -51,6 +51,8 @@ pub mod aplonk;
 mod conversions;
 pub mod error;
 pub mod fec;
+#[cfg(feature = "fri")]
+pub mod fri;
 #[cfg(feature = "fs")]
 pub mod fs;
 #[cfg(feature = "kzg")]

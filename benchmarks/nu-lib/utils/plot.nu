@@ -54,6 +54,7 @@ export def into-axis-options [-x: string, -y: string]: table<x: float, y: float>
 
     let y_tick_labels = match $y {
         "duration" => ($y_ticks | into-duration-tick-labels),
+        "filesize" => ($y_ticks | into-filesize-tick-labels),
         "plain" => $y_ticks,
         _ => {
             print $"warning: ($y) option is unknown for -y"

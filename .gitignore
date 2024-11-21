@@ -3,6 +3,7 @@ target/
 Cargo.lock
 
 *.ndjson
+*.png
 
 # IDEs
 .idea

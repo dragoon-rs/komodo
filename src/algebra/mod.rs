@@ -67,7 +67,7 @@ pub mod linalg;
 /// # }
 /// ```
 pub fn split_data_into_field_elements<F: PrimeField>(bytes: &[u8], modulus: usize) -> Vec<F> {
-    let bytes_per_element = (F::MODULUS_BIT_SIZE as usize) / 8;
+    let bytes_per_element = (F::MODULUS_BIT_SIZE as usize - 1) / 8;
 
     let mut elements = Vec::new();
     for chunk in bytes.chunks(bytes_per_element) {

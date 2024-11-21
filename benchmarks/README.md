@@ -79,3 +79,53 @@ benchmarks fec plot e2e $out_fec
 benchmarks fec plot combined $out_fec --recoding $out_recoding
 benchmarks fec plot ratio $out_fec --recoding $out_recoding
 ```
+
+## FRI
+> :bulb: **Note**
+>
+> the FRI benchmarks don't use a module from [src/bin/](src/bin/) with PLNK but rather an
+> [example](../examples/fri.rs)
+
+- modify [benchmarks/params/fri.nu](benchmarks/params/fri.nu)
+- source it
+```nushell
+source benchmarks/params/fri.nu
+```
+- run the benchmarks
+```nushell
+(benchmarks fri run
+    --data-sizes $DATA_SIZES
+    --ks $KS
+    --blowup-factors $BFS
+    --nb-queries $QS
+    --hashes $HS
+    --finite-fields $FFS
+    --remainders $RPOS
+    --folding-factors $NS
+) | to ndjson out> $DATA
+```
+
+> the following `watch` call can be used to see the results as they are dumped to `$DATA`
+> ```nushell
+> watch . {
+>     open --raw $DATA
+>         | lines
+>         | last
+>         | from ndjson
+>         | into int evaluating encoding proving verifying decoding
+>         | into duration evaluating encoding proving verifying decoding
+>         | into filesize proofs commits d
+>         | into record
+> }
+> ```
+
+```nushell
+benchmarks fri plot --dump-dir $OUTPUT_DIR --file $DATA evaluating encoding proving decoding --y-type "duration"
+benchmarks fri plot --dump-dir $OUTPUT_DIR --file $DATA verifying --y-type "duration" --single
+
+benchmarks fri plot --dump-dir $OUTPUT_DIR --file $DATA proofs --y-type "filesize" --identity --normalize
+benchmarks fri plot --dump-dir $OUTPUT_DIR --file $DATA commits --y-type "filesize" --single --identity --normalize
+
+benchmarks fri plot --dump-dir $OUTPUT_DIR --file $DATA proofs --y-type "filesize" --identity
+benchmarks fri plot --dump-dir $OUTPUT_DIR --file $DATA commits --y-type "filesize" --single --identity
+```

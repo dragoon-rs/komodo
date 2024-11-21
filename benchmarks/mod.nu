@@ -3,3 +3,4 @@ export module nu-lib/commit.nu
 export module nu-lib/fec/
 export module nu-lib/recoding.nu
 export module nu-lib/linalg.nu
+export module nu-lib/fri/
