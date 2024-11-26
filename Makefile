@@ -9,6 +9,7 @@ fmt:
 	cargo fmt --all
 
 check:
+	nu scripts/check-nushell-files.nu
 	cargo check --workspace --all-targets
 	cargo check --workspace --all-targets --features kzg
 	cargo check --workspace --all-targets --features aplonk
