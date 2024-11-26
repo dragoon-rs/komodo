@@ -1,10 +1,37 @@
-## requirements
-- install [GPLT](https://gitlab.isae-supaero.fr/a.stevan/gplt)
+# Table of contents
+- [Requirements](#requirements)
+- [Atomic operations](#atomic-operations)
+- [Linear algebra](#linear-algebra)
+- [Trusted setup and commit](#trusted-setup-and-commit)
+- [End to end benchmarks](#end-to-end-benchmarks)
+- [FRI](#fri)
 
-```nushell
-use .nushell/math.nu *
-use .nushell/formats.nu *
+## requirements
+> :bulb: **Note**
+>
+> these should only be required for plotting results
+
+- install [GPLT](https://gitlab.isae-supaero.fr/a.stevan/gplt)
+- create a virtual environment
+```bash
+const VENV = "~/.local/share/venvs/gplt/bin/activate.nu" | path expand
 ```
+```bash
+virtualenv ($VENV | path dirname --num-levels 2)
+```
+- activate the virtual environment
+```bash
+overlay use $VENV
+```
+- activate required modules
+```bash
+use benchmarks
+```
+
+> :bulb: **Note**
+>
+> i personally use the [`nuenv` hook](https://github.com/nushell/nu_scripts/blob/main/nu-hooks/nu-hooks/nuenv/hook.nu)
+> that reads [`.env.nu`](../.env.nu).
 
 ## atomic operations
 ```nushell
@@ -12,7 +39,7 @@ cargo run --release --package benchmarks --bin field_operations -- --nb-measurem
 cargo run --release --package benchmarks --bin curve_group_operations -- --nb-measurements 1000 out> curve_group.ndjson
 ```
 ```nushell
-use .nushell/parse.nu read-atomic-ops
+use benchmarks/nu-lib/utils/parse.nu read-atomic-ops
 
 gplt multi_bar --title "simple field operations" -l "time (in ns)" (
     open field.ndjson
@@ -93,6 +120,8 @@ source benchmarks/params/fri.nu
 ```
 - run the benchmarks
 ```nushell
+use std formats "to ndjson"
+
 (benchmarks fri run
     --data-sizes $DATA_SIZES
     --ks $KS
@@ -107,6 +136,8 @@ source benchmarks/params/fri.nu
 
 > the following `watch` call can be used to see the results as they are dumped to `$DATA`
 > ```nushell
+> use std formats "from ndjson"
+>
 > watch . {
 >     open --raw $DATA
 >         | lines
