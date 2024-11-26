@@ -88,7 +88,7 @@ export def main [
     --dump-dir: path = "./",
 ] {
     if ($x | is-empty) {
-        error make --unspanned { msg: "nothing to do" }
+        error make --unspanned { msg: "nothing to do, x is empty" }
     }
     if $file == null {
         error make --unspanned { msg: "missing --file" }

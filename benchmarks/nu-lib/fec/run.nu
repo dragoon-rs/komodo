@@ -1,5 +1,6 @@
 use ../utils log
 use ../utils formats *
+use ../utils args check-list-arg
 
 use std formats *
 
@@ -16,10 +17,9 @@ export def main [
 ]: list<int> -> path {
     let input = $in
 
-    if ($ks | is-empty) or ($input | is-empty) or ($curves | is-empty) {
-        print "nothing to do"
-        return
-    }
+    $ks | check-list-arg --cmd "fec run" --arg "--ks" --span (metadata $ks).span
+    $curves | check-list-arg --cmd "fec run" --arg "--curves" --span (metadata $curves).span
+    $in | check-list-arg --cmd "fec run" --arg "pipeline input"
 
     let new_file = $output == null
     let output = $output | default (mktemp --tmpdir komodo_fec.XXXXXX)

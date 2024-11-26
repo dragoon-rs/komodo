@@ -2,6 +2,7 @@ use utils log
 use utils math *
 use utils fs check-file
 use utils plot [ into-axis-options, COMMON_OPTIONS, gplt ]
+use utils args check-list-arg
 
 use std formats *
 
@@ -16,10 +17,7 @@ export def run [
 ]: list<int> -> path {
     let input = $in
 
-    if ($input | is-empty) {
-        print "nothing to do"
-        return
-    }
+    $in | check-list-arg --cmd "linalg run" --arg "pipeline input"
 
     let new_file = $output == null
     let output = $output | default (mktemp --tmpdir komodo_linalg.XXXXXX)

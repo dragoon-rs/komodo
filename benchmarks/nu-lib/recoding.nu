@@ -3,6 +3,7 @@ use utils formats *
 use utils math *
 use utils plot [ into-axis-options, COMMON_OPTIONS, gplt ]
 use utils fs check-file
+use utils args check-list-arg
 
 use std formats *
 
@@ -19,10 +20,9 @@ export def run [
 ]: list<int> -> path {
     let input = $in
 
-    if ($ks | is-empty) or ($input | is-empty) or ($curves | is-empty) {
-        print "nothing to do"
-        return
-    }
+    $ks | check-list-arg --cmd "recoding run" --arg "--ks" --span (metadata $ks).span
+    $curves | check-list-arg --cmd "recoding run" --arg "--curves" --span (metadata $curves).span
+    $in | check-list-arg --cmd "recoding run" --arg "pipeline input"
 
     let new_file = $output == null
     let output = $output | default (mktemp --tmpdir komodo_recoding.XXXXXX)

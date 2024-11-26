@@ -2,6 +2,7 @@ use utils log
 use utils math *
 use utils fs check-file
 use utils plot [ into-axis-options, COMMON_OPTIONS, gplt ]
+use utils args check-list-arg
 
 use std formats *
 
@@ -17,10 +18,8 @@ export def run [
 ]: list<int> -> path {
     let input = $in
 
-    if ($input | is-empty) or ($curves | is-empty) {
-        print "nothing to do"
-        return
-    }
+    $curves | check-list-arg --cmd "commit run" --arg "--curves" --span (metadata $curves).span
+    $in | check-list-arg --cmd "commit run" --arg "pipeline input"
 
     let new_file = $output == null
     let output = $output | default (mktemp --tmpdir komodo_commit.XXXXXX)
