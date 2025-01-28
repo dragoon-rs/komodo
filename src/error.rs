@@ -1,6 +1,6 @@
 //! Komodo-specific errors
 //!
-//! there are a few linear algebra errors and some related to ZK.
+//! there are a few linear algebra errors and some related to [crate::zk].
 use thiserror::Error;
 
 /// An error that Komodo could end up producing.
@@ -42,7 +42,7 @@ pub enum KomodoError {
     #[error("Degree is zero")]
     DegreeIsZero,
     /// `{0}` is the supported degree of the trusted setup and `{1}` is the actual requested
-    /// polynomnial degree
+    /// polynomial degree
     #[error("too many coefficients: max is {0}, found {0}")]
     TooFewPowersInTrustedSetup(usize, usize),
     /// `{0}` is a custom error message.

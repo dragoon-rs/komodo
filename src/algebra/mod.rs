@@ -246,13 +246,11 @@ mod tests {
         split_data_template::<Fr>(&[], 1, None);
         split_data_template::<Fr>(&[], 8, None);
 
-        let nb_bytes = 11 * (Fr::MODULUS_BIT_SIZE as usize / 8);
-        split_data_template::<Fr>(&bytes()[..nb_bytes], 1, Some(11));
-        split_data_template::<Fr>(&bytes()[..nb_bytes], 8, Some(16));
-
-        let nb_bytes = 11 * (Fr::MODULUS_BIT_SIZE as usize / 8) - 10;
-        split_data_template::<Fr>(&bytes()[..nb_bytes], 1, Some(11));
-        split_data_template::<Fr>(&bytes()[..nb_bytes], 8, Some(16));
+        const MODULUS_BYTE_SIZE: usize = Fr::MODULUS_BIT_SIZE as usize / 8;
+        for n in (10 * MODULUS_BYTE_SIZE + 1)..(11 * MODULUS_BYTE_SIZE) {
+            split_data_template::<Fr>(&bytes()[..n], 1, Some(11));
+            split_data_template::<Fr>(&bytes()[..n], 8, Some(16));
+        }
     }
 
     fn split_and_merge_template<F: PrimeField>(bytes: &[u8], modulus: usize) {
@@ -264,10 +262,9 @@ mod tests {
 
     #[test]
     fn split_and_merge() {
-        split_and_merge_template::<Fr>(&bytes(), 1);
-        split_and_merge_template::<Fr>(&bytes(), 8);
-        split_and_merge_template::<Fr>(&bytes(), 64);
-        split_and_merge_template::<Fr>(&bytes(), 4096);
+        for i in 0..12 {
+            split_and_merge_template::<Fr>(&bytes(), 1 << i);
+        }
     }
 
     #[cfg(any(feature = "kzg", feature = "aplonk"))]

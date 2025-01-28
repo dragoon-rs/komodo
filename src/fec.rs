@@ -8,7 +8,7 @@ use rs_merkle::{algorithms::Sha256, Hasher};
 
 use crate::{algebra, algebra::linalg::Matrix, error::KomodoError};
 
-/// representation of a FEC shard of data.
+/// representation of a [FEC](https://en.wikipedia.org/wiki/Error_correction_code) shard of data.
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Shard<F: PrimeField> {
     /// the code parameter, required to decode
@@ -57,7 +57,7 @@ impl<F: PrimeField> Shard<F> {
                 .iter()
                 .zip(other.data.iter())
                 .map(|(es, eo)| es.mul(alpha) + eo.mul(beta))
-                .collect::<Vec<_>>(),
+                .collect(),
             size: self.size,
         }
     }
@@ -248,7 +248,7 @@ mod tests {
 
     /// `contains_one_of(x, set)` is true iif `x` fully contains one of the lists from `set`
     ///
-    /// > **Note**  
+    /// > **Note**
     /// >
     /// > see [`containment`] for some example
     fn contains_one_of(x: &[usize], set: &[Vec<usize>]) -> bool {

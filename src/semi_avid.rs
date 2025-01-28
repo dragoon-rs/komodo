@@ -327,6 +327,7 @@ where
 #[cfg(test)]
 mod tests {
     use ark_bls12_381::{Fr, G1Projective};
+    const CURVE_NAME: &str = "bls12-381";
     use ark_ec::CurveGroup;
     use ark_ff::PrimeField;
     use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
@@ -339,7 +340,7 @@ mod tests {
         zk::{setup, Commitment},
     };
 
-    use super::{build, prove, recode, verify};
+    use super::{build, prove, recode, verify, Block};
 
     fn bytes() -> Vec<u8> {
         include_bytes!("../assets/dragoon_133x133.png").to_vec()
@@ -351,6 +352,7 @@ mod tests {
         };
     }
 
+    /// verify all `n` blocks
     fn verify_template<F, G, P>(bytes: &[u8], encoding_mat: &Matrix<F>) -> Result<(), KomodoError>
     where
         F: PrimeField,
@@ -371,9 +373,27 @@ mod tests {
         Ok(())
     }
 
+    /// attack a block by alterring one part of its proof
+    fn attack<F, G>(block: Block<F, G>, c: usize, base: u128, pow: u64) -> Block<F, G>
+    where
+        F: PrimeField,
+        G: CurveGroup<ScalarField = F>,
+    {
+        let mut block = block;
+        // modify a field in the struct b to corrupt the block proof without corrupting the data serialization
+        let a = F::from_le_bytes_mod_order(&base.to_le_bytes());
+        let mut commits: Vec<G> = block.proof.iter().map(|c| c.0.into()).collect();
+        commits[c] = commits[c].mul(a.pow([pow]));
+        block.proof = commits.iter().map(|&c| Commitment(c.into())).collect();
+
+        block
+    }
+
+    /// verify all `n` blocks and then make sure an attacked block does not verify
     fn verify_with_errors_template<F, G, P>(
         bytes: &[u8],
         encoding_mat: &Matrix<F>,
+        attacks: Vec<(usize, usize, u128, u64)>,
     ) -> Result<(), KomodoError>
     where
         F: PrimeField,
@@ -391,21 +411,18 @@ mod tests {
             assert!(verify(block, &powers)?);
         }
 
-        let mut corrupted_block = blocks[0].clone();
-        // modify a field in the struct b to corrupt the block proof without corrupting the data serialization
-        let a = F::from_le_bytes_mod_order(&123u128.to_le_bytes());
-        let mut commits: Vec<G> = corrupted_block.proof.iter().map(|c| c.0.into()).collect();
-        commits[0] = commits[0].mul(a.pow([4321_u64]));
-        corrupted_block.proof = commits.iter().map(|&c| Commitment(c.into())).collect();
-
-        assert!(!verify(&corrupted_block, &powers)?);
+        for (b, c, base, pow) in attacks {
+            assert!(!verify(&attack(blocks[b].clone(), c, base, pow), &powers)?);
+        }
 
         Ok(())
     }
 
+    /// make sure recoded blocks still verify correctly
     fn verify_recoding_template<F, G, P>(
         bytes: &[u8],
         encoding_mat: &Matrix<F>,
+        recodings: Vec<Vec<usize>>,
     ) -> Result<(), KomodoError>
     where
         F: PrimeField,
@@ -419,20 +436,30 @@ mod tests {
 
         let blocks = full!(bytes, powers, encoding_mat);
 
-        assert!(verify(
-            &recode(&blocks[2..=3], rng).unwrap().unwrap(),
-            &powers
-        )?);
-        assert!(verify(
-            &recode(&[blocks[3].clone(), blocks[5].clone()], rng)
+        let min_nb_blocks = recodings.clone().into_iter().flatten().max().unwrap() + 1;
+        assert!(
+            blocks.len() >= min_nb_blocks,
+            "not enough blocks, expected {}, found {}",
+            min_nb_blocks,
+            blocks.len()
+        );
+
+        for bs in recodings {
+            assert!(verify(
+                &recode(
+                    &bs.iter().map(|&i| blocks[i].clone()).collect::<Vec<_>>(),
+                    rng
+                )
                 .unwrap()
                 .unwrap(),
-            &powers
-        )?);
+                &powers
+            )?);
+        }
 
         Ok(())
     }
 
+    /// encode and decode with all `n` shards
     fn end_to_end_template<F, G, P>(
         bytes: &[u8],
         encoding_mat: &Matrix<F>,
@@ -456,9 +483,11 @@ mod tests {
         Ok(())
     }
 
+    /// encode and try to decode with recoded shards
     fn end_to_end_with_recoding_template<F, G, P>(
         bytes: &[u8],
         encoding_mat: &Matrix<F>,
+        recodings: Vec<(Vec<Vec<usize>>, bool)>,
     ) -> Result<(), KomodoError>
     where
         F: PrimeField,
@@ -468,47 +497,72 @@ mod tests {
     {
         let rng = &mut test_rng();
 
+        let max_k = recodings.iter().map(|(rs, _)| rs.len()).min().unwrap();
+        assert!(
+            encoding_mat.height <= max_k,
+            "too many source shards, expected at most {}, found {}",
+            max_k,
+            encoding_mat.height
+        );
+
         let powers = setup::<F, G>(bytes.len(), rng)?;
 
         let blocks = full!(bytes, powers, encoding_mat);
 
-        let b_0_1 = recode(&blocks[0..=1], rng).unwrap().unwrap();
-        let shards = vec![
-            b_0_1.shard,
-            blocks[2].shard.clone(),
-            blocks[3].shard.clone(),
-        ];
-        assert_eq!(bytes, decode(shards).unwrap());
-
-        let b_0_1 = recode(&[blocks[0].clone(), blocks[1].clone()], rng)
+        let min_n = recodings
+            .iter()
+            .flat_map(|(rs, _)| rs.iter().flatten())
+            .max()
             .unwrap()
-            .unwrap();
-        let shards = vec![
-            blocks[0].shard.clone(),
-            blocks[1].shard.clone(),
-            b_0_1.shard,
-        ];
-        assert!(decode(shards).is_err());
+            + 1;
+        assert!(
+            blocks.len() >= min_n,
+            "not enough blocks, expected {}, found {}",
+            min_n,
+            blocks.len()
+        );
 
-        let b_0_1 = recode(&blocks[0..=1], rng).unwrap().unwrap();
-        let b_2_3 = recode(&blocks[2..=3], rng).unwrap().unwrap();
-        let b_1_4 = recode(&[blocks[1].clone(), blocks[4].clone()], rng)
-            .unwrap()
-            .unwrap();
-        let shards = vec![b_0_1.shard, b_2_3.shard, b_1_4.shard];
-        assert_eq!(bytes, decode(shards).unwrap());
-
-        let fully_recoded_shards = (0..3)
-            .map(|_| recode(&blocks[0..=2], rng).unwrap().unwrap().shard)
-            .collect();
-        assert_eq!(bytes, decode(fully_recoded_shards).unwrap());
+        for (rs, pass) in recodings {
+            let recoded_shards = rs
+                .iter()
+                .map(|bs| {
+                    if bs.len() == 1 {
+                        blocks[bs[0]].clone().shard
+                    } else {
+                        recode(
+                            &bs.iter().map(|&i| blocks[i].clone()).collect::<Vec<_>>(),
+                            rng,
+                        )
+                        .unwrap()
+                        .unwrap()
+                        .shard
+                    }
+                })
+                .collect();
+            if pass {
+                assert_eq!(
+                    bytes,
+                    decode(recoded_shards).unwrap(),
+                    "should decode with {:?}",
+                    rs
+                );
+            } else {
+                assert!(
+                    decode(recoded_shards).is_err(),
+                    "should not decode with {:?}",
+                    rs
+                );
+            }
+        }
 
         Ok(())
     }
 
-    // NOTE: this is part of an experiment, to be honest, to be able to see how
-    // much these tests could be refactored and simplified
-    fn run_template<F, P, Fun>(test: Fun)
+    /// run the `test` with a _(k, n)_ encoding and on both a random and a Vandermonde encoding
+    ///
+    /// NOTE: this is part of an experiment, to be honest, to be able to see how
+    /// much these tests could be refactored and simplified
+    fn run_template<F, P, Fun>(k: usize, n: usize, test: Fun)
     where
         F: PrimeField,
         Fun: Fn(&[u8], &Matrix<F>) -> Result<(), KomodoError>,
@@ -517,14 +571,12 @@ mod tests {
     {
         let mut rng = ark_std::test_rng();
 
-        let (k, n) = (3, 6_usize);
-
         let bytes = bytes();
 
         let test_case = format!("TEST | data: {} bytes, k: {}, n: {}", bytes.len(), k, n);
 
         test(&bytes, &Matrix::random(k, n, &mut rng)).unwrap_or_else(|_| {
-            panic!("verification failed for bls12-381 and random encoding matrix\n{test_case}")
+            panic!("verification failed for {CURVE_NAME} and random encoding matrix\n{test_case}")
         });
         test(
             &bytes,
@@ -536,42 +588,65 @@ mod tests {
             ),
         )
         .unwrap_or_else(|_| {
-            panic!("verification failed for bls12-381 and Vandermonde encoding matrix\n{test_case}")
+            panic!(
+                "verification failed for {CURVE_NAME} and Vandermonde encoding matrix\n{test_case}"
+            )
         });
     }
 
     #[test]
     fn verification() {
         run_template::<Fr, DensePolynomial<Fr>, _>(
+            3,
+            6,
             verify_template::<Fr, G1Projective, DensePolynomial<Fr>>,
         );
     }
 
     #[test]
     fn verify_with_errors() {
-        run_template::<Fr, DensePolynomial<Fr>, _>(
-            verify_with_errors_template::<Fr, G1Projective, DensePolynomial<Fr>>,
-        );
+        run_template::<Fr, DensePolynomial<Fr>, _>(3, 6, |b, m| {
+            verify_with_errors_template::<Fr, G1Projective, DensePolynomial<Fr>>(
+                b,
+                m,
+                vec![(0, 0, 123u128, 4321u64)],
+            )
+        });
     }
 
     #[test]
     fn verify_recoding() {
-        run_template::<Fr, DensePolynomial<Fr>, _>(
-            verify_recoding_template::<Fr, G1Projective, DensePolynomial<Fr>>,
-        );
+        run_template::<Fr, DensePolynomial<Fr>, _>(3, 6, |b, m| {
+            verify_recoding_template::<Fr, G1Projective, DensePolynomial<Fr>>(
+                b,
+                m,
+                vec![vec![2, 3], vec![3, 5]],
+            )
+        });
     }
 
     #[test]
     fn end_to_end() {
         run_template::<Fr, DensePolynomial<Fr>, _>(
+            3,
+            6,
             end_to_end_template::<Fr, G1Projective, DensePolynomial<Fr>>,
         );
     }
 
     #[test]
     fn end_to_end_with_recoding() {
-        run_template::<Fr, DensePolynomial<Fr>, _>(
-            end_to_end_with_recoding_template::<Fr, G1Projective, DensePolynomial<Fr>>,
-        );
+        run_template::<Fr, DensePolynomial<Fr>, _>(3, 6, |b, m| {
+            end_to_end_with_recoding_template::<Fr, G1Projective, DensePolynomial<Fr>>(
+                b,
+                m,
+                vec![
+                    (vec![vec![0, 1], vec![2], vec![3]], true),
+                    (vec![vec![0, 1], vec![0], vec![1]], false),
+                    (vec![vec![0, 1], vec![2, 3], vec![1, 4]], true),
+                    (vec![vec![0, 1, 2], vec![0, 1, 2], vec![0, 1, 2]], true),
+                ],
+            )
+        });
     }
 }

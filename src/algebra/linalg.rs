@@ -10,7 +10,7 @@ use crate::error::KomodoError;
 
 /// a matrix defined over a finite field
 ///
-/// internally, a matrix is just a vector of field elements that whose length is
+/// internally, a matrix is just a vector of field elements whose length is
 /// exactly the width times the height and where elements are organized row by
 /// row.
 #[derive(Clone, PartialEq, Default, Debug, CanonicalSerialize, CanonicalDeserialize)]
@@ -24,7 +24,7 @@ impl<T: Field> Matrix<T> {
     /// build a matrix from a diagonal of elements
     ///
     /// # Example
-    /// building a diagonal matrix from the diagonal $[1, 2, 3, 4]$ will give
+    /// building a diagonal matrix from the diagonal `[1, 2, 3, 4]` would give
     /// ```text
     /// [
     ///     [1, 0, 0, 0],
@@ -66,12 +66,13 @@ impl<T: Field> Matrix<T> {
 
     /// build a Vandermonde matrix for some seed points
     ///
-    /// actually, this is the tranpose of the Vandermonde matrix defined in the
+    /// actually, this is the transpose of the Vandermonde matrix defined in the
     /// [Wikipedia article][article], i.e. there are as many columns as there
     /// are seed points and there are as many rows as there are powers of the
     /// seed points.
     ///
-    /// > **Note**  
+    /// > **Note**
+    /// >
     /// > if you are sure the points are distinct and don't want to perform any
     /// > runtime check to ensure that condition, have a look at
     /// > [`Self::vandermonde_unchecked`].
@@ -153,7 +154,8 @@ impl<T: Field> Matrix<T> {
 
     /// build a matrix from a "_matrix_" of elements
     ///
-    /// > **Note**  
+    /// > **Note**
+    /// >
     /// > if you are sure each row should have the same length and don't want to
     /// > perform any runtime check to ensure that condition, have a look at
     /// > [`Self::from_vec_vec_unchecked`].
@@ -249,6 +251,7 @@ impl<T: Field> Matrix<T> {
     /// extract a single column from the matrix
     ///
     /// > **Note**
+    /// >
     /// > returns `None` if the provided index is out of bounds
     pub(crate) fn get_col(&self, j: usize) -> Option<Vec<T>> {
         if j >= self.width {
@@ -258,14 +261,14 @@ impl<T: Field> Matrix<T> {
         Some((0..self.height).map(|i| self.get(i, j)).collect())
     }
 
-    // compute _row / value_
+    /// compute _row = row / value_
     fn divide_row_by(&mut self, row: usize, value: T) {
         for j in 0..self.width {
             self.set(row, j, self.get(row, j) / value);
         }
     }
 
-    // compute _destination = destination + source * value_
+    /// compute _destination = destination + source * value_
     fn multiply_row_by_and_add_to_row(&mut self, source: usize, value: T, destination: usize) {
         for j in 0..self.width {
             self.set(
@@ -278,7 +281,8 @@ impl<T: Field> Matrix<T> {
 
     /// compute the inverse of the matrix
     ///
-    /// > **None**
+    /// > **Note**
+    /// >
     /// > the matrix should be
     /// > - square
     /// > - invertible
@@ -314,6 +318,7 @@ impl<T: Field> Matrix<T> {
     /// swap rows `i` and `j`, inplace
     ///
     /// > **Note**
+    /// >
     /// > this function assumes both `i` and `j` are in bounds, unexpected
     /// > results are expected if `i` or `j` are out of bounds.
     fn swap_rows(&mut self, i: usize, j: usize) {
@@ -324,7 +329,8 @@ impl<T: Field> Matrix<T> {
 
     /// compute the rank of the matrix
     ///
-    /// > **None**
+    /// > **Note**
+    /// >
     /// > see the [_Wikipedia article_](https://en.wikipedia.org/wiki/Rank_(linear_algebra))
     /// > for more information
     /// >
@@ -373,10 +379,11 @@ impl<T: Field> Matrix<T> {
 
     /// compute the matrix multiplication with another matrix
     ///
-    /// if `mat` represents a matrix $A$ and `rhs` is the representation of
-    /// another matrix $B$, then `mat.mul(rhs)` will compute $A \times B$
+    /// if `lhs` represents a matrix $A$ and `rhs` is the representation of
+    /// another matrix $B$, then `lhs.mul(rhs)` will compute $A \times B$
     ///
     /// > **Note**
+    /// >
     /// > both matrices should have compatible shapes, i.e. if `self` has shape
     /// > `(n, m)` and `rhs` has shape `(p, q)`, then `m == p`.
     pub fn mul(&self, rhs: &Self) -> Result<Self, KomodoError> {
@@ -412,6 +419,7 @@ impl<T: Field> Matrix<T> {
     /// compute the transpose of the matrix
     ///
     /// > **Note**
+    /// >
     /// > see the [_Wikipedia article_](https://en.wikipedia.org/wiki/Transpose)
     pub fn transpose(&self) -> Self {
         let height = self.width;

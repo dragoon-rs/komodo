@@ -10,7 +10,7 @@
 //! > modules marked with an `*`, e.g. [`kzg`]*, are hidden behind a _Cargo_ feature with the same
 //! > name
 //!
-//! Other submodules define several fundamental building blocks to Komodo, but which are not
+//! Other submodules define several fundamental building blocks to Komodo, but are not
 //! mandatory to explore to understand the protocols.
 //!
 //! # Example
