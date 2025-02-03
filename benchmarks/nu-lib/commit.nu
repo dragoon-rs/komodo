@@ -13,11 +13,10 @@ use std formats *
 export def run [
     --output: path, # the output path (defaults to a random file in $nu.temp-path)
     --curves: list<string>, # the curves to benchmark
-    --force, # does not ask for confirmation if the output file already exists, it will be overwritten
+    --no-confirm (-y), # does not ask for confirmation if the output file already exists, it will be overwritten
     --nb-measurements: int = 10, # the number of measurements per benchmark run
+    --append, # append to the output path instead of overwritting
 ]: list<int> -> path {
-    let input = $in
-
     $curves | check-list-arg --cmd "commit run" --arg "--curves" --span (metadata $curves).span
     $in | check-list-arg --cmd "commit run" --arg "pipeline input"
 
@@ -26,7 +25,7 @@ export def run [
     let pretty_output = $"(ansi purple)($output)(ansi reset)"
     if ($output | path exists) and not $new_file {
         log warning $"($pretty_output) already exists"
-        if not $force {
+        if not $no_confirm {
             let res = ["no", "yes"] | input list $"Do you want to overwrite ($pretty_output)?"
             if $res == null or $res == "no" {
                 log info "aborting"
@@ -36,11 +35,20 @@ export def run [
         }
     }
 
-    cargo run --release --package benchmarks --bin commit -- ...[
+    let options = [
+        --release
+        --package benchmarks
+        --bin commit
+        --
         --nb-measurements $nb_measurements
-        ...$input
+        ...$in
         --curves ...$curves
-    ] out> $output
+    ]
+    if $append {
+        cargo run ...$options out>> $output
+    } else {
+        cargo run ...$options out> $output
+    }
 
     log info $"results saved to ($pretty_output)"
     $output
@@ -64,7 +72,7 @@ export def plot [
         | select name x y e
         | group-by name --to-table
         | reject items.name
-        | rename --column { group: "name", items: "points" }
+        | rename --column { name: "name", items: "points" }
         | insert style.color {|it|
             match $it.name {
                 "BLS12-381" => "tab:blue"

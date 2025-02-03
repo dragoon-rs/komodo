@@ -39,6 +39,8 @@ Other examples that showcase the Komodo API are available in [`examples/`](examp
 ## the benchmarks
 see [`benchmarks/`](benchmarks/README.md)
 
+the results can be found in [`dragoon/komodo-benchmark-results`](https://gitlab.isae-supaero.fr/dragoon/komodo-benchmark-results).
+
 ## contributors
 
 Because the code for this project has been originally extracted from

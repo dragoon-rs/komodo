@@ -72,7 +72,7 @@ export def main [
     }
 
     $params | each { |p|
-        print $p
+        print ($p | to nuon --raw)
         run $p
     }
 }

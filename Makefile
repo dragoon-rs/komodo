@@ -2,7 +2,7 @@ NU="nu"
 NU_FLAGS="--no-config-file"
 
 NU_ARCH="x86_64-unknown-linux-musl"
-NU_VERSION="0.95.0"
+NU_VERSION="0.101.0"
 NU_BUILD="nu-${NU_VERSION}-${NU_ARCH}"
 NU_DEST="/tmp/"
 

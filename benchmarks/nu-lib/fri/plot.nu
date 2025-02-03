@@ -54,6 +54,7 @@ def plot [
             points: ($ds | wrap x | merge ($ds | wrap y) | if $normalize { update y { |it| $it.y / $it.x } } else { $in }),
             style: { color: "black", line: { type: "dotted" } },
         } } else { $in }
+        | reject points.k? points.bf? points.ff?
 
     let title = [
         $name,
@@ -86,6 +87,7 @@ export def main [
     --identity,
     --normalize,
     --dump-dir: path = "./",
+    --save,
 ] {
     if ($x | is-empty) {
         error make --unspanned { msg: "nothing to do, x is empty" }
@@ -101,6 +103,6 @@ export def main [
     let data = open $file | where h == "sha3-512" and q == 50
 
     for i in $x {
-        $data | plot --save $i --y-type=$y_type --single=$single --identity=$identity --normalize=$normalize --dump-dir=$dump_dir
+        $data | plot --save=$save $i --y-type=$y_type --single=$single --identity=$identity --normalize=$normalize --dump-dir=$dump_dir
     }
 }

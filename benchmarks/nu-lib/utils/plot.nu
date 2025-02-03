@@ -29,9 +29,7 @@ export def into-filesize-tick-labels []: list<int> -> list<string> {
 }
 
 export def into-axis-options [-x: string, -y: string]: table<x: float, y: float> -> list<string> {
-    let input = $in
-
-    let xs = $input | flatten | get x | uniq
+    let xs = $in | flatten | get x | uniq
 
     let x_tick_labels = match $x {
         "filesize" => ($xs | into-filesize-tick-labels),
@@ -47,7 +45,7 @@ export def into-axis-options [-x: string, -y: string]: table<x: float, y: float>
         --x-tick-labels ...$x_tick_labels
     ]
 
-    let ys = $input | flatten | get y
+    let ys = $in | flatten | get y
     let y_ticks = seq ($ys | math min | math log 10 | math ceil | $in - 1) ($ys | math max | math log 10 | math floor)
         | into float
         | each { 10 ** $in }
