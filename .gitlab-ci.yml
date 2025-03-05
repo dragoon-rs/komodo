@@ -1,4 +1,5 @@
-image: "rust:latest"
+# WARNING: update `rust-toolchain.toml` as well
+image: "rust:1.78"
 
 stages:
   - fmt
