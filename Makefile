@@ -63,7 +63,7 @@ show:
 
 .PHONY: doc
 doc:
-	cargo doc --document-private-items --no-deps --open
+	RUSTDOCFLAGS="--html-in-header katex.html" cargo doc --no-deps --open
 
 .PHONY: build-examples
 build-examples:

@@ -45,6 +45,7 @@ fs = []
 
 [package.metadata.docs.rs]
 features = ["kzg", "aplonk"]
+rustdoc-args = [ "--html-in-header", "katex.html" ]
 
 [[example]]
 name = "kzg"
