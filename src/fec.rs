@@ -17,7 +17,7 @@ pub struct Shard<F: PrimeField> {
     ///
     /// this effectively allows support for _recoding_.
     ///
-    /// If we denote the $k$ source shards by $(s_i)_{0 \le i \lt k}$, the linear combination by $k$
+    /// If we denote the $k$ source shards by $(s\_i)\_\{0 \le i \lt k\}$, the linear combination by $k$
     /// coefficients $(\alpha_i)_{0 \le i \lt k}$ and $s$ the shard itself, then
     ///
     /// $$ s = \sum\limits_{i = 0}^{k - 1} \alpha_i s_i$$
@@ -72,8 +72,8 @@ impl<F: PrimeField> Shard<F> {
 /// > returns [`None`] if the number of shards is not the same as the number of
 /// > coefficients or if no shards are provided.
 ///
-/// if the shards are the $(s_i)_{1 \le i \le n}$ and the coefficients the
-/// $(\alpha_i)_{0 \le i \le n}$, then the output will be
+/// if the shards are the $(s \_i)\_\{1 \le i \le n\}$ and the coefficients the
+/// $(\alpha\_i)\_\{0 \le i \le n\}$, then the output will be
 ///
 /// $$ \sum\limits_{i = 1}^{n} \alpha_i s_i$$
 pub fn recode_with_coeffs<F: PrimeField>(shards: &[Shard<F>], coeffs: &[F]) -> Option<Shard<F>> {
