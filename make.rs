@@ -36,6 +36,9 @@ enum Commands {
         /// Be extra verbose with the output of the tests.
         #[arg(short, long)]
         verbose: bool,
+        /// Run the examples instead of regular tests.
+        #[arg(short, long)]
+        examples: bool,
     },
     /// Shows the version of all the tools used,
     Version,
@@ -90,14 +93,18 @@ fn main() {
                 "warnings"
             )
         }
-        Some(Commands::Test { verbose }) => {
-            if *verbose {
-                nob::run_cmd_and_fail!("cargo", "test", "--verbose", "--workspace", "--all-features");
-                nob::run_cmd_and_fail!("cargo", "test", "--verbose", "--examples");
+        Some(Commands::Test { verbose, examples }) => {
+            let mut cmd = vec!["cargo", "test"];
+
+            if *verbose { cmd.push("--verbose") }
+            if *examples {
+                cmd.push("--examples");
             } else {
-                nob::run_cmd_and_fail!("cargo", "test", "--workspace", "--all-features");
-                nob::run_cmd_and_fail!("cargo", "test", "--examples");
+                cmd.push("--workspace");
+                cmd.push("--all-features");
             }
+
+            nob::run_cmd_as_vec_and_fail!(cmd);
         }
         Some(Commands::Version) => {
             nob::run_cmd_and_fail!(@"rustup", "--version", "2>", "/dev/null");
@@ -110,15 +117,12 @@ fn main() {
             open,
             private,
             features,
-        }) => match (open, private, features) {
-            (false, false, false) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps"),
-            (false, false,  true) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps", "--all-features"),
-            (false,  true, false) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps",                   "--document-private-items"),
-            (false,  true,  true) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps", "--all-features", "--document-private-items"),
-            ( true, false, false) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps",                                               "--open"),
-            ( true, false,  true) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps", "--all-features",                             "--open"),
-            ( true,  true, false) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps",                   "--document-private-items", "--open"),
-            ( true,  true,  true) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps", "--all-features", "--document-private-items", "--open"),
+        }) => {
+            let mut cmd = vec!["cargo", "doc", "--no-deps"];
+            if *open { cmd.push("--open") }
+            if *private { cmd.push("--document-private-items") }
+            if *features { cmd.push("--all-features") }
+            nob::run_cmd_as_vec_and_fail!(cmd);
         },
         None => {}
     }
