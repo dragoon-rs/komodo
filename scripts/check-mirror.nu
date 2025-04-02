@@ -1,3 +1,8 @@
+const GH_API_OPTIONS = [
+    -H "Accept: application/vnd.github+json"
+    -H "X-GitHub-Api-Version: 2022-11-28"
+]
+
 def "str color" [color: string]: [ string -> string ] {
     $"(ansi $color)($in)(ansi reset)"
 }
@@ -52,4 +57,29 @@ def main [base: string, mirror: string, branch: string] {
     } else {
         log ok "mirror is up to date"
     }
+
+    log info "pulling mirror runs"
+    let res = gh api ...$GH_API_OPTIONS /repos/dragoon-rs/komodo/actions/runs | from json
+
+    let runs = $res.workflow_runs
+        | where head_branch == $branch
+        | select id head_sha status conclusion run_started_at
+        | into datetime run_started_at
+        | sort-by run_started_at
+
+    $env.config.table = {
+        mode: compact,
+        index_mode: always,
+        show_empty: true,
+        padding: { left: 0, right: 0 },
+        header_on_separator: true,
+        trim: {
+            methodology: wrapping,
+            wrapping_try_keep_words: true,
+        },
+        abbreviated_row_count: null,
+        footer_inheritance: false,
+    }
+
+    print $runs
 }
