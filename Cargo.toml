@@ -30,7 +30,6 @@ ark-poly-commit = { git = "https://gitlab.isae-supaero.fr/a.stevan/poly-commit",
 members = [
     "benchmarks",
     "bins/rank",
-    "bins/saclin",
 ]
 
 [dev-dependencies]
