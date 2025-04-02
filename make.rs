@@ -27,8 +27,33 @@ enum Commands {
         #[arg(short, long)]
         check: bool,
     },
+    /// Checks the code.
+    Check,
+    /// Runs Clippy.
+    Clippy,
+    /// Runs the tests.
+    Test {
+        /// Be extra verbose with the output of the tests.
+        #[arg(short, long)]
+        verbose: bool,
+    },
+    /// Shows the version of all the tools used,
+    Version,
+    /// Builds the documentation
+    Doc {
+        /// Open the documentation in the browser.
+        #[arg(short, long)]
+        open: bool,
+        /// Document private items.
+        #[arg(short, long)]
+        private: bool,
+        /// Document all features.
+        #[arg(short, long)]
+        features: bool,
+    },
 }
 
+#[rustfmt::skip]
 fn main() {
     let cli = Cli::parse();
 
@@ -47,6 +72,54 @@ fn main() {
                 nob::run_cmd_and_fail!("cargo", "fmt", "--all");
             }
         }
+        Some(Commands::Check) => {
+            nob::run_cmd_and_fail!("cargo", "check", "--workspace", "--all-targets");
+            nob::run_cmd_and_fail!("cargo", "check", "--workspace", "--all-targets", "--features", "kzg");
+            nob::run_cmd_and_fail!("cargo", "check", "--workspace", "--all-targets", "--features", "aplonk");
+            nob::run_cmd_and_fail!("cargo", "check", "--workspace", "--all-targets", "--all-features");
+        }
+        Some(Commands::Clippy) => {
+            nob::run_cmd_and_fail!(
+                "cargo",
+                "clippy",
+                "--workspace",
+                "--all-targets",
+                "--all-features",
+                "--",
+                "-D",
+                "warnings"
+            )
+        }
+        Some(Commands::Test { verbose }) => {
+            if *verbose {
+                nob::run_cmd_and_fail!("cargo", "test", "--verbose", "--workspace", "--all-features");
+                nob::run_cmd_and_fail!("cargo", "test", "--verbose", "--examples");
+            } else {
+                nob::run_cmd_and_fail!("cargo", "test", "--workspace", "--all-features");
+                nob::run_cmd_and_fail!("cargo", "test", "--examples");
+            }
+        }
+        Some(Commands::Version) => {
+            nob::run_cmd_and_fail!(@"rustup", "--version", "2>", "/dev/null");
+            nob::run_cmd_and_fail!(@"rustup", "show", "active-toolchain");
+            nob::run_cmd_and_fail!(@"rustc", "--version");
+            nob::run_cmd_and_fail!(@"cargo", "--version");
+            nob::run_cmd_and_fail!(@"cargo", "clippy", "--version");
+        }
+        Some(Commands::Doc {
+            open,
+            private,
+            features,
+        }) => match (open, private, features) {
+            (false, false, false) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps"),
+            (false, false,  true) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps", "--all-features"),
+            (false,  true, false) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps",                   "--document-private-items"),
+            (false,  true,  true) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps", "--all-features", "--document-private-items"),
+            ( true, false, false) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps",                                               "--open"),
+            ( true, false,  true) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps", "--all-features",                             "--open"),
+            ( true,  true, false) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps",                   "--document-private-items", "--open"),
+            ( true,  true,  true) => nob::run_cmd_and_fail!("cargo", "doc", "--no-deps", "--all-features", "--document-private-items", "--open"),
+        },
         None => {}
     }
 }
