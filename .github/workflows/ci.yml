@@ -31,13 +31,8 @@ jobs:
           sudo apt update --yes
           sudo apt upgrade --yes
           sudo apt install protobuf-compiler --yes
-      - name: Install Nushell
-        run: |
-          # looks like the following PATH export does not work and `NU` still needs to be set for some reason to invoke `make`...
-          echo "PATH=\"$(make print-NU_DEST):$PATH\"" >> $GITHUB_ENV
-          make install-nu
       - name: Show configuration
-        run: make NU="$(make print-NU_DEST)/nu" show
+        run: make show
       - name: Run tests
         run: |
-          make NU="$(make print-NU_DEST)/nu" check clippy test example
+          make check clippy test

@@ -31,7 +31,6 @@ dragoonfri = { version = "0.1.0", optional = true}
 members = [
     "benchmarks",
     "bins/rank",
-    "bins/saclin",
 ]
 
 [dev-dependencies]

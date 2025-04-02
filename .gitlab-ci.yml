@@ -28,9 +28,7 @@ test:
     - apt update --yes
     - apt upgrade --yes
     - apt install protobuf-compiler --yes
-    - export PATH="$(make print-NU_DEST):$PATH"
-    - make install-nu
     - make show
 
   script:
-    - make check clippy test example
+    - make check clippy test
