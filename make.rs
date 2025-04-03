@@ -13,6 +13,9 @@ extern crate clap;
 
 use clap::{Parser, Subcommand};
 
+const REGISTRY: &str = "gitlab-registry.isae-supaero.fr";
+const IMAGE: &str = "dragoon/komodo";
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -54,6 +57,15 @@ enum Commands {
         /// Document all features.
         #[arg(short, long)]
         features: bool,
+    },
+    /// Builds the container.
+    Container {
+        /// Log into the registry instead of building.
+        #[arg(short, long)]
+        login: bool,
+        /// Push to the registry instead of building.
+        #[arg(short, long)]
+        push: bool,
     },
 }
 
@@ -117,7 +129,23 @@ fn main() {
             if *private { cmd.push("--document-private-items") }
             if *features { cmd.push("--all-features") }
             nob::run_cmd_as_vec_and_fail!(cmd ; "RUSTDOCFLAGS" => "--html-in-header katex.html");
-        },
+        }
+        Some(Commands::Container { login, push }) => {
+            let image = format!("{}/{}", REGISTRY, IMAGE);
+            if *login {
+                nob::run_cmd_and_fail!("docker", "login", REGISTRY);
+            } else if *push {
+                nob::run_cmd_and_fail!("docker", "push", &image);
+            } else {
+                nob::run_cmd_and_fail!(
+                    "docker",
+                    "build",
+                    "-t", &image,
+                    ".",
+                    "--file", ".gitlab-ci.dockerfile"
+                );
+            }
+        }
         None => {}
     }
 }
