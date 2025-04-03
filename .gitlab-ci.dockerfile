@@ -8,6 +8,7 @@ RUN apt update --yes && apt upgrade --yes
 RUN apt install --yes protobuf-compiler
 
 RUN rustup toolchain install 1.78
+RUN rustup component add clippy rust-analyzer rustfmt
 RUN rustup show
 RUN rustup show active-toolchain
 
