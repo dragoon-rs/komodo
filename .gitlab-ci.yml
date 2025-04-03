@@ -1,4 +1,4 @@
-image: "komodo"
+image: "dragoon/komodo"
 
 stages:
   - fmt
