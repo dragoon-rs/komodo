@@ -1,5 +1,10 @@
 #!/usr/bin/env run-cargo-script
 //! ```cargo
+//! [package]
+//! name = "komodo-make"
+//! version = "1.0.0"
+//! edition = "2021"
+//!
 //! [dependencies]
 //! nob = { git = "https://gitlab.isae-supaero.fr/a.stevan/nob.rs" }
 //! clap = { version = "4.5.17", features = ["derive"] }
