@@ -17,8 +17,12 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+      - name: Install dependencies
+        run: |
+          cargo install cargo-script
       - name: Run fmt check
-        run: make fmt-check
+        run: |
+          ./make.rs fmt --check
 
   test:
     runs-on: ubuntu-latest
@@ -31,8 +35,12 @@ jobs:
           sudo apt update --yes
           sudo apt upgrade --yes
           sudo apt install protobuf-compiler --yes
+          cargo install cargo-script
       - name: Show configuration
-        run: make show
+        run: |
+          ./make.rs version
       - name: Run tests
         run: |
-          make check clippy test
+          ./make.rs check
+          ./make.rs clippy
+          ./make.rs test
