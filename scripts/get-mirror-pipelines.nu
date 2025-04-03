@@ -7,7 +7,7 @@ const GITHUB_MIRROR = "dragoon-rs/komodo"
 
 ^$nu.current-exe ./scripts/check-nushell-version.nu
 
-def main [branch: string] {
+def main [branch: string]: [ nothing -> string ] {
     let res = gh api ...$GH_API_OPTIONS $"/repos/($GITHUB_MIRROR)/actions/runs" | from json
 
     let runs = $res.workflow_runs
