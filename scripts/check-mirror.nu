@@ -14,16 +14,7 @@ def "log error" [msg: string] { __log "ERR" "red"   $msg }
 def "log info"  [msg: string] { __log "INF" "cyan"  $msg }
 def "log ok"    [msg: string] { __log " OK" "green" $msg }
 
-let config = open .nu.cfg
-    | lines
-    | parse "{key}: {value}"
-    | transpose --header-row
-    | into record
-if (version).commit_hash != $config.REVISION or (version).version != $config.VERSION {
-    print --stderr $"(ansi yellow_bold)Warning(ansi reset): unexpected version"
-    print --stderr $"    expected (ansi green)($config.VERSION)@($config.REVISION)(ansi reset)"
-    print --stderr $"    found    (ansi red)((version).version)@((version).commit_hash)(ansi reset)"
-}
+^$nu.current-exe ./scripts/check-nushell-version.nu
 
 def main [base: string, mirror: string, branch: string] {
     let base_remote = random uuid
