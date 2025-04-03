@@ -6,7 +6,7 @@
 //! edition = "2021"
 //!
 //! [dependencies]
-//! nob = { git = "https://gitlab.isae-supaero.fr/a.stevan/nob.rs", rev = "4ecb8ba38551282f72afe735b6e846e5a8d05dbe" }
+//! nob = { git = "https://gitlab.isae-supaero.fr/a.stevan/nob.rs", rev = "e4b03cdd4f1ba9daf3095930911b12fb28b6a248" }
 //! clap = { version = "4.5.17", features = ["derive"] }
 //! ```
 extern crate clap;
@@ -116,7 +116,7 @@ fn main() {
             if *open { cmd.push("--open") }
             if *private { cmd.push("--document-private-items") }
             if *features { cmd.push("--all-features") }
-            nob::run_cmd_as_vec_and_fail!(cmd);
+            nob::run_cmd_as_vec_and_fail!(cmd ; "RUSTDOCFLAGS" => "--html-in-header katex.html");
         },
         None => {}
     }
