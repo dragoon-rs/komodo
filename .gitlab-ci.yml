@@ -16,9 +16,10 @@ workflow:
 
 fmt:
   stage: fmt
-
+  before_script:
+    - cargo install cargo-script
   script:
-    - make fmt-check
+    - ./make.rs fmt --check
 
 test:
   stage: test
@@ -28,7 +29,10 @@ test:
     - apt update --yes
     - apt upgrade --yes
     - apt install protobuf-compiler --yes
-    - make show
+    - cargo install cargo-script
+    - ./make.rs version
 
   script:
-    - make check clippy test
+    - ./make.rs check
+    - ./make.rs clippy
+    - ./make.rs test

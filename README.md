@@ -11,11 +11,9 @@ see `cargo doc` or [the library itself](src/)
 
 ## the tests
 ```shell
-make
-```
-or
-```shell
-make check clippy test
+./make.rs check
+./make.rs clippy
+./make.rs test
 ```
 
 Other examples that showcase the Komodo API are available in [`examples/`](examples/).
