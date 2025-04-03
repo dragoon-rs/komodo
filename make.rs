@@ -6,7 +6,7 @@
 //! edition = "2021"
 //!
 //! [dependencies]
-//! nob = { git = "https://gitlab.isae-supaero.fr/a.stevan/nob.rs", rev = "26548f75f15c299ae2bb609348f99823aa4fd594" }
+//! nob = { git = "https://gitlab.isae-supaero.fr/a.stevan/nob.rs", rev = "4ecb8ba38551282f72afe735b6e846e5a8d05dbe" }
 //! clap = { version = "4.5.17", features = ["derive"] }
 //! ```
 extern crate clap;
