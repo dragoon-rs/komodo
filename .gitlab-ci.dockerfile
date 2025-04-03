@@ -7,7 +7,7 @@ RUN apt update --yes && apt upgrade --yes
 
 RUN apt install --yes protobuf-compiler
 
-COPY rust-toolchain.toml /app/
+RUN rustup toolchain install 1.78
 RUN rustup show
 RUN rustup show active-toolchain
 
