@@ -1,5 +1,4 @@
 [toolchain]
 profile = "minimal"
-# WARNING: update `.gitlab-ci.yml` as well
 channel = "1.78"
 components = ["rustfmt", "clippy", "rust-analyzer"]
