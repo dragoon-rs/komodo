@@ -6,7 +6,7 @@
 //! edition = "2021"
 //!
 //! [dependencies]
-//! nob = { git = "https://gitlab.isae-supaero.fr/a.stevan/nob.rs", rev = "e4b03cdd4f1ba9daf3095930911b12fb28b6a248" }
+//! nob = { git = "https://gitlab.isae-supaero.fr/a.stevan/nob.rs", rev = "8fbc3369289e379456ef2131a61adf3efd38cfd2" }
 //! clap = { version = "4.5.17", features = ["derive"] }
 //! ```
 extern crate clap;
@@ -97,7 +97,7 @@ fn main() {
                 "--",
                 "-D",
                 "warnings"
-            )
+            );
         }
         Some(Commands::Test { verbose, examples }) => {
             let mut cmd = vec!["cargo", "test"];
@@ -131,7 +131,10 @@ fn main() {
             nob::run_cmd_as_vec_and_fail!(cmd ; "RUSTDOCFLAGS" => "--html-in-header katex.html");
         }
         Some(Commands::Container { login, push }) => {
-            let image = format!("{}/{}", REGISTRY, IMAGE);
+            let res = nob::run_cmd_and_fail!("git", "rev-parse", "HEAD");
+            let sha = String::from_utf8(res.stdout).expect("Invalid UTF-8 string");
+            let image = format!("{}/{}:{}", REGISTRY, IMAGE, sha.trim());
+
             if *login {
                 nob::run_cmd_and_fail!("docker", "login", REGISTRY);
             } else if *push {
