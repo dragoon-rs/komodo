@@ -4,7 +4,9 @@ on: [push, pull_request, workflow_dispatch]
 
 jobs:
   fmt:
-    runs-on: "gitlab-registry.isae-supaero.fr/dragoon/komodo:latest"
+    runs-on: ubuntu-latest
+    container:
+      image: "gitlab-registry.isae-supaero.fr/dragoon/komodo:latest"
     if: "!contains(github.event.head_commit.message, 'draft:') && !contains(github.event.head_commit.message, 'no-ci:')"
     steps:
       - uses: actions/checkout@v3
@@ -13,7 +15,9 @@ jobs:
           ./make.rs fmt --check
 
   test:
-    runs-on: "gitlab-registry.isae-supaero.fr/dragoon/komodo:latest"
+    runs-on: ubuntu-latest
+    container:
+      image: "gitlab-registry.isae-supaero.fr/dragoon/komodo:latest"
     needs: fmt
     if: "!contains(github.event.head_commit.message, 'draft:') && !contains(github.event.head_commit.message, 'no-ci:')"
     steps:
