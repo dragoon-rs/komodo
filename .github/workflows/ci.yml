@@ -6,7 +6,7 @@ jobs:
   fmt:
     runs-on: ubuntu-latest
     container:
-      image: "gitlab-registry.isae-supaero.fr/dragoon/komodo:latest"
+      image: "ghcr.io/dragoon-rs/dragoon/komodo:21b26efd988b2d8d7159d24cae37341135cfb1b9"
     if: "!contains(github.event.head_commit.message, 'draft:') && !contains(github.event.head_commit.message, 'no-ci:')"
     steps:
       - uses: actions/checkout@v3
@@ -17,7 +17,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     container:
-      image: "gitlab-registry.isae-supaero.fr/dragoon/komodo:latest"
+      image: "ghcr.io/dragoon-rs/dragoon/komodo:21b26efd988b2d8d7159d24cae37341135cfb1b9"
     needs: fmt
     if: "!contains(github.event.head_commit.message, 'draft:') && !contains(github.event.head_commit.message, 'no-ci:')"
     steps:
