@@ -16,6 +16,7 @@ use clap::{Parser, Subcommand};
 const REGISTRY: &str = "gitlab-registry.isae-supaero.fr";
 const MIRROR_REGISTRY: &str = "ghcr.io/dragoon-rs";
 const IMAGE: &str = "dragoon/komodo";
+const DOCKERFILE: &str = ".env.dockerfile";
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -149,14 +150,14 @@ fn main() {
                     "build",
                     "-t", &image,
                     ".",
-                    "--file", ".gitlab-ci.dockerfile"
+                    "--file", DOCKERFILE
                 );
                 nob::run_cmd_and_fail!(
                     "docker",
                     "build",
                     "-t", &mirror_image,
                     ".",
-                    "--file", ".gitlab-ci.dockerfile"
+                    "--file", DOCKERFILE
                 );
             }
         }
