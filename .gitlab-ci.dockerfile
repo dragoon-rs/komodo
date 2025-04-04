@@ -1,16 +1,20 @@
-FROM rust:1.78
+FROM alpine:latest
 
-# Suppress prompts during package installation
-ENV DEBIAN_FRONTEND=noninteractive
+RUN apk add --no-cache \
+    curl \
+    gcc \
+    g++ \
+    musl-dev \
+    make \
+    protobuf \
+    protobuf-dev
 
-RUN apt update --yes && apt upgrade --yes
-
-RUN apt install --yes protobuf-compiler
+# install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 RUN rustup toolchain install 1.78
 RUN rustup default 1.78
 RUN rustup component add clippy rust-analyzer rustfmt
 
 RUN cargo install cargo-script
-
-RUN apt clean && rm -rf /var/lib/apt/lists/*
