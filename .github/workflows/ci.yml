@@ -4,33 +4,20 @@ on: [push, pull_request, workflow_dispatch]
 
 jobs:
   fmt:
-    runs-on: ubuntu-latest
+    runs-on: "gitlab-registry.isae-supaero.fr/dragoon/komodo:latest"
     if: "!contains(github.event.head_commit.message, 'draft:') && !contains(github.event.head_commit.message, 'no-ci:')"
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - name: Install dependencies
-        run: |
-          cargo install cargo-script
       - name: Run fmt check
         run: |
           ./make.rs fmt --check
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: "gitlab-registry.isae-supaero.fr/dragoon/komodo:latest"
     needs: fmt
     if: "!contains(github.event.head_commit.message, 'draft:') && !contains(github.event.head_commit.message, 'no-ci:')"
     steps:
       - uses: actions/checkout@v3
-      - name: Install dependencies
-        run: |
-          sudo apt update --yes
-          sudo apt upgrade --yes
-          sudo apt install protobuf-compiler --yes
-          cargo install cargo-script
       - name: Show configuration
         run: |
           ./make.rs version
