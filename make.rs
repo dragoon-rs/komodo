@@ -142,7 +142,7 @@ fn main() {
                 nob::run_cmd_and_fail!("docker", "login", MIRROR_REGISTRY);
             } else if *push {
                 nob::run_cmd_and_fail!("docker", "push", &image);
-                nob::run_cmd_and_fail!("docker", "push", &image);
+                nob::run_cmd_and_fail!("docker", "push", &mirror_image);
             } else {
                 nob::run_cmd_and_fail!(
                     "docker",
