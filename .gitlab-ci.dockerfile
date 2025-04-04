@@ -1,19 +1,14 @@
-FROM alpine:latest
+FROM rust:latest
 
-RUN apk add --no-cache \
-    curl \
-    gcc \
-    g++ \
-    musl-dev \
-    make \
-    protobuf \
-    protobuf-dev
+# Suppress prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
 
-# install Rust
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
+RUN apt update --yes && apt upgrade --yes
+RUN apt install --yes protobuf-compiler
 
 COPY rust-toolchain.toml /
 RUN rustup show && cargo --version
 
 RUN cargo install cargo-script
+
+RUN apt clean && rm -rf /var/lib/apt/lists/*
