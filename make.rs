@@ -6,7 +6,7 @@
 //! edition = "2021"
 //!
 //! [dependencies]
-//! nob = { git = "https://gitlab.isae-supaero.fr/a.stevan/nob.rs", rev = "8fbc3369289e379456ef2131a61adf3efd38cfd2" }
+//! nob = { git = "https://gitlab.isae-supaero.fr/a.stevan/nob.rs", rev = "7ea6be855cf5600558440def6e59a83f78b8b543" }
 //! clap = { version = "4.5.17", features = ["derive"] }
 //! ```
 extern crate clap;
@@ -131,7 +131,7 @@ fn main() {
             nob::run_cmd_as_vec_and_fail!(cmd ; "RUSTDOCFLAGS" => "--html-in-header katex.html");
         }
         Some(Commands::Container { login, push }) => {
-            let res = nob::run_cmd_and_fail!("git", "rev-parse", "HEAD");
+            let res = nob::run_cmd_and_fail!(@+"git", "rev-parse", "HEAD");
             let sha = String::from_utf8(res.stdout).expect("Invalid UTF-8 string");
             let image = format!("{}/{}:{}", REGISTRY, IMAGE, sha.trim());
 
