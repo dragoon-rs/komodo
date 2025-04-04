@@ -14,6 +14,7 @@ extern crate clap;
 use clap::{Parser, Subcommand};
 
 const REGISTRY: &str = "gitlab-registry.isae-supaero.fr";
+const MIRROR_REGISTRY: &str = "ghcr.io/dragoon-rs";
 const IMAGE: &str = "dragoon/komodo";
 
 #[derive(Parser)]
@@ -134,16 +135,26 @@ fn main() {
             let res = nob::run_cmd_and_fail!(@+"git", "rev-parse", "HEAD");
             let sha = String::from_utf8(res.stdout).expect("Invalid UTF-8 string");
             let image = format!("{}/{}:{}", REGISTRY, IMAGE, sha.trim());
+            let mirror_image = format!("{}/{}:{}", MIRROR_REGISTRY, IMAGE, sha.trim());
 
             if *login {
                 nob::run_cmd_and_fail!("docker", "login", REGISTRY);
+                nob::run_cmd_and_fail!("docker", "login", MIRROR_REGISTRY);
             } else if *push {
+                nob::run_cmd_and_fail!("docker", "push", &image);
                 nob::run_cmd_and_fail!("docker", "push", &image);
             } else {
                 nob::run_cmd_and_fail!(
                     "docker",
                     "build",
                     "-t", &image,
+                    ".",
+                    "--file", ".gitlab-ci.dockerfile"
+                );
+                nob::run_cmd_and_fail!(
+                    "docker",
+                    "build",
+                    "-t", &mirror_image,
                     ".",
                     "--file", ".gitlab-ci.dockerfile"
                 );
