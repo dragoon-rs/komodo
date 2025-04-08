@@ -1,5 +1,4 @@
-# WARNING: update `rust-toolchain.toml` as well
-image: "rust:1.78"
+image: "gitlab-registry.isae-supaero.fr/dragoon/komodo:bcb0e6b5f73420762f6208700a43291e0066c2c3"
 
 stages:
   - fmt
@@ -16,8 +15,6 @@ workflow:
 
 fmt:
   stage: fmt
-  before_script:
-    - cargo install cargo-script
   script:
     - ./make.rs fmt --check
 
@@ -25,14 +22,8 @@ test:
   stage: test
   needs:
     - fmt
-  before_script:
-    - apt update --yes
-    - apt upgrade --yes
-    - apt install protobuf-compiler --yes
-    - cargo install cargo-script
-    - ./make.rs version
-
   script:
+    - ./make.rs version
     - ./make.rs check
     - ./make.rs clippy
     - ./make.rs test

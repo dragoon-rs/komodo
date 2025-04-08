@@ -5,32 +5,23 @@ on: [push, pull_request, workflow_dispatch]
 jobs:
   fmt:
     runs-on: ubuntu-latest
+    container:
+      image: "ghcr.io/dragoon-rs/dragoon/komodo:bcb0e6b5f73420762f6208700a43291e0066c2c3"
     if: "!contains(github.event.head_commit.message, 'draft:') && !contains(github.event.head_commit.message, 'no-ci:')"
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - name: Install dependencies
-        run: |
-          cargo install cargo-script
       - name: Run fmt check
         run: |
           ./make.rs fmt --check
 
   test:
     runs-on: ubuntu-latest
+    container:
+      image: "ghcr.io/dragoon-rs/dragoon/komodo:bcb0e6b5f73420762f6208700a43291e0066c2c3"
     needs: fmt
     if: "!contains(github.event.head_commit.message, 'draft:') && !contains(github.event.head_commit.message, 'no-ci:')"
     steps:
       - uses: actions/checkout@v3
-      - name: Install dependencies
-        run: |
-          sudo apt update --yes
-          sudo apt upgrade --yes
-          sudo apt install protobuf-compiler --yes
-          cargo install cargo-script
       - name: Show configuration
         run: |
           ./make.rs version
