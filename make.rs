@@ -6,12 +6,17 @@
 //! edition = "2021"
 //!
 //! [dependencies]
-//! nob = { git = "https://gitlab.isae-supaero.fr/a.stevan/nob.rs", rev = "e4b03cdd4f1ba9daf3095930911b12fb28b6a248" }
+//! nob = { git = "https://gitlab.isae-supaero.fr/a.stevan/nob.rs", rev = "7ea6be855cf5600558440def6e59a83f78b8b543" }
 //! clap = { version = "4.5.17", features = ["derive"] }
 //! ```
 extern crate clap;
 
 use clap::{Parser, Subcommand};
+
+const REGISTRY: &str = "gitlab-registry.isae-supaero.fr";
+const MIRROR_REGISTRY: &str = "ghcr.io/dragoon-rs";
+const IMAGE: &str = "dragoon/komodo";
+const DOCKERFILE: &str = ".env.dockerfile";
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -55,6 +60,15 @@ enum Commands {
         #[arg(short, long)]
         features: bool,
     },
+    /// Builds the container.
+    Container {
+        /// Log into the registry instead of building.
+        #[arg(short, long)]
+        login: bool,
+        /// Push to the registry instead of building.
+        #[arg(short, long)]
+        push: bool,
+    },
 }
 
 #[rustfmt::skip]
@@ -85,7 +99,7 @@ fn main() {
                 "--",
                 "-D",
                 "warnings"
-            )
+            );
         }
         Some(Commands::Test { verbose, examples }) => {
             let mut cmd = vec!["cargo", "test"];
@@ -117,7 +131,36 @@ fn main() {
             if *private { cmd.push("--document-private-items") }
             if *features { cmd.push("--all-features") }
             nob::run_cmd_as_vec_and_fail!(cmd ; "RUSTDOCFLAGS" => "--html-in-header katex.html");
-        },
+        }
+        Some(Commands::Container { login, push }) => {
+            let res = nob::run_cmd_and_fail!(@+"git", "rev-parse", "HEAD");
+            let sha = String::from_utf8(res.stdout).expect("Invalid UTF-8 string");
+            let image = format!("{}/{}:{}", REGISTRY, IMAGE, sha.trim());
+            let mirror_image = format!("{}/{}:{}", MIRROR_REGISTRY, IMAGE, sha.trim());
+
+            if *login {
+                nob::run_cmd_and_fail!("docker", "login", REGISTRY);
+                nob::run_cmd_and_fail!("docker", "login", MIRROR_REGISTRY);
+            } else if *push {
+                nob::run_cmd_and_fail!("docker", "push", &image);
+                nob::run_cmd_and_fail!("docker", "push", &mirror_image);
+            } else {
+                nob::run_cmd_and_fail!(
+                    "docker",
+                    "build",
+                    "-t", &image,
+                    ".",
+                    "--file", DOCKERFILE
+                );
+                nob::run_cmd_and_fail!(
+                    "docker",
+                    "build",
+                    "-t", &mirror_image,
+                    ".",
+                    "--file", DOCKERFILE
+                );
+            }
+        }
         None => {}
     }
 }

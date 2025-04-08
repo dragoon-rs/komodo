@@ -21,6 +21,28 @@ Other examples that showcase the Komodo API are available in [`examples/`](examp
 ## the benchmarks
 see [`benchmarks/`](benchmarks/README.md)
 
+the results can be found in [`dragoon/komodo-benchmark-results`](https://gitlab.isae-supaero.fr/dragoon/komodo-benchmark-results).
+
+## development
+
+Komodo uses a Docker image as the base of the GitLab pipelines.
+
+That means that there is nothing to build apart from the source code of Komodo itself when running jobs.
+
+When the development environment needs to change, e.g. when the version of Rust is bumped in
+[`rust-toolchain.toml`](./rust-toolchain.toml), one shall run the following commands to push the new
+Docker image to the [_container registry_][gitlab.isae-supaero.fr:dragoon/komodo@containers].
+
+```shell
+./make.rs container --login
+```
+```shell
+./make.rs container
+```
+```shell
+./make.rs container --push
+```
+
 ## contributors
 
 Because the code for this project has been originally extracted from
@@ -33,3 +55,4 @@ note that the following people have contributed to this code base:
 - @j.detchart
 
 [pcs-fec-id]: https://gitlab.isae-supaero.fr/dragoon/pcs-fec-id
+[gitlab.isae-supaero.fr:dragoon/komodo@containers]: https://gitlab.isae-supaero.fr/dragoon/komodo/container_registry/42
