@@ -6,8 +6,19 @@
 [![source](https://gitlab.isae-supaero.fr/dragoon/komodo/badges/main/pipeline.svg?key_text=GitLab%20CI)](https://gitlab.isae-supaero.fr/dragoon/komodo/-/pipelines)
 [![mirror](https://github.com/dragoon-rs/komodo/actions/workflows/ci.yml/badge.svg)](https://github.com/dragoon-rs/komodo/actions)
 
+Komodo uses a build system entirely writen in Rust.
+- [`cargo-script`](https://crates.io/crates/cargo-script) to build the script
+- [`nob.rs`](https://gitlab.isae-supaero.fr/a.stevan/nob.rs) to run commands
+- [`clap`](https://crates.io/crates/clap) to provide a nice and complete build API
+
+First, [install `cargo-script`](https://github.com/DanielKeep/cargo-script#installation).
+
+Then, run the script with `./make.rs --help`
+
 ## the library
-see `cargo doc` or [the library itself](src/)
+```shell
+./make.rs doc
+```
 
 ## the tests
 ```shell
