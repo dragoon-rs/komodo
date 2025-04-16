@@ -68,6 +68,12 @@ enum Commands {
     },
     /// Run all that is needed for the Continuous Integration of the project.
     CI {
+        /// Run the "fmt" stage of the Continuous Integration
+        #[arg(short, long)]
+        fmt: bool,
+        /// Run the "test" stage of the Continuous Integration
+        #[arg(short, long)]
+        test: bool,
         /// Be extra verbose with the output of the Continuous Integration.
         #[arg(short, long)]
         verbose: bool,
@@ -174,14 +180,28 @@ fn main() {
             private,
             features,
         }) => doc(*open, *private, *features),
-        Some(Commands::CI { verbose }) => {
-            fmt(true);
-            version();
-            check();
-            clippy();
-            test(*verbose, false);
-            test(*verbose, true);
-        }
+        Some(Commands::CI {
+            fmt: fmt_stage,
+            test: test_stage,
+            verbose,
+        }) => match (fmt_stage, test_stage) {
+            (false, false) | (true, true) => {
+                fmt(true);
+                version();
+                check();
+                clippy();
+                test(*verbose, false);
+                test(*verbose, true);
+            }
+            (true, false) => fmt(true),
+            (false, true) => {
+                version();
+                check();
+                clippy();
+                test(*verbose, false);
+                test(*verbose, true);
+            }
+        },
         Some(Commands::Container(container_cmd)) => {
             let res = nob::run_cmd_and_fail!(@+"git", "rev-parse", "HEAD");
             let sha = String::from_utf8(res.stdout).expect("Invalid UTF-8 string");
