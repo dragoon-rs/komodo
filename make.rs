@@ -87,75 +87,87 @@ enum ContainerCommands {
     Push,
 }
 
+fn fmt(check: bool) {
+    if check {
+        nob::run_cmd_and_fail!("cargo", "fmt", "--all", "--", "--check");
+    } else {
+        nob::run_cmd_and_fail!("cargo", "fmt", "--all");
+    }
+}
+
+fn check() {
+    let cmd = vec!["cargo", "check", "--workspace", "--all-targets"];
+    extend_and_run(&cmd, &[]);
+    extend_and_run(&cmd, &["--features", "kzg"]);
+    extend_and_run(&cmd, &["--features", "aplonk"]);
+    extend_and_run(&cmd, &["--all-features"]);
+}
+
+fn clippy() {
+    nob::run_cmd_and_fail!(
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+    );
+}
+
+fn test(verbose: bool, examples: bool) {
+    let mut cmd = vec!["cargo", "test"];
+
+    if verbose {
+        cmd.push("--verbose")
+    }
+    if examples {
+        cmd.push("--examples");
+    } else {
+        cmd.push("--workspace");
+        cmd.push("--all-features");
+    }
+
+    nob::run_cmd_as_vec_and_fail!(cmd);
+}
+
+fn version() {
+    nob::run_cmd_and_fail!(@"rustup", "--version", "2>", "/dev/null");
+    nob::run_cmd_and_fail!(@"rustup", "show", "active-toolchain");
+    nob::run_cmd_and_fail!(@"rustc", "--version");
+    nob::run_cmd_and_fail!(@"cargo", "--version");
+    nob::run_cmd_and_fail!(@"cargo", "clippy", "--version");
+}
+
+fn doc(open: bool, private: bool, features: bool) {
+    let mut cmd = vec!["cargo", "doc", "--no-deps"];
+    if open {
+        cmd.push("--open")
+    }
+    if private {
+        cmd.push("--document-private-items")
+    }
+    if features {
+        cmd.push("--all-features")
+    }
+    nob::run_cmd_as_vec_and_fail!(cmd ; "RUSTDOCFLAGS" => "--html-in-header katex.html");
+}
+
 fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
-        Some(Commands::Fmt { check }) => {
-            if *check {
-                nob::run_cmd_and_fail!("cargo", "fmt", "--all", "--", "--check");
-            } else {
-                nob::run_cmd_and_fail!("cargo", "fmt", "--all");
-            }
-        }
-        Some(Commands::Check) => {
-            let cmd = vec!["cargo", "check", "--workspace", "--all-targets"];
-            extend_and_run(&cmd, &[]);
-            extend_and_run(&cmd, &["--features", "kzg"]);
-            extend_and_run(&cmd, &["--features", "aplonk"]);
-            extend_and_run(&cmd, &["--all-features"]);
-        }
-        Some(Commands::Clippy) => {
-            nob::run_cmd_and_fail!(
-                "cargo",
-                "clippy",
-                "--workspace",
-                "--all-targets",
-                "--all-features",
-                "--",
-                "-D",
-                "warnings"
-            );
-        }
-        Some(Commands::Test { verbose, examples }) => {
-            let mut cmd = vec!["cargo", "test"];
-
-            if *verbose {
-                cmd.push("--verbose")
-            }
-            if *examples {
-                cmd.push("--examples");
-            } else {
-                cmd.push("--workspace");
-                cmd.push("--all-features");
-            }
-
-            nob::run_cmd_as_vec_and_fail!(cmd);
-        }
-        Some(Commands::Version) => {
-            nob::run_cmd_and_fail!(@"rustup", "--version", "2>", "/dev/null");
-            nob::run_cmd_and_fail!(@"rustup", "show", "active-toolchain");
-            nob::run_cmd_and_fail!(@"rustc", "--version");
-            nob::run_cmd_and_fail!(@"cargo", "--version");
-            nob::run_cmd_and_fail!(@"cargo", "clippy", "--version");
-        }
+        Some(Commands::Fmt { check }) => fmt(*check),
+        Some(Commands::Check) => check(),
+        Some(Commands::Clippy) => clippy(),
+        Some(Commands::Test { verbose, examples }) => test(*verbose, *examples),
+        Some(Commands::Version) => version(),
         Some(Commands::Doc {
             open,
             private,
             features,
-        }) => {
-            let mut cmd = vec!["cargo", "doc", "--no-deps"];
-            if *open {
-                cmd.push("--open")
-            }
-            if *private {
-                cmd.push("--document-private-items")
-            }
-            if *features {
-                cmd.push("--all-features")
-            }
-            nob::run_cmd_as_vec_and_fail!(cmd ; "RUSTDOCFLAGS" => "--html-in-header katex.html");
-        }
+        }) => doc(*open, *private, *features),
         Some(Commands::Container(container_cmd)) => {
             let res = nob::run_cmd_and_fail!(@+"git", "rev-parse", "HEAD");
             let sha = String::from_utf8(res.stdout).expect("Invalid UTF-8 string");
