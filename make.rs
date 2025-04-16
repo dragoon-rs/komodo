@@ -227,7 +227,6 @@ fn docker_images_to_table(lines: String) -> Table {
     let mut rows: Vec<Vec<String>> = Vec::new();
     let mut headers: Vec<String> = Vec::new();
     for line in lines.lines() {
-        let json: Value = serde_json::from_str(&line).unwrap_or_else(|_| Value::Null);
         if let Value::Object(map) = serde_json::from_str(&line).unwrap_or_else(|_| Value::Null) {
             if headers.is_empty() {
                 headers = map.keys().cloned().collect();
