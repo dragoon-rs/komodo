@@ -10,9 +10,7 @@ jobs:
     if: "!contains(github.event.head_commit.message, 'draft:') && !contains(github.event.head_commit.message, 'no-ci:')"
     steps:
       - uses: actions/checkout@v3
-      - name: Run fmt check
-        run: |
-          ./make.rs fmt --check
+      - run: ./make.rs ci --fmt
 
   test:
     runs-on: ubuntu-latest
@@ -22,11 +20,4 @@ jobs:
     if: "!contains(github.event.head_commit.message, 'draft:') && !contains(github.event.head_commit.message, 'no-ci:')"
     steps:
       - uses: actions/checkout@v3
-      - name: Show configuration
-        run: |
-          ./make.rs version
-      - name: Run tests
-        run: |
-          ./make.rs check
-          ./make.rs clippy
-          ./make.rs test
+      - run: ./make.rs ci --test
