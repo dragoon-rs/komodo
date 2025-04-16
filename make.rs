@@ -66,6 +66,12 @@ enum Commands {
         #[arg(short, long)]
         features: bool,
     },
+    /// Run all that is needed for the Continuous Integration of the project.
+    CI {
+        /// Be extra verbose with the output of the Continuous Integration.
+        #[arg(short, long)]
+        verbose: bool,
+    },
     /// Builds the container.
     #[command(subcommand)]
     Container(ContainerCommands),
@@ -168,6 +174,14 @@ fn main() {
             private,
             features,
         }) => doc(*open, *private, *features),
+        Some(Commands::CI { verbose }) => {
+            fmt(true);
+            version();
+            check();
+            clippy();
+            test(*verbose, false);
+            test(*verbose, true);
+        }
         Some(Commands::Container(container_cmd)) => {
             let res = nob::run_cmd_and_fail!(@+"git", "rev-parse", "HEAD");
             let sha = String::from_utf8(res.stdout).expect("Invalid UTF-8 string");
