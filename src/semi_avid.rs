@@ -16,17 +16,38 @@
 //! used: _the commitment of a linear combination of polynomials is equal to the same linear
 //! combination of the commiments of the same polynomials_.
 //!
+//! > **Note**
+//! >
+//! > In the following, we denote by $\text{com}$ the commitment operation and by
+//! > $\mathbb{F}_p\[X\]$ the ring of all polynomials of one variable over $\mathbb{F}_p$.
+//!
+//! $$\forall (\alpha_i) \in \mathbb{F}_p, (P_i) \in \mathbb{F}_p\[X\], \quad \text{com}\left(\sum\limits_i \alpha_i P_i\right) = \sum\limits_i \alpha_i \text{com}(P_i)$$
+//!
 //! This give us a simple, lightweight and fast commitment scheme.
+//!
+//! > **Note**
+//! >
+//! > In the following, the data $\Delta$ is arranged in an $m \times k$ matrix and $i$ will denote
+//! the number of a row and $j$ the number of a column
+//! > - $0 \leq i \leq m - 1$
+//! > - $0 \leq j \leq k - 1$
+//!
+//! Let’s explain with a very simple example how things operate with Semi-AVID. The setup is that a
+//! prover wants to show a verifier that a shard of encoded data $s_\alpha$ has indeed been
+//! generated with a linear combination of the $k$ source shards from data $\Delta$. $\alpha$ is
+//! the number that identifies shard $s_\alpha$ and $\text{lincomb}(s_\alpha)$ is the linear combination
+//! used to compute $s_\alpha$ from the $k$ source shards.
+#![doc = simple_mermaid::mermaid!("semi_avid.mmd")]
 //!
 //! # Example
 //! > **Note**
 //! >
-//! > below, `F`, `G` and `DP<F>` are explicitely specified everywhere but, in _real_ code, i.e.
+//! > Below, `F`, `G` and `DP<F>` are explicitely specified everywhere but, in _real_ code, i.e.
 //! > using generic types as it's commonly done in Arkworks, it should be possible to specify them
 //! > once and Rust will take care of _carrying_ the types in the rest of the code. Also, `DP<F>`
 //! > will likely be its own generic type, usually written `P` in this code base.
 //! >
-//! > see the Semi-AVID example for a fully-typed code.
+//! > See the Semi-AVID example for a fully-typed code.
 //!
 //! - first, let's import some types...
 //! ```
@@ -38,20 +59,22 @@
 //! # fn main() {
 //! let mut rng = ark_std::test_rng();
 //!
-//! let (k, n) = (3, 6_usize);
+//! let (k, n) = (3, 6);
 //! let bytes = include_bytes!("../assets/dragoon_133x133.png").to_vec();
 //! # }
 //! ```
-//! - then, Semi-AVID requires a trusted setup to prove and verify
+//! - then, Semi-AVID requires a trusted setup to prove and verify. This example shows a trusted
+//! setup big enough to support data as big as $10 \times 1024$ elements of $\mathbb{F}_p$, to
+//! allow users to reuse it with multiple files of varying lengths.
 //! ```
 //! # use ark_bls12_381::{Fr as F, G1Projective as G};
 //! # fn main() {
 //! # let mut rng = ark_std::test_rng();
 //! #
-//! # let (k, n) = (3, 6_usize);
+//! # let (k, n) = (3, 6);
 //! # let bytes = include_bytes!("../assets/dragoon_133x133.png").to_vec();
 //! #
-//! let powers = komodo::zk::setup::<F, G>(bytes.len(), &mut rng).unwrap();
+//! let powers = komodo::zk::setup::<F, G>(10 * 1_024, &mut rng).unwrap();
 //! # }
 //! ```
 //! - we can now build an encoding matrix, encode the data, prove the shards and build [`Block`]s
@@ -64,10 +87,10 @@
 //! # fn main() {
 //! # let mut rng = ark_std::test_rng();
 //! #
-//! # let (k, n) = (3, 6_usize);
+//! # let (k, n) = (3, 6);
 //! # let bytes = include_bytes!("../assets/dragoon_133x133.png").to_vec();
 //! #
-//! # let powers = komodo::zk::setup::<F, G>(bytes.len(), &mut rng).unwrap();
+//! # let powers = komodo::zk::setup::<F, G>(10 * 1_024, &mut rng).unwrap();
 //! #
 //! let encoding_mat = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
 //! let shards = komodo::fec::encode(&bytes, encoding_mat).unwrap();
@@ -75,7 +98,7 @@
 //! let blocks = build::<F, G, DP<F>>(&shards, &proof);
 //! # }
 //! ```
-//! - finally, each [`Block`] can be verified individually
+//! - finally, each [`Block`] can be verified individually, using the same trusted setup
 //! ```
 //! # use ark_bls12_381::{Fr as F, G1Projective as G};
 //! # use ark_poly::univariate::DensePolynomial as DP;
@@ -85,10 +108,10 @@
 //! # fn main() {
 //! # let mut rng = ark_std::test_rng();
 //! #
-//! # let (k, n) = (3, 6_usize);
+//! # let (k, n) = (3, 6);
 //! # let bytes = include_bytes!("../assets/dragoon_133x133.png").to_vec();
 //! #
-//! # let powers = komodo::zk::setup::<F, G>(bytes.len(), &mut rng).unwrap();
+//! # let powers = komodo::zk::setup::<F, G>(10 * 1_024, &mut rng).unwrap();
 //! #
 //! # let encoding_mat = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
 //! # let shards = komodo::fec::encode(&bytes, encoding_mat).unwrap();
@@ -100,7 +123,7 @@
 //! }
 //! # }
 //! ```
-//! - and decoded using any $k$ of the shards
+//! - and decoded using any $k$ of the shards, here the first $k$
 //! ```
 //! # use ark_bls12_381::{Fr as F, G1Projective as G};
 //! # use ark_poly::univariate::DensePolynomial as DP;
@@ -110,10 +133,10 @@
 //! # fn main() {
 //! # let mut rng = ark_std::test_rng();
 //! #
-//! # let (k, n) = (3, 6_usize);
+//! # let (k, n) = (3, 6);
 //! # let bytes = include_bytes!("../assets/dragoon_133x133.png").to_vec();
 //! #
-//! # let powers = komodo::zk::setup::<F, G>(bytes.len(), &mut rng).unwrap();
+//! # let powers = komodo::zk::setup::<F, G>(10 * 1_024, &mut rng).unwrap();
 //! #
 //! # let encoding_mat = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
 //! # let shards = komodo::fec::encode(&bytes, encoding_mat).unwrap();
@@ -149,9 +172,9 @@ use crate::{
     zk::{self, Commitment, Powers},
 };
 
-/// representation of a block of proven data.
+/// Representation of a block of proven data.
 ///
-/// this is a wrapper around a [`fec::Shard`] with some additional cryptographic
+/// This is a wrapper around a [`fec::Shard`] with some additional cryptographic
 /// information that allows to prove the integrity of said shard.
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Block<F: PrimeField, G: CurveGroup<ScalarField = F>> {
@@ -208,26 +231,30 @@ impl<F: PrimeField, G: CurveGroup<ScalarField = F>> std::fmt::Display for Block<
     }
 }
 
-/// compute a recoded block from an arbitrary set of blocks
+/// Computes a recoded block from an arbitrary set of blocks.
 ///
-/// coefficients will be drawn at random, one for each block.
-///
-/// if the blocks appear to come from different data, e.g. if the commits are
-/// different, an error will be returned.
+/// Coefficients will be drawn at random, one for each block.
 ///
 /// > **Note**
 /// >
-/// > this is a wrapper around [`fec::recode_random`].
+/// > If the blocks appear to come from different data, e.g. if the commits are
+/// > different, an error will be returned.
+///
+/// > **Note**
+/// >
+/// > This is a wrapper around [`fec::recode_random`].
 pub fn recode<F: PrimeField, G: CurveGroup<ScalarField = F>>(
     blocks: &[Block<F, G>],
     rng: &mut impl RngCore,
 ) -> Result<Option<Block<F, G>>, KomodoError> {
     for (i, (b1, b2)) in blocks.iter().zip(blocks.iter().skip(1)).enumerate() {
         if b1.proof != b2.proof {
-            return Err(KomodoError::IncompatibleBlocks(format!(
-                "proofs are not the same at {}: {:?} vs {:?}",
-                i, b1.proof, b2.proof
-            )));
+            return Err(KomodoError::IncompatibleBlocks {
+                key: "proof".to_string(),
+                index: i,
+                left: format!("{:?}", b1.proof),
+                right: format!("{:?}", b2.proof),
+            });
         }
     }
     let shard = match fec::recode_random(
@@ -244,7 +271,7 @@ pub fn recode<F: PrimeField, G: CurveGroup<ScalarField = F>>(
     }))
 }
 
-/// compute the Semi-AVID proof for some data
+/// Computes the Semi-AVID proof for some data.
 pub fn prove<F, G, P>(
     bytes: &[u8],
     powers: &Powers<F, G>,
@@ -281,7 +308,7 @@ where
     Ok(commits)
 }
 
-/// attach a Semi-AVID proof to a collection of encoded shards
+/// Attaches a Semi-AVID proof to a collection of encoded shards.
 #[inline(always)]
 pub fn build<F, G, P>(shards: &[Shard<F>], proof: &[Commitment<F, G>]) -> Vec<Block<F, G>>
 where
@@ -299,7 +326,7 @@ where
         .collect::<Vec<_>>()
 }
 
-/// verify that a single block of encoded and proven data is valid
+/// Verifies that a single block of encoded and proven data is valid.
 pub fn verify<F, G, P>(
     block: &Block<F, G>,
     verifier_key: &Powers<F, G>,

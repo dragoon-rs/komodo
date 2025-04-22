@@ -1,4 +1,20 @@
-//! a module to encode, recode and decode shards of data with FEC methods.
+//! A module to encode, recode and decode shards of data with [FEC] methods.
+//!
+//! In all the following, $(k, n)$ codes will be described, where $k$ is the number of source
+//! shards and $n$ is the number of encoded shards.
+//!
+//! The _code ratio_ is defined as $\rho = \frac{k}{n}$.
+//!
+//! ## Example
+//! In the following example, a file is encoded and decoded back.
+//!
+//! The dotted circle in between "_dissemination_" and "_gathering_" represents the "_life_" of the
+//! shards, e.g. them being shared between peers on a network, recoded or lost.
+#![doc = simple_mermaid::mermaid!("fec.mmd")]
+//! In the end, [FEC] methods guarantee that $F^* = F$, as long as at least $k$ linearly
+//! independant shards are gathered before decoding.
+//!
+//! [FEC]: https://en.wikipedia.org/wiki/Error_correction_code
 
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -8,14 +24,16 @@ use rs_merkle::{algorithms::Sha256, Hasher};
 
 use crate::{algebra, algebra::linalg::Matrix, error::KomodoError};
 
-/// representation of a [FEC](https://en.wikipedia.org/wiki/Error_correction_code) shard of data.
+/// Representation of a [FEC] shard of data.
+///
+/// [FEC]: https://en.wikipedia.org/wiki/Error_correction_code
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Shard<F: PrimeField> {
     /// the code parameter, required to decode
     pub k: u32,
-    /// tells the decoder how the shard was constructed with respect to the original source shards
+    /// tells the decoder how the shard was constructed with respect to the original source shards.
     ///
-    /// this effectively allows support for _recoding_.
+    /// This effectively allows support for _recoding_.
     ///
     /// If we denote the $k$ source shards by $(s\_i)\_\{0 \le i \lt k\}$, the linear combination by $k$
     /// coefficients $(\alpha_i)_{0 \le i \lt k}$ and $s$ the shard itself, then
@@ -31,9 +49,9 @@ pub struct Shard<F: PrimeField> {
 }
 
 impl<F: PrimeField> Shard<F> {
-    /// compute the linear combination between two [`Shard`]s
+    /// Computes the linear combination between two [`Shard`]s.
     ///
-    /// if we denote the [`Shard`] itself and the other [`Shard`] by $s$ and $o$ respectively, the
+    /// If we denote the [`Shard`] itself and the other [`Shard`] by $s$ and $o$ respectively, the
     /// output is
     /// $$ \alpha s + \beta o $$
     pub fn recode_with(&self, alpha: F, other: &Self, beta: F) -> Self {
@@ -63,17 +81,17 @@ impl<F: PrimeField> Shard<F> {
     }
 }
 
-/// compute the linear combination between an arbitrary number of [`Shard`]s
+/// Computes the linear combination between an arbitrary number of [`Shard`]s.
 ///
 /// > **Note**
 /// >
-/// > this is basically a multi-[`Shard`] wrapper around [`Shard::recode_with`]
+/// > This is basically a multi-[`Shard`] wrapper around [`Shard::recode_with`].
 /// >
-/// > returns [`None`] if the number of shards is not the same as the number of
-/// > coefficients or if no shards are provided.
+/// > [`recode_with_coeffs`] will return [`None`] if the number of shards
+/// > is not the same as the number of coefficients or if no shards are provided.
 ///
-/// if the shards are the $(s \_i)\_\{1 \le i \le n\}$ and the coefficients the
-/// $(\alpha\_i)\_\{0 \le i \le n\}$, then the output will be
+/// If the shards are the $(s \_i)\_\{1 \le i \le n\}$ and the coefficients the
+/// $(\alpha\_i)\_\{1 \le i \le n\}$, then the output will be
 ///
 /// $$ \sum\limits_{i = 1}^{n} \alpha_i s_i$$
 pub fn recode_with_coeffs<F: PrimeField>(shards: &[Shard<F>], coeffs: &[F]) -> Option<Shard<F>> {
@@ -94,38 +112,44 @@ pub fn recode_with_coeffs<F: PrimeField>(shards: &[Shard<F>], coeffs: &[F]) -> O
     Some(s)
 }
 
-/// compute a recoded shard from an arbitrary set of shards
+/// Computes a recoded shard from an arbitrary set of compatible shards.
 ///
-/// coefficients will be drawn at random, one for each shard.
+/// Coefficients will be drawn at random, one for each shard.
 ///
-/// if the shards appear to come from different data, e.g. if `k` is not the
+/// If the shards appear to come from different data, e.g. if $k$ is not the
 /// same or the hash of the data is different, an error will be returned.
 ///
 /// > **Note**
 /// >
-/// > this is a wrapper around [`recode_with_coeffs`].
+/// > This is a wrapper around [`recode_with_coeffs`].
 pub fn recode_random<F: PrimeField>(
     shards: &[Shard<F>],
     rng: &mut impl RngCore,
 ) -> Result<Option<Shard<F>>, KomodoError> {
     for (i, (s1, s2)) in shards.iter().zip(shards.iter().skip(1)).enumerate() {
         if s1.k != s2.k {
-            return Err(KomodoError::IncompatibleShards(format!(
-                "k is not the same at {}: {} vs {}",
-                i, s1.k, s2.k
-            )));
+            return Err(KomodoError::IncompatibleShards {
+                key: "k".to_string(),
+                index: i,
+                left: s1.k.to_string(),
+                right: s2.k.to_string(),
+            });
         }
         if s1.hash != s2.hash {
-            return Err(KomodoError::IncompatibleShards(format!(
-                "hash is not the same at {}: {:?} vs {:?}",
-                i, s1.hash, s2.hash
-            )));
+            return Err(KomodoError::IncompatibleShards {
+                key: "hash".to_string(),
+                index: i,
+                left: format!("{:?}", s1.hash),
+                right: format!("{:?}", s2.hash),
+            });
         }
         if s1.size != s2.size {
-            return Err(KomodoError::IncompatibleShards(format!(
-                "size is not the same at {}: {} vs {}",
-                i, s1.size, s2.size
-            )));
+            return Err(KomodoError::IncompatibleShards {
+                key: "size".to_string(),
+                index: i,
+                left: s1.size.to_string(),
+                right: s2.size.to_string(),
+            });
         }
     }
 
@@ -133,15 +157,21 @@ pub fn recode_random<F: PrimeField>(
     Ok(recode_with_coeffs(shards, &coeffs))
 }
 
-/// applies a given encoding matrix to some data to generate encoded shards
+/// Applies a given encoding matrix to some data to generate encoded shards.
+///
+/// We arrange the source shards to be encoded in an $m \times k$ matrix $S$, i.e. $k$ shards of
+/// length $m$. The encoding matrix $M$ then is a $k \times n$ matrix and the encoded shards are
+/// the $n$ columns of
+///
+/// $$E = S M$$
 ///
 /// > **Note**
 /// >
-/// > the input data and the encoding matrix should have compatible shapes,
+/// > The input data and the encoding matrix should have compatible shapes,
 /// > otherwise, an error might be thrown to the caller.
 ///
 /// Padding might be applied depending on the size of the data compared to the size of the encoding
-/// matrix. (see [`algebra::split_data_into_field_elements`])
+/// matrix, see [`algebra::split_data_into_field_elements`].
 ///
 /// This is the inverse of [`decode`].
 pub fn encode<F: PrimeField>(
@@ -175,11 +205,18 @@ pub fn encode<F: PrimeField>(
         .collect())
 }
 
-/// reconstruct the original data from a set of encoded, possibly recoded, shards
+/// Reconstructs the original data from a set of encoded, possibly recoded, shards.
+///
+/// Let's assume at least $k$ linearly independant shards have been retrieved and put in a matrix
+/// $\hat{E}$. We use the [linear combination][`Shard::linear_combination`] of each shard to
+/// reconstruct the columns of the square submatrix $\hat{M}$ that has been used to encode these
+/// shards. Then the reconstructed source shards $\hat{S}$ are given by
+///
+/// $$\hat{S} = \hat{M}^{-1} \hat{E}$$
 ///
 /// > **Note**
 /// >
-/// > this function might fail in a variety of cases
+/// > This function might fail in a variety of cases
 /// > - if there are too few shards
 /// > - if there are linear dependencies between shards
 ///

@@ -11,30 +11,30 @@ use crate::aplonk::polynomial;
 use crate::aplonk::transcript;
 use crate::error::KomodoError;
 
-/// holds the setup parameters of the IPA stage of [aPlonk from [Ambrona et al.]][aPlonK]
+/// Holds the setup parameters of the IPA stage of [aPlonk from [Ambrona et al.]][aPlonK].
 ///
-/// this can be found in [aPlonk from [Ambrona et al.]][aPlonK] in
+/// This can be found in [aPlonk from [Ambrona et al.]][aPlonK] in
 /// - page **13**. in Setup.1
 /// - page **13**. in Setup.3
 ///
 /// [aPlonk]: https://eprint.iacr.org/2022/1352.pdf
 #[derive(Debug, Clone, PartialEq, Default, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Params<E: Pairing> {
-    /// *[\tau]_1* in the paper
+    /// $\[\tau\]_1$ in the paper
     pub tau_1: E::G1,
-    /// *ck_\tau* in the paper
+    /// $\text{ck}_\tau$ in the paper
     pub ck_tau: Vec<E::G2>,
 }
 
 /// holds all the necessary pieces to prove the IPA stage of [aPlonk from [Ambrona et al.]][aPlonK]
 /// this can be found in [aPlonk from [Ambrona et al.]][aPlonK] as
-/// *\pi = ({L_G^j, R_G^j, L_r^j, R_r^j}_{j \in [\kappa]}, \mu^0, G^0)* in
+/// $\pi = ({L_G^j, R_G^j, L_r^j, R_r^j}_{j \in [\kappa]}, \mu^0, G^0)$ in
 /// - page **15**. in IPA.Prove.10
 ///
 /// > **Note**  
 /// > the notations are the same as in the paper, only with all letters in lower
-/// > case and the powers at the bottom, e.g. `l_g_j` instead of *L_G^j*, and
-/// > with *G* rename as `ck_tau`.
+/// > case and the powers at the bottom, e.g. `l_g_j` instead of $L_G^j$, and
+/// > with $G$ rename as `ck_tau`.
 ///
 /// [aPlonk]: https://eprint.iacr.org/2022/1352.pdf
 #[derive(Debug, Clone, Default, PartialEq, CanonicalSerialize, CanonicalDeserialize)]

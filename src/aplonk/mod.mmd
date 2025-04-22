@@ -1,0 +1,15 @@
+sequenceDiagram
+    actor prover
+    actor verifier
+
+    Note over prover,verifier: generate trusted setup<br/>$$\ \text{TS} = (([\sigma^j]_1), [\tau]_1, \text{ck}_\tau)$$
+    Note over prover,verifier: $$\tau \leftarrow \mathbb{F}_p$$
+    Note over prover,verifier: $$\text{ck}_\tau = ([\tau^i]_2)$$
+
+    Note left of prover: $$(P_i) = \text{split}(\Delta)$$
+    Note left of prover: $$c = \text{com}(P_i, \text{TS})$$
+    Note left of prover: $$\pi_\alpha = \text{prove}(c, P_i, s_\alpha, \text{TS})$$
+
+    prover->>verifier: $$\pi_{\alpha} \text{, } (c_i)$$
+
+    Note right of verifier: $$\text{verify}(s_\alpha, \pi_\alpha, \text{TS})$$

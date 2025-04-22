@@ -1,4 +1,4 @@
-//! interact with the filesystem, read from and write to it
+//! Interact with the filesystem, read from and write to it.
 use std::{
     fs::File,
     io::prelude::*,
@@ -15,18 +15,18 @@ use tracing::info;
 
 use crate::semi_avid::Block;
 
-/// dump any serializable object to the disk
+/// Dumps any serializable object to the disk.
 ///
 /// - `dumpable` can be anything that is _serializable_
 /// - if `filename` is provided, then it will be used as the filename as is
 /// - otherwise, the hash of the _dumpable_ will be computed and used as the
 ///   filename
 ///
-/// this function will return the name of the file the _dumpable_ has been
+/// This function will return the name of the file the _dumpable_ has been
 /// dumped to.
 pub fn dump(
     dumpable: &impl CanonicalSerialize,
-    dump_dir: &Path,
+    directory: &Path,
     filename: Option<&str>,
     compress: Compress,
 ) -> Result<String> {
@@ -43,7 +43,7 @@ pub fn dump(
             .join(""),
     };
 
-    let dump_path = dump_dir.join(&filename);
+    let dump_path = directory.join(&filename);
 
     info!("dumping dumpable into `{:?}`", dump_path);
     let mut file = File::create(&dump_path)?;
@@ -52,29 +52,29 @@ pub fn dump(
     Ok(filename)
 }
 
-/// dump a bunch of blocks to the disk and return a JSON / NUON compatible list
-/// of all the hashes that have been dumped
+/// Dumps a bunch of blocks to the disk and returns a JSON / NUON compatible list
+/// of all the hashes that have been dumped.
 ///
 /// > **Note**
 /// >
-/// > this is a wrapper around [`dump`]
+/// > This is a wrapper around [`dump`].
 ///
 /// # Example
-/// let's say we give three blocks to [`dump_blocks`] and their hashes are `aaaa`, `bbbb` and
+/// Let's say we give three blocks to [`dump_blocks`] and their hashes are `aaaa`, `bbbb` and
 /// `cccc` respectively, then this function will return
 /// ```json
-/// '["aaaa", "bbbb", "cccc"]'
+/// ["aaaa", "bbbb", "cccc"]
 /// ```
 pub fn dump_blocks<F: PrimeField, G: CurveGroup<ScalarField = F>>(
     blocks: &[Block<F, G>],
-    block_dir: &PathBuf,
+    directory: &PathBuf,
     compress: Compress,
 ) -> Result<String> {
-    info!("dumping blocks to `{:?}`", block_dir);
+    info!("dumping blocks to `{:?}`", directory);
     let mut hashes = vec![];
-    std::fs::create_dir_all(block_dir)?;
+    std::fs::create_dir_all(directory)?;
     for block in blocks.iter() {
-        let hash = dump(block, block_dir, None, compress)?;
+        let hash = dump(block, directory, None, compress)?;
         hashes.push(hash);
     }
 
@@ -87,30 +87,30 @@ pub fn dump_blocks<F: PrimeField, G: CurveGroup<ScalarField = F>>(
     Ok(formatted_output)
 }
 
-/// read blocks from a list of block hashes
+/// Reads blocks from a list of block hashes.
 ///
 /// > **Note**
 /// >
-/// > this is a basically the inverse of [`dump_blocks`]
+/// > This is a basically the inverse of [`dump_blocks`].
 ///
 /// # Example
-/// let's say we have three blocks `A`, `B` and `C` whose hashes are `aaaa`, `bbbb` and `cccc`
+/// Let's say we have three blocks `A`, `B` and `C` whose hashes are `aaaa`, `bbbb` and `cccc`
 /// respectively.
-/// if one calls [`read_blocks`] with `aaaa` and `cccc` as the queried block hashes, the output of
+/// If one calls [`read_blocks`] with `aaaa` and `cccc` as the queried block hashes, the output of
 /// this function will be
 /// ```ignore
 /// Ok(vec![("aaaa", A), ("cccc", C)])
 /// ```
 pub fn read_blocks<F: PrimeField, G: CurveGroup<ScalarField = F>>(
-    block_hashes: &[String],
-    block_dir: &Path,
+    hashes: &[String],
+    directory: &Path,
     compress: Compress,
     validate: Validate,
 ) -> Result<Vec<(String, Block<F, G>)>> {
-    block_hashes
+    hashes
         .iter()
         .map(|f| {
-            let filename = block_dir.join(f);
+            let filename = directory.join(f);
             let s = std::fs::read(filename)?;
             Ok((
                 f.clone(),

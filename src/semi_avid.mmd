@@ -1,0 +1,15 @@
+sequenceDiagram
+    actor prover
+    actor verifier
+
+    Note over prover,verifier: generate trusted setup<br/>$$\ \text{TS} = ([\tau^i]_1)$$
+
+    Note left of prover: $$(P_j) = \text{split}(\Delta)$$
+    Note left of prover: $$c_j = \text{com}(P_j, \text{TS})$$
+
+    prover->>verifier: $$(c_j)$$
+
+    Note right of verifier: $$(\lambda_j) = \text{lincomb}(s_\alpha)$$
+    Note right of verifier: $$P_\alpha = \text{poly}(s_\alpha)$$
+    Note right of verifier: $$\hat{c} = \sum\limits \lambda_j c_j$$
+    Note right of verifier: assert $$\ \hat{c} = \text{com}(P_{\alpha}, \text{TS})$$

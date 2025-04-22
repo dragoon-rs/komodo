@@ -2,6 +2,8 @@
 //!
 //! > references:
 //! > - [Ambrona et al., 2022](https://link.springer.com/chapter/10.1007/978-3-031-41326-1_11)
+//!
+#![doc = simple_mermaid::mermaid!("mod.mmd")]
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
     AffineRepr,
@@ -16,7 +18,6 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress};
 use ark_std::{test_rng, One, UniformRand};
 use rs_merkle::algorithms::Sha256;
 use rs_merkle::Hasher;
-use std::marker::PhantomData;
 use std::ops::{Div, Mul};
 
 use crate::{
@@ -31,28 +32,27 @@ mod polynomial;
 mod transcript;
 
 #[derive(Debug, Clone, Default, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
+/// Representation of an _aPlonK_ block.
 pub struct Block<E: Pairing> {
     pub shard: Shard<E::ScalarField>,
+    /// $\text{com}_f \in \mathbb{G}_T$
     com_f: PairingOutput<E>,
+    /// $\hat{v} \in \mathbb{F}_p$
     v_hat: E::ScalarField,
+    /// $\hat{\mu} \in \mathbb{G}_1$
     mu_hat: E::G1,
+    /// $\pi_\text{KZG} \in \mathbb{G}_1$
     kzg_proof: kzg10::Proof<E>,
+    /// $\pi_\text{IPA}$
     ipa_proof: ipa::Proof<E>,
+    /// $\pi_{\text{aPlonK}} \in \mathbb{G}_2$
     aplonk_proof: E::G2,
 }
 
-/// /!\ [`Commitment`] is not [`CanonicalDeserialize`] because `P` is not [`Send`].
-#[derive(Debug, Clone, Default, PartialEq, CanonicalSerialize)]
-pub struct Commitment<E, P>
-where
-    E: Pairing,
-    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
-    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
-{
-    _engine: PhantomData<E>,
-    _poly: PhantomData<P>,
-}
-
+/// Representation of _aPlonK_'s parameters.
+///
+/// This is a wrapper around $\text{KZG}^+$ and IPA parameters.
+///
 /// /!\ [`SetupParams`] is not [`Default`] because [`kzg10::UniversalParams`] is not [`Default`].
 #[derive(Debug, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct SetupParams<E: Pairing> {
@@ -60,18 +60,11 @@ pub struct SetupParams<E: Pairing> {
     pub ipa: ipa::Params<E>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
-pub struct VerifierKey<E: Pairing> {
-    pub vk_psi: kzg10::VerifierKey<E>,
-    pub tau_1: E::G1,
-    pub g1: E::G1,
-    pub g2: E::G2,
-}
-
-/// creates a combination of a trusted KZG and an IPA setup for [[aPlonk]]
+/// Creates a combination of a trusted KZG and an IPA setup for [[aPlonk]].
 ///
-/// > **Note**  
-/// > this is an almost perfect translation of the *Setup* algorithm in page
+/// > **Note**
+/// >
+/// > This is an almost perfect translation of the *Setup* algorithm in page
 /// > **13** of [aPlonk from [Ambrona et al.]][aPlonK]
 ///
 /// [aPlonk]: https://eprint.iacr.org/2022/1352.pdf
@@ -105,6 +98,9 @@ where
     })
 }
 
+/// Commits the polynomials.
+///
+/// [`commit`] actually computes $\mu$ and $\text{com}_f$.
 pub fn commit<E, P>(
     polynomials: Vec<P>,
     setup: SetupParams<E>,
@@ -151,6 +147,20 @@ where
     Ok((mu, com_f))
 }
 
+/// Proves the whole data $\Delta$.
+///
+/// For each shard $s_\alpha$:
+/// - $r = \text{hash}(\text{com}_f, \alpha)$
+/// - $f = \sum r^i P_i$
+/// - $\hat{\mu} = \sum r^i \mu_i$
+/// - $\hat{v} = \sum r^i P_i(\alpha)$
+/// - $\pi_{\text{KZG}} = \text{KZG.prove}(\text{TS}, f, \alpha)$
+/// - $(\pi_{\text{IPA}}, u) = \text{IPA.prove}(\text{TS}, \text{com}_f, r, \hat{\mu}, \mu)$
+/// - $\kappa = \log_2(m)$
+/// - $G(X) = G(\kappa, u, u^{-1})$
+/// - $\rho = \text{hash}(\pi_{\text{IPA}})$
+/// - $H = \text{witness}(G, \rho)$
+/// - $\pi_{\text{aPlonK}} = \sum [\tau^i\]_2 H_i$
 pub fn prove<E, P>(
     commit: (Vec<E::G1>, PairingOutput<E>),
     polynomials: Vec<P>,
@@ -281,6 +291,19 @@ where
     Ok(proofs)
 }
 
+/// Verifies that a block is valid.
+///
+/// For a given shard $s_\alpha$:
+/// - $r = \text{hash}(\text{com}_f, \alpha)$
+/// - $\text{ok}_{\text{KZG}} = E(\hat{\mu} - \[\hat{v}\]_1, \[1\]_2) = E(\pi\_{\text{KZG}}, \[\sigma\]_2 - \[\alpha\]_2)$
+/// - $\text{ok}_{\text{IPA}} = \text{IPA.verify'}(\text{com}_f, r, \hat{\mu}, \pi\_{\text{IPA}})$
+/// - $\rho = \text{hash}(\pi_{\text{IPA}})$
+/// - $\kappa = \log_2(m)$
+/// - $u = \text{replay}(\text{com}_f, r, \hat{\mu})$
+/// - $G(X) = G(\kappa, u, u^{-1})$
+/// - $v_{\rho} = G(\rho)$
+/// - $\text{ok}_{\text{aPlonK}} = E(\[\tau\]_1 - \[\rho\]_1, \pi\_{\text{aPlonK}}) = E(\[1\]_1, \pi\_{\text{IPA}}.\text{ck}\_{\tau,0})$
+/// - assert $\text{ok}_{\text{KZG}}$, $\text{ok}\_{\text{IPA}}$ and $\text{ok}\_{\text{aPlonK}}$ are true
 pub fn verify<E, P>(
     block: &Block<E>,
     pt: E::ScalarField,

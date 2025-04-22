@@ -154,7 +154,7 @@ fn main() {
             if *features {
                 cmd.push("--all-features")
             }
-            nob::run_cmd_as_vec_and_fail!(cmd ; "RUSTDOCFLAGS" => "--html-in-header katex.html");
+            nob::run_cmd_as_vec_and_fail!(cmd);
         }
         Some(Commands::Container(container_cmd)) => {
             let res = nob::run_cmd_and_fail!(@+"git", "rev-parse", "HEAD");

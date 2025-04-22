@@ -1,38 +1,39 @@
-//! some linear algebra fun
+//! Some linear algebra fun over elements in $\mathbb{F}_p$.
 //!
-//! this module mainly contains an implementation of matrices over a finite
-//! field.
+//! This module mainly contains an implementation of matrices over a finite
+//! field $\mathbb{F}_p$.
 use ark_ff::Field;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::{Rng, RngCore};
 
 use crate::error::KomodoError;
 
-/// a matrix defined over a finite field
+/// A matrix defined over a finite field $\mathbb{F}_p$.
 ///
-/// internally, a matrix is just a vector of field elements whose length is
+/// Internally, a matrix is just a vector of field elements whose length is
 /// exactly the width times the height and where elements are organized row by
 /// row.
 #[derive(Clone, PartialEq, Default, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Matrix<T: Field> {
+    /// $h \times w$ elements in $\mathbb{F}_p$.
     pub elements: Vec<T>,
+    /// the number of rows $h$.
     pub height: usize,
+    /// the number of columns $w$.
     pub width: usize,
 }
 
 impl<T: Field> Matrix<T> {
-    /// build a matrix from a diagonal of elements
+    /// Builds a matrix from a diagonal of elements in $\mathbb{F}_p$.
     ///
     /// # Example
-    /// building a diagonal matrix from the diagonal `[1, 2, 3, 4]` would give
-    /// ```text
-    /// [
-    ///     [1, 0, 0, 0],
-    ///     [0, 2, 0, 0],
-    ///     [0, 0, 3, 0],
-    ///     [0, 0, 0, 4],
-    /// ]
-    /// ```
+    /// Building a diagonal matrix from the diagonal $(1, 2, 3, 4)$ would give
+    /// $ \begin{pmatrix}
+    ///     1 & . & . & . \\\\
+    ///     . & 2 & . & . \\\\
+    ///     . & . & 3 & . \\\\
+    ///     . & . & . & 4 \\\\
+    /// \end{pmatrix} $.
     fn from_diagonal(diagonal: Vec<T>) -> Self {
         let size = diagonal.len();
 
@@ -49,35 +50,42 @@ impl<T: Field> Matrix<T> {
         }
     }
 
-    /// build the identity matrix of a given size
+    /// Builds the identity matrix $I_n$ of a given size $n$.
     ///
     /// # Example
-    /// the identity of size 3 is
-    /// ```text
-    /// [
-    ///     [1, 0, 0],
-    ///     [0, 1, 0],
-    ///     [0, 0, 1],
-    /// ]
-    /// ```
+    /// The identity of size $3$ is
+    /// $ I_3 = \begin{pmatrix}
+    ///     1 & . & . \\\\
+    ///     . & 1 & . \\\\
+    ///     . & . & 1 \\\\
+    /// \end{pmatrix} $.
     fn identity(size: usize) -> Self {
         Self::from_diagonal(vec![T::one(); size])
     }
 
-    /// build a Vandermonde matrix for some seed points
+    /// Builds a _Vandermonde_ matrix for some _seed points_.
     ///
-    /// actually, this is the transpose of the Vandermonde matrix defined in the
+    /// Actually, this is the transpose of the Vandermonde matrix defined in the
     /// [Wikipedia article][article], i.e. there are as many columns as there
-    /// are seed points and there are as many rows as there are powers of the
-    /// seed points.
+    /// are seed points, the $(\alpha_i)_{1 \leq i \leq m}$, and there are as
+    /// many rows, $n$, as there are powers of the seed points.
+    ///
+    /// $ M = V_n(\alpha_1, ..., \alpha_m)^T = \begin{pmatrix}
+    ///     1                & 1                & ...    & 1                \\\\
+    ///     \alpha_1         & \alpha_2         & ...    & \alpha_m         \\\\
+    ///     \alpha_1^2       & \alpha_2^2       & ...    & \alpha_m^2       \\\\
+    ///     \vdots           & \vdots           & \ddots & \vdots           \\\\
+    ///     \alpha_1^{n - 1} & \alpha_2^{n - 1} & ...    & \alpha_m^{n - 1} \\\\
+    /// \end{pmatrix} $
     ///
     /// > **Note**
     /// >
-    /// > if you are sure the points are distinct and don't want to perform any
+    /// > If you are sure the points are distinct and don't want to perform any
     /// > runtime check to ensure that condition, have a look at
     /// > [`Self::vandermonde_unchecked`].
     ///
     /// # Example
+    /// Let's compute $V_4(0, 1, 2, 3, 4)^T$:
     /// ```rust
     /// # use ark_ff::Field;
     /// # use komodo::algebra::linalg::Matrix;
@@ -109,11 +117,11 @@ impl<T: Field> Matrix<T> {
         for i in 0..points.len() {
             for j in (i + 1)..points.len() {
                 if points[i] == points[j] {
-                    return Err(KomodoError::InvalidVandermonde(
-                        i,
-                        j,
-                        format!("{}", points[i]),
-                    ));
+                    return Err(KomodoError::InvalidVandermonde {
+                        first_index: i,
+                        second_index: j,
+                        value_repr: format!("{}", points[i]),
+                    });
                 }
             }
         }
@@ -121,7 +129,7 @@ impl<T: Field> Matrix<T> {
         Ok(Self::vandermonde_unchecked(points, height))
     }
 
-    /// the unchecked version of [`Self::vandermonde`]
+    /// The unchecked version of [`Self::vandermonde`].
     pub fn vandermonde_unchecked(points: &[T], height: usize) -> Self {
         let width = points.len();
 
@@ -143,7 +151,7 @@ impl<T: Field> Matrix<T> {
         }
     }
 
-    /// build a completely random matrix of shape $n \times m$
+    /// Builds a completely random matrix of shape $n \times m$.
     pub fn random<R: RngCore>(n: usize, m: usize, rng: &mut R) -> Self {
         Self {
             elements: (0..(n * m)).map(|_| T::from(rng.gen::<u128>())).collect(),
@@ -152,11 +160,11 @@ impl<T: Field> Matrix<T> {
         }
     }
 
-    /// build a matrix from a "_matrix_" of elements
+    /// Builds a matrix from a "_matrix_" of elements.
     ///
     /// > **Note**
     /// >
-    /// > if you are sure each row should have the same length and don't want to
+    /// > If you are sure each row should have the same length and don't want to
     /// > perform any runtime check to ensure that condition, have a look at
     /// > [`Self::from_vec_vec_unchecked`].
     ///
@@ -208,19 +216,18 @@ impl<T: Field> Matrix<T> {
         let width = matrix[0].len();
         for (i, row) in matrix.iter().enumerate() {
             if row.len() != width {
-                return Err(KomodoError::InvalidMatrixElements(format!(
-                    "expected rows to be of same length {}, found {} at row {}",
-                    width,
-                    row.len(),
-                    i
-                )));
+                return Err(KomodoError::InvalidMatrixElements {
+                    expected: width,
+                    found: row.len(),
+                    row: i,
+                });
             }
         }
 
         Ok(Self::from_vec_vec_unchecked(matrix))
     }
 
-    /// the unchecked version of [`Self::from_vec_vec`]
+    /// The unchecked version of [`Self::from_vec_vec`].
     pub fn from_vec_vec_unchecked(matrix: Vec<Vec<T>>) -> Self {
         let height = matrix.len();
         let width = matrix[0].len();
@@ -248,11 +255,11 @@ impl<T: Field> Matrix<T> {
         self.elements[i * self.width + j] = value;
     }
 
-    /// extract a single column from the matrix
+    /// Extracts a single column from the matrix.
     ///
     /// > **Note**
     /// >
-    /// > returns `None` if the provided index is out of bounds
+    /// > Returns `None` if the provided index is out of bounds.
     pub(crate) fn get_col(&self, j: usize) -> Option<Vec<T>> {
         if j >= self.width {
             return None;
@@ -261,14 +268,14 @@ impl<T: Field> Matrix<T> {
         Some((0..self.height).map(|i| self.get(i, j)).collect())
     }
 
-    /// compute _row = row / value_
+    /// Computes $\text{row} = \frac{\text{row}}{\text{value}}$.
     fn divide_row_by(&mut self, row: usize, value: T) {
         for j in 0..self.width {
             self.set(row, j, self.get(row, j) / value);
         }
     }
 
-    /// compute _destination = destination + source * value_
+    /// Computes $\text{destination} = \text{destination} + \text{source} \times \text{value}$.
     fn multiply_row_by_and_add_to_row(&mut self, source: usize, value: T, destination: usize) {
         for j in 0..self.width {
             self.set(
@@ -279,13 +286,11 @@ impl<T: Field> Matrix<T> {
         }
     }
 
-    /// compute the inverse of the matrix
+    /// Computes the inverse of the matrix.
     ///
-    /// > **Note**
-    /// >
-    /// > the matrix should be
-    /// > - square
-    /// > - invertible
+    /// If $M \in \mathcal{M}_{n \times n}(\mathbb{F}_p)$ is an invertible matrix,
+    /// then [`Self::invert`] computes $M^{-1}$ such that
+    /// $$ MM^{-1} = M^{-1}M = I_n$$
     pub fn invert(&self) -> Result<Self, KomodoError> {
         if self.height != self.width {
             return Err(KomodoError::NonSquareMatrix(self.height, self.width));
@@ -315,29 +320,30 @@ impl<T: Field> Matrix<T> {
         Ok(inverse)
     }
 
-    /// swap rows `i` and `j`, inplace
+    /// Swaps rows $i$ and $j$, inplace.
     ///
     /// > **Note**
     /// >
-    /// > this function assumes both `i` and `j` are in bounds, unexpected
-    /// > results are expected if `i` or `j` are out of bounds.
+    /// > This function assumes both $i$ and $j$ are in bounds, unexpected
+    /// > results are expected if $i$ or $j$ are out of bounds.
     fn swap_rows(&mut self, i: usize, j: usize) {
         for k in 0..self.width {
             self.elements.swap(i * self.width + k, j * self.width + k);
         }
     }
 
-    /// compute the rank of the matrix
+    /// Computes the rank of the matrix.
+    ///
+    /// Let $M \in \mathcal{M}_{n \times m}(\mathbb{F}_p)$ and $r(M)$ its rank:
+    /// - the rank is always smaller than the min between the height and the
+    ///   width of any matrix, $r(M) \leq \min(n, m)$
+    /// - a square and invertible matrix will have _full rank_, i.e. it will
+    ///   be equal to its size, if $M$ is invertible, then $r(M) = n$
     ///
     /// > **Note**
     /// >
-    /// > see the [_Wikipedia article_](https://en.wikipedia.org/wiki/Rank_(linear_algebra))
+    /// > See the [_Wikipedia article_](https://en.wikipedia.org/wiki/Rank_(linear_algebra))
     /// > for more information
-    /// >
-    /// > - the rank is always smaller than the min between the height and the
-    /// >   width of any matrix.
-    /// > - a square and invertible matrix will have _full rank_, i.e. it will
-    /// >   be equal to its size.
     pub fn rank(&self) -> usize {
         let mut mat = self.clone();
         let mut i = 0;
@@ -377,23 +383,22 @@ impl<T: Field> Matrix<T> {
         nb_non_zero_rows
     }
 
-    /// compute the matrix multiplication with another matrix
+    /// Computes the matrix multiplication with another matrix.
     ///
-    /// if `lhs` represents a matrix $A$ and `rhs` is the representation of
-    /// another matrix $B$, then `lhs.mul(rhs)` will compute $A \times B$
+    /// Let $A \in \mathcal{M}_{a \times b}(\mathbb{F}_p) \sim \texttt{lhs}$ and
+    /// $B \in \mathcal{M}\_{c \times d}(\mathbb{F}_p) \sim \texttt{rhs}$ then
+    /// `lhs.mul(rhs)` will compute $A \times B$.
     ///
     /// > **Note**
     /// >
-    /// > both matrices should have compatible shapes, i.e. if `self` has shape
-    /// > `(n, m)` and `rhs` has shape `(p, q)`, then `m == p`.
+    /// > Both matrices should have compatible shapes, i.e. if `self` has shape
+    /// > `(a, b)` and `rhs` has shape `(c, d)`, then `b == c`.
     pub fn mul(&self, rhs: &Self) -> Result<Self, KomodoError> {
         if self.width != rhs.height {
-            return Err(KomodoError::IncompatibleMatrixShapes(
-                self.height,
-                self.width,
-                rhs.height,
-                rhs.width,
-            ));
+            return Err(KomodoError::IncompatibleMatrixShapes {
+                left: (self.height, self.width),
+                right: (rhs.height, rhs.width),
+            });
         }
 
         let height = self.height;
@@ -416,7 +421,7 @@ impl<T: Field> Matrix<T> {
         })
     }
 
-    /// compute the transpose of the matrix
+    /// Computes the transpose of the matrix.
     ///
     /// > **Note**
     /// >
@@ -441,11 +446,11 @@ impl<T: Field> Matrix<T> {
         }
     }
 
-    /// truncate the matrix to the provided shape, from right and bottom
+    /// Truncates the matrix to the provided shape, from right and bottom.
     ///
     /// # Example
-    /// if a matrix has shape `(10, 11)` and is truncated to `(5, 7)`, the 5
-    /// bottom rows and 4 right columns will be removed.
+    /// If a matrix has shape $(10, 11)$ and is truncated to $(5, 7)$, the $5$
+    /// bottom rows and $4$ right columns will be removed.
     pub(crate) fn truncate(&self, rows: Option<usize>, cols: Option<usize>) -> Self {
         let width = if let Some(w) = cols {
             self.width - w
@@ -614,10 +619,14 @@ mod tests {
 
         let matrix = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![vec![0], vec![0, 0]]));
         assert!(matrix.is_err());
-        assert!(matches!(
+        assert_eq!(
             matrix.err().unwrap(),
-            KomodoError::InvalidMatrixElements(..)
-        ));
+            KomodoError::InvalidMatrixElements {
+                expected: 1,
+                found: 2,
+                row: 1,
+            }
+        );
     }
 
     #[test]
@@ -659,10 +668,13 @@ mod tests {
         ]))
         .unwrap();
 
-        assert!(matches!(
+        assert_eq!(
             a.mul(&Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![vec![1, 2]])).unwrap()),
-            Err(KomodoError::IncompatibleMatrixShapes(3, 3, 1, 2))
-        ));
+            Err(KomodoError::IncompatibleMatrixShapes {
+                left: (3, 3),
+                right: (1, 2)
+            })
+        );
 
         let product = a.mul(&b).unwrap();
         let expected = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
@@ -713,17 +725,11 @@ mod tests {
                 .unwrap()
                 .invert();
         assert!(inverse.is_err());
-        assert!(matches!(
-            inverse.err().unwrap(),
-            KomodoError::NonSquareMatrix(..)
-        ));
+        assert_eq!(inverse.err().unwrap(), KomodoError::NonSquareMatrix(2, 3));
 
         let inverse = Matrix::<Fr>::from_diagonal(vec_to_elements(vec![0, 3, 4])).invert();
         assert!(inverse.is_err());
-        assert!(matches!(
-            inverse.err().unwrap(),
-            KomodoError::NonInvertibleMatrix(0)
-        ));
+        assert_eq!(inverse.err().unwrap(), KomodoError::NonInvertibleMatrix(0));
 
         let inverse = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
             vec![1, 1, 0],
@@ -733,19 +739,22 @@ mod tests {
         .unwrap()
         .invert();
         assert!(inverse.is_err());
-        assert!(matches!(
-            inverse.err().unwrap(),
-            KomodoError::NonInvertibleMatrix(1)
-        ));
+        assert_eq!(inverse.err().unwrap(), KomodoError::NonInvertibleMatrix(1));
     }
 
     #[test]
     fn vandermonde() {
-        assert!(Matrix::<Fr>::vandermonde(&vec_to_elements(vec![0, 4, 2, 3, 4]), 4).is_err());
+        assert_eq!(
+            Matrix::<Fr>::vandermonde(&vec_to_elements(vec![0, 4, 2, 3, 4]), 4),
+            Err(KomodoError::InvalidVandermonde {
+                first_index: 1,
+                second_index: 4,
+                value_repr: "4".to_string()
+            }),
+        );
         assert!(Matrix::<Fr>::vandermonde(&vec_to_elements(vec![0, 1, 2, 3, 4]), 4).is_ok());
 
-        let actual =
-            Matrix::<Fr>::vandermonde_unchecked(&mat_to_elements(vec![vec![0, 1, 2, 3, 4]])[0], 4);
+        let actual = Matrix::<Fr>::vandermonde_unchecked(&vec_to_elements(vec![0, 1, 2, 3, 4]), 4);
         #[rustfmt::skip]
         let expected = Matrix::from_vec_vec(mat_to_elements(vec![
             vec![1, 1, 1,  1,  1],
