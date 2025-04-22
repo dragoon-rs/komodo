@@ -1,0 +1,12 @@
+sequenceDiagram
+    actor prover
+    actor verifier
+
+    Note over prover,verifier: generate public objects required<br/>for proving and verifying
+
+    Note left of prover: computes commitments $$\ (c) = \text{com}(\Delta)$$
+    Note left of prover: computes proof $$\ \pi = \text{prove}(s)$$
+
+    prover->>verifier: $$(c) \text{, } \pi$$
+
+    Note right of verifier: verify that $$\ (c) \text{, } \pi \text{ and } s\ $$ are consistent

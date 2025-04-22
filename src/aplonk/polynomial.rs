@@ -12,48 +12,48 @@ fn to_binary(number: usize, width: usize) -> Vec<u8> {
         .collect()
 }
 
-/// compute the polynomial *g(X)* in [aPlonk from [Ambrona et al.]][aPlonk]
+/// compute the polynomial $g(X)$ in [aPlonk from [Ambrona et al.]][aPlonk]
 ///
-/// *g(X)* can be found, at
+/// $g(X)$ can be found, at
 /// - page **13**. in *open.7*
 /// - page **13**. in *check.5*
 /// - page **15**. in *IPA.verify.4*
 ///
 /// it's theoretical formula is the following (modified version):  
-/// *g(X) = \Pi_{j=1}^{\kappa = log_2(k)}(u_j^{-1} + u_j X^{2^j})*
+/// $g(X) = \Pi_{j=1}^{\kappa = log_2(k)}(u_j^{-1} + u_j X^{2^j})$
 ///
 /// however this formula is not very convenient, so let's expand this and
 /// compute all the coefficients!
 /// when we do that on small examples:
-/// - *\kappa = 1*: *
-///     g(X) = (u_0^{-1} + u_0 X)
-///          = u_0^{-1} +
-///            u_0 X
-/// *
-/// - *\kappa = 2*: *
-///     g(X) = (u_0^{-1} + u_0 X)(u_1^{-1} + u_1 X^2)
-///          = u_1^{-1} u_0^{-1}     +
-///            u_1^{-1} u_0        X +
-///            u_1      u_0^{-1} X^2 +
-///            u_1      u_0      X^3
-/// *
-/// - *\kappa = 3*: *
-///     g(X) = (u_0^{-1} + u_0 X)(u_1^{-1} + u_1 X^2)(u_2^{-1} + u_2 X^2)
-///          = u_2^{-1} u_1^{-1} u_0^{-1}     +
-///            u_2^{-1} u_1^{-1} u_0        X +
-///            u_2^{-1} u_1      u_0^{-1} X^2 +
-///            u_2^{-1} u_1      u_0      X^3 +
-///            u_2      u_1^{-1} u_0^{-1} X^4 +
-///            u_2      u_1^{-1} u_0      X^5 +
-///            u_2      u_1      u_0^{-1} X^6 +
-///            u_2      u_1      u_0      X^7
-/// *
+/// - $\kappa = 1$: \begin{align} \begin{split}
+///     g(X) &= (u_0^{-1} + u_0 X) \\\\
+///          &=\quad u_0^{-1} + \\\\
+///          &\quad+ u_0 X
+/// \end{split} \end{align}
+/// - $\kappa = 2$: \begin{align} \begin{split}
+///     g(X) &= (u_0^{-1} + u_0 X)(u_1^{-1} + u_1 X^2) \\\\
+///          &=\quad u_1^{-1} u_0^{-1}      \\\\
+///          &\quad+  u_1^{-1} u_0        X \\\\
+///          &\quad+  u_1      u_0^{-1} X^2 \\\\
+///          &\quad+  u_1      u_0      X^3
+/// \end{split} \end{align}
+/// - $\kappa = 3$: \begin{align} \begin{split}
+///     g(X) &= (u_0^{-1} + u_0 X)(u_1^{-1} + u_1 X^2)(u_2^{-1} + u_2 X^2) \\\\
+///          &=\quad u_2^{-1} u_1^{-1} u_0^{-1}     \\\\
+///          &\quad+ u_2^{-1} u_1^{-1} u_0        X \\\\
+///          &\quad+ u_2^{-1} u_1      u_0^{-1} X^2 \\\\
+///          &\quad+ u_2^{-1} u_1      u_0      X^3 \\\\
+///          &\quad+ u_2      u_1^{-1} u_0^{-1} X^4 \\\\
+///          &\quad+ u_2      u_1^{-1} u_0      X^5 \\\\
+///          &\quad+ u_2      u_1      u_0^{-1} X^6 \\\\
+///          &\quad+ u_2      u_1      u_0      X^7
+/// \end{split} \end{align}
 ///
-/// we can see that the *j*-the coefficient of *g(X)* for a given *\kappa* is
-/// a product of a combination of *(u_i)* and their inverse elements directly
-/// related to the binary representation of the *j* polynomial power, e.g.
-/// - with *\kappa = 3* and *j = 6*, the binary is *110* and the coefficient is
-///   *u_0 \times u_1 \times u_2^{-1}*
+/// we can see that the $j$-the coefficient of $g(X)$ for a given $\kappa$ is
+/// a product of a combination of $(u_i)$ and their inverse elements directly
+/// related to the binary representation of the $j$ polynomial power, e.g.
+/// - with $\kappa = 3$ and $j = 6$, the binary is $110$ and the coefficient is
+///   $u_0 \times u_1 \times u_2^{-1}$
 ///
 /// [aPlonk]: https://eprint.iacr.org/2022/1352.pdf
 pub(super) fn compute_g<E, P>(

@@ -26,6 +26,7 @@ tracing = "0.1.40"
 tracing-subscriber = "0.3.17"
 ark-poly-commit = { git = "https://gitlab.isae-supaero.fr/a.stevan/poly-commit", version = "0.4.0", rev = "19fc0d4", optional = true }
 dragoonfri = { version = "0.1.0", optional = true}
+simple-mermaid = "0.2.0"
 
 [workspace]
 members = [

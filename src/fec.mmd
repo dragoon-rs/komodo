@@ -1,0 +1,15 @@
+flowchart LR
+    file@{ shape: rounded, label: "original file $$\\ F$$" }
+    source@{ shape: processes, label: "$$k\\ $$ source shards" }
+    encoded@{ shape: processes, label: "$$n\\ $$ encoded shards" }
+
+    gathered@{ shape: processes, label: "at least $$\\ k\\ $$ shards" }
+    decoded@{ shape: processes, label: "$$k\\ $$ decoded shards" }
+    reconstructed@{ shape: rounded, label: "reconstructed file $$\\ F^*$$" }
+
+    life_1@{ shape: framed-circle, label: "life" }
+    life_2@{ shape: framed-circle, label: "life" }
+
+    file --split--> source --"$$(k, n)\\ $$ encoding"--> encoded --disseminate--> life_1
+
+    life_2 --gather--> gathered --"$$(k, n)\\ $$ decoding"--> decoded --concat--> reconstructed
