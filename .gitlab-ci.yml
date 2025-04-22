@@ -16,14 +16,11 @@ workflow:
 fmt:
   stage: fmt
   script:
-    - ./make.rs fmt --check
+    - ./make.rs ci --fmt
 
 test:
   stage: test
   needs:
     - fmt
   script:
-    - ./make.rs version
-    - ./make.rs check
-    - ./make.rs clippy
-    - ./make.rs test
+    - ./make.rs ci --test
