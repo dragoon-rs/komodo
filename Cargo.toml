@@ -25,26 +25,32 @@ thiserror = "1.0.50"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.17"
 ark-poly-commit = { git = "https://gitlab.isae-supaero.fr/a.stevan/poly-commit", version = "0.4.0", rev = "19fc0d4", optional = true }
+dragoonfri = { version = "0.1.0", optional = true}
+simple-mermaid = "0.2.0"
 
 [workspace]
 members = [
     "benchmarks",
     "bins/rank",
-    "bins/saclin",
 ]
 
 [dev-dependencies]
 ark-bls12-381 = "0.4.0"
+clap = { version = "4.5.17", features = ["derive"] }
 itertools = "0.13.0"
 rand = "0.8.5"
+dragoonfri-test-utils = "0.1.0"
+hex = "0.4.3"
 
 [features]
 kzg = ["dep:ark-poly-commit"]
 aplonk = ["dep:ark-poly-commit"]
+fri = ["dep:dragoonfri"]
 fs = []
 
 [package.metadata.docs.rs]
 features = ["kzg", "aplonk"]
+rustdoc-args = [ "--html-in-header", "katex.html" ]
 
 [[example]]
 name = "kzg"
@@ -53,3 +59,11 @@ required-features = ["kzg"]
 [[example]]
 name = "aplonk"
 required-features = ["aplonk"]
+
+[[example]]
+name = "fri"
+required-features = ["fri"]
+
+[[example]]
+name = "fec"
+required-features = ["fri"]

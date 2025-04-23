@@ -1,4 +1,4 @@
-//! Komodo: Cryptographically-proven Erasure Coding
+//! Komodo: Cryptographically-proven Erasure Coding.
 //!
 //! Komodo provides an easy-to-use Rust library and ecosystem that is composed of two main parts:
 //! - support for FEC encoding and decoding with the [`fec`] submodule
@@ -10,16 +10,24 @@
 //! > modules marked with an `*`, e.g. [`kzg`]*, are hidden behind a _Cargo_ feature with the same
 //! > name
 //!
-//! Other submodules define several fundamental building blocks to Komodo, but which are not
+//! Other submodules define several fundamental building blocks to Komodo, but are not
 //! mandatory to explore to understand the protocols.
 //!
 //! # Example
-//! Let's explain with a very simple example how things operate with Komodo.
+//! Let's explain with a very simple example how things operate with Komodo. The setup is that a
+//! _prover_ wants to show a _verifier_ that a shard of encoded data $s$ has indeed been generated
+//! with a linear combination of the $k$ source shards from data $\Delta$.
+//!
+#![doc = simple_mermaid::mermaid!("lib.mmd")]
 //!
 //! > **Note**
 //! >
 //! > the following example uses some syntax of Rust but is NOT valid Rust code and omits a lot of
-//! > details for both Rust and Komodo
+//! > details for both Rust and Komodo.
+//! >
+//! > Real complete examples can be found in the
+//! > [`examples/`](https://gitlab.isae-supaero.fr/dragoon/komodo/-/tree/main/examples)
+//! > directory in the repository.
 //!
 //! 1. choose an _encoding matrix_ to encode the _input data_
 //! ```ignore
@@ -51,6 +59,8 @@ pub mod aplonk;
 mod conversions;
 pub mod error;
 pub mod fec;
+#[cfg(feature = "fri")]
+pub mod fri;
 #[cfg(feature = "fs")]
 pub mod fs;
 #[cfg(feature = "kzg")]

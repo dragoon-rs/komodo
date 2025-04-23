@@ -1,4 +1,4 @@
-//! Manipulate finite field elements
+//! Manipulate elements from finite field $\mathbb{F}_p$.
 #[cfg(any(feature = "kzg", feature = "aplonk"))]
 use ark_ec::pairing::Pairing;
 #[cfg(feature = "aplonk")]
@@ -13,17 +13,18 @@ use std::ops::{Div, Mul};
 
 pub mod linalg;
 
-/// split a sequence of raw bytes into valid field elements
+/// Splits a sequence of raw bytes into valid field elements in $\mathbb{F}_p$.
 ///
-/// [`split_data_into_field_elements`] supports padding the output vector of
-/// elements by giving a number that needs to divide the length of the vector.
+/// The size of the output vector is a multiple of the provided `modulus` argument.
+///
+/// If necessary, the output vector is padded with $1$ in $\mathbb{F}_p$.
 ///
 /// # Example
-/// In the following example `Fp` is a small finite field with prime order $65537$ and which
+/// In the following example $\mathbb{F}_p$ is a small finite field with prime order $2^{16} + 1$ and which
 /// requires only two bytes to represent elements.
 ///
-/// 1. splitting `0x02000300`, which contains 4 bytes, will result in two elements of `Fp`, i.e. 2
-///    and 3
+/// 1. splitting `0x02000300`, which contains $4$ bytes, will result in two elements of $\mathbb{F}_p$, i.e. $2$
+///    and $3$
 /// ```
 /// # #[derive(ark_ff::MontConfig)]
 /// # #[modulus = "65537"]
@@ -40,9 +41,9 @@ pub mod linalg;
 /// );
 /// # }
 /// ```
-/// 2. splitting `0x0200030004000500`, which contains 8 bytes, and asking for a multiple of 3
-///    elements, will result in 6 elements of `Fp`, i.e. 2, 3, 4 and 5 which come from the data and
-///    two padding elements, set to 1.
+/// 2. splitting `0x0200030004000500`, which contains $8$ bytes, and asking for a multiple of $3$
+///    elements, will result in $6$ elements of $\mathbb{F}_p$, i.e. $2$, $3$, $4$ and $5$ which come from the data and
+///    two padding elements, set to $1$.
 /// ```
 /// # #[derive(ark_ff::MontConfig)]
 /// # #[modulus = "65537"]
@@ -67,7 +68,7 @@ pub mod linalg;
 /// # }
 /// ```
 pub fn split_data_into_field_elements<F: PrimeField>(bytes: &[u8], modulus: usize) -> Vec<F> {
-    let bytes_per_element = (F::MODULUS_BIT_SIZE as usize) / 8;
+    let bytes_per_element = (F::MODULUS_BIT_SIZE as usize - 1) / 8;
 
     let mut elements = Vec::new();
     for chunk in bytes.chunks(bytes_per_element) {
@@ -81,9 +82,11 @@ pub fn split_data_into_field_elements<F: PrimeField>(bytes: &[u8], modulus: usiz
     elements
 }
 
-/// merges elliptic curve elements back into a sequence of bytes
+/// Merges elements of $\mathbb{F}_p$ back into a sequence of bytes.
 ///
-/// this is the inverse operation of [`split_data_into_field_elements`].
+/// > **Note**
+/// >
+/// > This is the inverse operation of [`split_data_into_field_elements`].
 pub(crate) fn merge_elements_into_bytes<F: PrimeField>(elements: &[F]) -> Vec<u8> {
     let mut bytes = vec![];
     for e in elements {
@@ -96,11 +99,16 @@ pub(crate) fn merge_elements_into_bytes<F: PrimeField>(elements: &[F]) -> Vec<u8
 }
 
 #[cfg(any(feature = "kzg", feature = "aplonk"))]
-/// compute the linear combination of polynomials
+/// Computes the linear combination of polynomials.
 ///
-/// if the _lhs_ are the coefficients, $(c_i)$ in a field $\mathbb{F}$, and the _rhs_ are the
-/// polynomials, $(p_i)$ with coefficients in $\mathbb{F}$, then the result of this is
-/// $$P(X) = \sum\limits_{i = 0}^{n - 1} c_i p_i(X)$$
+/// [`scalar_product_polynomial`] computes the linear combination $P$ of $n$
+/// polynomials $(P_i) \in \mathbb{F}_p\[X\]^n \sim \texttt{lhs}$ with
+/// coefficients $(c_i) \in \mathbb{F}_p^n \sim \texttt{rhs}$ as
+///
+/// $$P(X) = \sum\limits_{i = 0}^{n - 1} c_i P_i(X)$$
+///
+/// ## Preconditions
+/// - `lhs` and `rhs` should contain the same number of elements.
 pub(crate) fn scalar_product_polynomial<E, P>(lhs: &[E::ScalarField], rhs: &[P]) -> P
 where
     E: Pairing,
@@ -121,12 +129,19 @@ where
 }
 
 #[cfg(feature = "aplonk")]
-/// compute the scalar product between vectors of elements in $G_1$ and in $G_2$ respectively
+/// Computes the "_scalar product_" between vectors of elements in $\mathbb{G}_1$ and in $\mathbb{G}_2$ respectively.
 ///
-/// if the _lhs_ are the elements of $G_1$, $(a_i)$, and the _rhs_ are the ones from $G_2$, $(b_i)$,
-/// then the result of this is
-/// $$c = \sum\limits_{i = 0}^{n - 1} E(a_i, b_i)$$
-/// where $E$ is a bilinear mapping from $G_1 \times G_2 \rightarrow G_T$
+/// [`scalar_product_pairing`] computes the "_pairing combination_" $c$ of $(a_i) \in \mathbb{G}_1^n \sim \texttt{lhs}$ and
+/// $(b_i) \in \mathbb{G}_2^n \sim \texttt{rhs}$ as
+///
+/// $$ c = \sum\limits_{i = 0}^{n - 1} E(a_i, b_i) $$
+///
+/// where $E$ is a [bilinear mapping] from $\mathbb{G}_1 \times \mathbb{G}_2 \rightarrow \mathbb{G}_T$.
+///
+/// ## Preconditions
+/// - `lhs` and `rhs` should contain the same number of elements.
+///
+/// [bilinear mapping]: <https://en.wikipedia.org/wiki/Bilinear_map>
 pub(super) fn scalar_product_pairing<E: Pairing>(lhs: &[E::G1], rhs: &[E::G2]) -> PairingOutput<E> {
     lhs.iter()
         .zip(rhs.iter())
@@ -135,11 +150,19 @@ pub(super) fn scalar_product_pairing<E: Pairing>(lhs: &[E::G1], rhs: &[E::G2]) -
 }
 
 #[cfg(feature = "aplonk")]
-/// compute the scalar product between vectors of elements of a finite field $\mathbb{F}$
+/// Computes the [scalar product] between vectors of elements of a finite field $\mathbb{F}_p$
+/// associated with a "_pairing-friendly_" [elliptic curve] $(\mathbb{G}_1, \mathbb{G}_2, \mathbb{G}_T)$.
 ///
-/// if _lhs_ is the first vector, $(a_i)$, and _rhs_ is the second, $(b_i)$, then the result of this
-/// is
-/// $$c = \sum\limits_{i = 0}^{n - 1} a_i b_i$$
+/// [`scalar_product`] computes the [scalar product] $c$ of $(a_i) \in \mathbb{F}_p^n \sim \texttt{lhs}$ and
+/// $(b_i) \in \mathbb{F}_p^n \sim \texttt{rhs}$ as
+///
+/// $$ c = a \cdot b = \sum\limits_{i = 0}^{n - 1} a_i b_i $$
+///
+/// ## Preconditions
+/// - `lhs` and `rhs` should contain the same number of elements.
+///
+/// [scalar product]: <https://en.wikipedia.org/wiki/Dot_product>
+/// [elliptic curve]: <https://en.wikipedia.org/wiki/Elliptic_curve>
 pub(super) fn scalar_product<E: Pairing>(
     lhs: &[E::ScalarField],
     rhs: &[E::ScalarField],
@@ -148,13 +171,40 @@ pub(super) fn scalar_product<E: Pairing>(
 }
 
 #[cfg(feature = "aplonk")]
-/// see [`scalar_product`], but with _lhs_ a vector from $G_1$
+/// Computes a linear combination of elements of a finite field $\mathbb{F}_p$ associated with a
+/// "_pairing-friendly_" [elliptic curve] $(\mathbb{G}_1, \mathbb{G}_2, \mathbb{G}_T)$.
+///
+/// [`scalar_product_g1`] computes the linear combination $c$ of the $(a_i) \in \mathbb{G}_1^n \sim \texttt{lhs}$
+/// with coefficients $(c_i) \in \mathbb{F}_p^n \sim \texttt{rhs}$ as
+///
+/// $$ c = \sum\limits_{i = 0}^{n - 1} c_i a_i $$
+///
+/// > **Note**
+/// >
+/// > [`scalar_product_g1`] is the same as [`scalar_product`], but with elements from $\mathbb{G}_1$.
+///
+/// ## Preconditions
+/// - `lhs` and `rhs` should contain the same number of elements.
+///
+/// [elliptic curve]: <https://en.wikipedia.org/wiki/Elliptic_curve>
 pub(super) fn scalar_product_g1<E: Pairing>(lhs: &[E::G1], rhs: &[E::ScalarField]) -> E::G1 {
     lhs.iter().zip(rhs.iter()).map(|(l, r)| l.mul(r)).sum()
 }
 
 #[cfg(feature = "aplonk")]
-/// see [`scalar_product`], but with _lhs_ a vector from $G_2$
+/// Computes a linear combination of elements of a finite field $\mathbb{F}_p$ associated with a
+/// "_pairing-friendly_" [elliptic curve] $(\mathbb{G}_1, \mathbb{G}_2, \mathbb{G}_T)$.
+///
+/// [`scalar_product_g2`] computes the linear combination $c$ of the $(a_i) \in \mathbb{G}_2^n \sim \texttt{lhs}$
+/// with coefficients $(c_i) \in \mathbb{F}_p^n \sim \texttt{rhs}$ as
+///
+/// $$ c = \sum\limits_{i = 0}^{n - 1} c_i a_i $$
+///
+/// > **Note**
+/// >
+/// > [`scalar_product_g2`] is the same as [`scalar_product`], but with elements from $\mathbb{G}_2$.
+///
+/// [elliptic curve]: <https://en.wikipedia.org/wiki/Elliptic_curve>
 pub(super) fn scalar_product_g2<E: Pairing>(lhs: &[E::G2], rhs: &[E::ScalarField]) -> E::G2 {
     lhs.iter().zip(rhs.iter()).map(|(l, r)| l.mul(r)).sum()
 }
@@ -163,7 +213,7 @@ pub(super) fn scalar_product_g2<E: Pairing>(lhs: &[E::G2], rhs: &[E::ScalarField
 pub(super) mod vector {
     use ark_ff::Zero;
 
-    /// return [0, 0, ..., 0] of size *n* on some group
+    /// Returns $(0, ..., 0) \in \mathbb{F}_p^n$.
     pub fn zero<Z: Zero + Clone>(capacity: usize) -> Vec<Z> {
         let mut vector = Vec::with_capacity(capacity);
         vector.resize(capacity, Z::zero());
@@ -172,12 +222,14 @@ pub(super) mod vector {
     }
 }
 
-/// compute the successive powers of a scalar group element
+/// Computes the successive powers of a scalar $r$ in a field $\mathbb{F}_p$ associated with a
+/// "_pairing-friendly_" [elliptic curve] $(\mathbb{G}_1, \mathbb{G}_2, \mathbb{G}_T)$.
 ///
-/// if the scalar number is called *r*, then [`powers_of`] will return the
-/// following vector:
-///         [1, r, r^2, ..., r^(n-1)]
-/// where *n* is the number of powers
+/// [`powers_of`] will compute a vector $R$ from a scalar $r \in \mathbb{F}_p$ as
+///
+/// $$ R = (1, r, r^2, ..., r^{n-1}) $$
+///
+/// where $n$ is the desired number of powers.
 #[cfg(any(feature = "kzg", feature = "aplonk"))]
 pub(crate) fn powers_of<E: Pairing>(step: E::ScalarField, nb_powers: usize) -> Vec<E::ScalarField> {
     let mut powers = Vec::with_capacity(nb_powers);
@@ -246,13 +298,11 @@ mod tests {
         split_data_template::<Fr>(&[], 1, None);
         split_data_template::<Fr>(&[], 8, None);
 
-        let nb_bytes = 11 * (Fr::MODULUS_BIT_SIZE as usize / 8);
-        split_data_template::<Fr>(&bytes()[..nb_bytes], 1, Some(11));
-        split_data_template::<Fr>(&bytes()[..nb_bytes], 8, Some(16));
-
-        let nb_bytes = 11 * (Fr::MODULUS_BIT_SIZE as usize / 8) - 10;
-        split_data_template::<Fr>(&bytes()[..nb_bytes], 1, Some(11));
-        split_data_template::<Fr>(&bytes()[..nb_bytes], 8, Some(16));
+        const MODULUS_BYTE_SIZE: usize = Fr::MODULUS_BIT_SIZE as usize / 8;
+        for n in (10 * MODULUS_BYTE_SIZE + 1)..(11 * MODULUS_BYTE_SIZE) {
+            split_data_template::<Fr>(&bytes()[..n], 1, Some(11));
+            split_data_template::<Fr>(&bytes()[..n], 8, Some(16));
+        }
     }
 
     fn split_and_merge_template<F: PrimeField>(bytes: &[u8], modulus: usize) {
@@ -264,10 +314,9 @@ mod tests {
 
     #[test]
     fn split_and_merge() {
-        split_and_merge_template::<Fr>(&bytes(), 1);
-        split_and_merge_template::<Fr>(&bytes(), 8);
-        split_and_merge_template::<Fr>(&bytes(), 64);
-        split_and_merge_template::<Fr>(&bytes(), 4096);
+        for i in 0..12 {
+            split_and_merge_template::<Fr>(&bytes(), 1 << i);
+        }
     }
 
     #[cfg(any(feature = "kzg", feature = "aplonk"))]
@@ -277,10 +326,9 @@ mod tests {
         const POWER: usize = 10;
         let r = E::ScalarField::rand(rng);
 
-        assert_eq!(
-            super::powers_of::<E>(r, POWER + 1).last().unwrap(),
-            &r.pow([POWER as u64])
-        );
+        let res = super::powers_of::<E>(r, POWER + 1);
+        assert_eq!(res.len(), POWER + 1);
+        assert_eq!(res.last().unwrap(), &r.pow([POWER as u64]));
     }
 
     #[cfg(any(feature = "kzg", feature = "aplonk"))]

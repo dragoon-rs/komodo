@@ -1,0 +1,18 @@
+sequenceDiagram
+    actor prover
+    actor verifier
+
+    Note over prover,verifier: generate trusted setup<br/>$$\ \text{TS} = ([\tau^j]_1)$$
+
+    Note left of prover: $$(P_i) = \text{split}(\Delta)$$
+    Note left of prover: $$c_i = \text{com}(P_i, \text{TS})$$
+    Note left of prover: $$r = H(P_0(\alpha)|...|P_{m-1}(\alpha))$$
+    Note left of prover: $$Q(X) = \sum\limits_i r^i P_i(X)$$
+    Note left of prover: $$\pi_\alpha = \text{KZG.prove}(Q, \text{TS})$$
+
+    prover->>verifier: $$\pi_{\alpha} \text{, } (c_i)$$
+
+    Note right of verifier: $$\ r = H(s_0|...|s_{m - 1})$$
+    Note right of verifier: $$\ y = \sum\limits_i r^i s_{\alpha, i}$$
+    Note right of verifier: $$\ c = \sum\limits_i r^i c_i$$
+    Note right of verifier: assert $$\ E(c - [y]_1, [1]_2) = E(\pi_{\alpha}, [\tau]_2 - [\alpha]_2)$$

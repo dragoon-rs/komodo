@@ -1,12 +1,8 @@
-image: "rust:latest"
+image: "gitlab-registry.isae-supaero.fr/dragoon/komodo:bcb0e6b5f73420762f6208700a43291e0066c2c3"
 
 stages:
   - fmt
   - test
-
-variables:
-  NUSHELL_ARCH: "x86_64-unknown-linux-musl"
-  NUSHELL_VERSION: "0.95.0"
 
 workflow:
   rules:
@@ -19,28 +15,12 @@ workflow:
 
 fmt:
   stage: fmt
-
   script:
-    - make fmt-check
+    - ./make.rs ci --fmt
 
 test:
   stage: test
   needs:
     - fmt
-  before_script:
-    - apt update --yes
-    - apt upgrade --yes
-    - apt install protobuf-compiler --yes
-
-    - export NUSHELL_BUILD="nu-$NUSHELL_VERSION-$NUSHELL_ARCH"
-    - export PATH="/tmp/:$PATH"
-
-    # install Nushell
-    - curl -fLo /tmp/nu.tar.gz "https://github.com/nushell/nushell/releases/download/$NUSHELL_VERSION/$NUSHELL_BUILD.tar.gz"
-    - tar xvf /tmp/nu.tar.gz --directory /tmp
-    - cp "/tmp/$NUSHELL_BUILD/nu" /tmp/nu
-
-    - make show
-
   script:
-    - make check clippy test example
+    - ./make.rs ci --test

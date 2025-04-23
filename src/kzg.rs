@@ -1,4 +1,4 @@
-//! KZG+: the multipolynomial and non-interactive extension of KZG
+//! $\text{KZG}^+$: the multipolynomial and non-interactive extension of $\text{KZG}$
 //!
 //! > references:
 //! > - [Kate et al., 2010](https://link.springer.com/chapter/10.1007/978-3-642-17373-8_11)
@@ -6,7 +6,20 @@
 //!
 //! # The protocol
 //! Here, we assume that the input data has been encoded with a _Reed-Solomon_ encoding, as can be
-//! done with the [crate::fec] module.
+//! done with the [`crate::fec`] module.
+//!
+//! > **Note**
+//! >
+//! > In the following, the data $\Delta$ is arranged in an $m \times k$ matrix and $i$ will denote
+//! > the number of a row and $j$ the number of a column
+//! > - $0 \leq i \leq m - 1$
+//! > - $0 \leq j \leq k - 1$
+//! >
+//! > Also, $H$ is a secure hash function and
+//! > $E: \mathbb{G}_1 \times \mathbb{G}_2 \mapsto \mathbb{G}_T$ is the bilinear pairing mapping
+//! > defined on _pairing-friendly_ elliptic curves $(\mathbb{G}_1, \mathbb{G}_2, \mathbb{G}_T)$
+//! > such as BLS12-381.
+#![doc = simple_mermaid::mermaid!("kzg.mmd")]
 //!
 //! Conveniently, each one of the $n$ encoded shards is a linear combination of the $k$ source
 //! shards. More precisely, it is the evaluation of the input data seen as a polynomial on some
@@ -32,11 +45,11 @@
 //! - because $k$ is a fixed code parameter and the data can be of arbitrary size, the bytes are
 //!   arranged in an $m \times k$ matrix of finite field elements. Then, instead of computing $m$
 //!   proofs per shard, KZG+ will _aggregate_ the $m$ polynomials, one per row in the data, into a
-//!   single polynomial $P$. This is done by computing a random linear combination of the $m$ input
-//!   polynomials
+//!   single polynomial $Q$. This is done by computing a random linear combination of the $m$ input
+//!   polynomials.
 //!
 //! # Example
-//! see the KZG example.
+//! See the KZG example.
 use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
@@ -52,9 +65,9 @@ use crate::fec::Shard;
 
 pub use crate::zk::ark_commit as commit;
 
-/// representation of a block of proven data.
+/// Representation of a block of proven data.
 ///
-/// this is a wrapper around a [`fec::Shard`] with some additional cryptographic
+/// This is a wrapper around a [`crate::fec::Shard`] with some additional cryptographic
 /// information that allows to prove the integrity of said shard.
 #[derive(Debug, Clone, Default, PartialEq, CanonicalDeserialize, CanonicalSerialize)]
 pub struct Block<E: Pairing> {
@@ -63,7 +76,7 @@ pub struct Block<E: Pairing> {
     proof: kzg10::Proof<E>,
 }
 
-/// proves $n$ encoded shards by computing one proof for each of them and attaching the commitment
+/// Proves $n$ encoded shards by computing one proof for each of them and attaching the commitments.
 pub fn prove<E, P>(
     commits: Vec<kzg10::Commitment<E>>,
     polynomials: Vec<P>,
@@ -154,13 +167,13 @@ where
     (y, c)
 }
 
-/// for a given Block, verify that the data has been correctly generated
+/// For a given Block, verifies that the data has been correctly generated.
 ///
-/// First, transform data bytes into m polynomial evaluation
-/// compute the hash of the concatenation of these evaluations
-/// compute y as a combination of the shards: y = sum(r^i * Shard_i) for i=[0..m[
-/// compute c as a combination of the commitments: c = sum(r^i * Commit_i) for i=[0..m[
-/// Check if e(c - yG1,G2) == e(proof,(T-alpha)G2)
+/// - transforms data bytes into $m$ polynomial evaluations
+/// - computes the hash of the concatenation of these evaluations
+/// - computes $y$ as a combination of the shards: $$y = \sum(r^i s_i)$$
+/// - computes $c$ as a combination of the commitments: $$c = \sum(r^i c_i)$$
+/// - checks that $$E(c - \[y\]_1, \[1\]_2) = E(\pi\_\alpha, \[\tau\]_2 - \[\alpha\]_2)$$
 pub fn verify<E, P>(
     block: &Block<E>,
     pt: E::ScalarField,
@@ -179,10 +192,10 @@ where
     E::pairing(p1, verifier_key.h) == E::pairing(block.proof.w, inner)
 }
 
-/// verify a bunch of blocks at once using a single elliptic pairing.
+/// Verifies a bunch of blocks at once using a single elliptic pairing.
 ///
 /// Rather than checking
-///     e(c - yG_1, G_2) = e(proof, (\tau - \alpha)G_2)
+///     $$E(c - \[y\]_1, \[1\]_2) = E(\pi\_\alpha, \[\tau - \alpha\]_2)$$
 /// for each block individually (see [`verify`]),
 /// we combine the blocks and perform one pairing as follows:
 ///
@@ -192,13 +205,13 @@ where
 /// > - $k$ as the number of blocks given
 ///
 /// 1. compute $r$ as the hash of all the proofs
-/// 2. for each block b_i:
-///    - compute y_i = sum_{j=[0..m[}(r^j * Shard_j)
-///    - compute c_i = sum_{j=[0..m[}(r^j * Commit_j)
-/// 3. combine a combination of proofs and (y, c, \alpha) such as :
-///    proof_agg = sum_{i=[0..k[}(r^i * proof_i)
-///    inner_agg = sum_{i=[0..k[}(r^i * (c_i - y_i G_1 + alpha_i * proof_i))
-/// 4. check e(proof_agg, \tau G_2) = e(inner_agg, G_2)
+/// 2. for each block $b_j$:
+///    - compute $y_j = \sum_{i = 0}^m r^i s_i$
+///    - compute $c_j = \sum_{i = 0}^m r^i c_i$
+/// 3. combine a combination of proofs and $(y, c, \alpha)$ such as :
+///    - $\Pi = \sum_{j = 0}^k r^j \pi_j$
+///    - $\Alpha = \sum_{j = 0}^k r^j (c_j - \[y_j\]_1 + \alpha_j \pi_j)$
+/// 4. check $E(\Pi, \[\tau\]_2) = E(\Alpha, \[1\]_2)$
 pub fn batch_verify<E, P>(
     blocks: &[Block<E>],
     pts: &[E::ScalarField],

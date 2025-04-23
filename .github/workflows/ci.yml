@@ -1,0 +1,23 @@
+name: Rust CI
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    container:
+      image: "ghcr.io/dragoon-rs/dragoon/komodo:bcb0e6b5f73420762f6208700a43291e0066c2c3"
+    if: "!contains(github.event.head_commit.message, 'draft:') && !contains(github.event.head_commit.message, 'no-ci:')"
+    steps:
+      - uses: actions/checkout@v3
+      - run: ./make.rs ci --fmt
+
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: "ghcr.io/dragoon-rs/dragoon/komodo:bcb0e6b5f73420762f6208700a43291e0066c2c3"
+    needs: fmt
+    if: "!contains(github.event.head_commit.message, 'draft:') && !contains(github.event.head_commit.message, 'no-ci:')"
+    steps:
+      - uses: actions/checkout@v3
+      - run: ./make.rs ci --test

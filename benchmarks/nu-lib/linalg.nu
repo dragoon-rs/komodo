@@ -2,6 +2,7 @@ use utils log
 use utils math *
 use utils fs check-file
 use utils plot [ into-axis-options, COMMON_OPTIONS, gplt ]
+use utils args check-list-arg
 
 use std formats *
 
@@ -11,22 +12,18 @@ use std formats *
 # - output: the output path, as NDJSON
 export def run [
     --output: path, # the output path (defaults to a random file in $nu.temp-path)
-    --force, # does not ask for confirmation if the output file already exists, it will be overwritten
+    --no-confirm (-y), # does not ask for confirmation if the output file already exists, it will be overwritten
     --nb-measurements: int = 10, # the number of measurements per benchmark run
+    --append, # append to the output path instead of overwritting
 ]: list<int> -> path {
-    let input = $in
-
-    if ($input | is-empty) {
-        print "nothing to do"
-        return
-    }
+    $in | check-list-arg --cmd "linalg run" --arg "pipeline input"
 
     let new_file = $output == null
     let output = $output | default (mktemp --tmpdir komodo_linalg.XXXXXX)
     let pretty_output = $"(ansi purple)($output)(ansi reset)"
     if ($output | path exists) and not $new_file {
         log warning $"($pretty_output) already exists"
-        if not $force {
+        if not $no_confirm {
             let res = ["no", "yes"] | input list $"Do you want to overwrite ($pretty_output)?"
             if $res == null or $res == "no" {
                 log info "aborting"
@@ -36,10 +33,19 @@ export def run [
         }
     }
 
-    cargo run --release --package benchmarks --bin linalg -- ...[
+    let options = [
+        --release
+        --package benchmarks
+        --bin linalg
+        --
         --nb-measurements $nb_measurements
-        ...$input
-    ] out> $output
+        ...$in
+    ]
+    if $append {
+        cargo run ...$options out>> $output
+    } else {
+        cargo run ...$options out> $output
+    }
 
     log info $"results saved to ($pretty_output)"
     $output
@@ -89,7 +95,8 @@ export def plot [
         | where op == $op
         | rename --column { n: "x", mean: "y", stddev: "e" }
         | group-by name --to-table
-        | rename --column { group: "name", items: "points" }
+        | reject items.name items.op items.times
+        | rename --column { name: "name", items: "points" }
         | insert style.color {|it|
             match $it.name {
                 "BLS12-381" => "tab:blue"

@@ -1,13 +1,23 @@
 // see `examples/benches/README.md`
 use ark_ff::PrimeField;
-
+use ark_poly::univariate::DensePolynomial;
+use benchmarks::fields::Fq128;
 use clap::{arg, command, Parser, ValueEnum};
-use komodo::{algebra::linalg::Matrix, fec};
+use dragoonfri::algorithms::Sha3_512;
+use komodo::{algebra::linalg::Matrix, fec, fri};
 use plnk::Bencher;
 use rand::{rngs::ThreadRng, thread_rng, Rng, RngCore};
 
 fn random_bytes(n: usize, rng: &mut ThreadRng) -> Vec<u8> {
     (0..n).map(|_| rng.gen::<u8>()).collect()
+}
+
+fn random_loss<T>(shards: &mut Vec<T>, k: usize, rng: &mut impl Rng) {
+    // Randomly drop some shards until k are left
+    while shards.len() > k {
+        let i = rng.gen_range(0..shards.len());
+        shards.remove(i);
+    }
 }
 
 fn build_encoding_mat<F: PrimeField>(
@@ -24,48 +34,93 @@ fn build_encoding_mat<F: PrimeField>(
                 .collect();
             Matrix::vandermonde_unchecked(&points, k)
         }
+        _ => panic!("FFT encoding is not supported for matrix encoding"),
     }
 }
 
 fn template<F: PrimeField>(b: &Bencher, nb_bytes: usize, k: usize, n: usize, encoding: &Encoding) {
     let mut rng = thread_rng();
 
-    let encoding_mat = build_encoding_mat(k, n, encoding, &mut rng);
-
-    plnk::bench(
-        b,
-        &format!(
-            r#"{{"bytes": {}, "step": "encode", "k": {}, "n": {}}}"#,
-            nb_bytes, k, n
-        ),
-        || {
+    match encoding {
+        Encoding::Fft => {
+            assert_eq!(n.count_ones(), 1, "n must be a power of 2");
+            assert_eq!(k.count_ones(), 1, "k must be a power of 2");
             let bytes = random_bytes(nb_bytes, &mut rng);
+            let mut shards: Vec<fec::Shard<F>> = vec![];
+            plnk::bench(
+                b,
+                &format!(
+                    r#"{{"bytes": {}, "step": "encode", "method": "fft", "k": {}, "n": {}}}"#,
+                    nb_bytes, k, n
+                ),
+                || {
+                    plnk::timeit(|| {
+                        let evaluations = fri::evaluate::<F>(&bytes, k, n);
+                        shards = fri::encode::<F>(&bytes, evaluations, k)
+                    })
+                },
+            );
 
-            plnk::timeit(|| fec::encode::<F>(&bytes, &encoding_mat).unwrap())
-        },
-    );
+            let evaluations = fri::evaluate::<F>(&bytes, k, n);
+            let mut blocks =
+                fri::prove::<2, F, Sha3_512, DensePolynomial<F>>(evaluations, shards, 2, 2, 1)
+                    .unwrap();
 
-    let encoding_mat = build_encoding_mat(k, k, encoding, &mut rng);
+            random_loss(&mut blocks, k, &mut rng);
 
-    plnk::bench(
-        b,
-        &format!(
-            r#"{{"bytes": {}, "step": "decode", "k": {}, "n": {}}}"#,
-            nb_bytes, k, n
-        ),
-        || {
-            let bytes = random_bytes(nb_bytes, &mut rng);
-            let shards = fec::encode::<F>(&bytes, &encoding_mat).unwrap();
+            plnk::bench(
+                b,
+                &format!(
+                    r#"{{"bytes": {}, "step": "decode", "method":"fft" "k": {}, "n": {}}}"#,
+                    nb_bytes, k, n
+                ),
+                || {
+                    plnk::timeit(|| {
+                        fri::decode::<F, Sha3_512>(blocks.clone(), n);
+                    })
+                },
+            );
+        }
+        _ => {
+            let encoding_mat = build_encoding_mat(k, n, encoding, &mut rng);
 
-            plnk::timeit(|| fec::decode::<F>(shards.clone()).unwrap())
-        },
-    );
+            plnk::bench(
+                b,
+                &format!(
+                    r#"{{"bytes": {}, "step": "encode", "method": "matrix", "k": {}, "n": {}}}"#,
+                    nb_bytes, k, n
+                ),
+                || {
+                    let bytes = random_bytes(nb_bytes, &mut rng);
+
+                    plnk::timeit(|| fec::encode::<F>(&bytes, &encoding_mat).unwrap())
+                },
+            );
+
+            let encoding_mat = build_encoding_mat(k, k, encoding, &mut rng);
+
+            plnk::bench(
+                b,
+                &format!(
+                    r#"{{"bytes": {}, "step": "decode", "method":"matrix", "k": {}, "n": {}}}"#,
+                    nb_bytes, k, n
+                ),
+                || {
+                    let bytes = random_bytes(nb_bytes, &mut rng);
+                    let shards = fec::encode::<F>(&bytes, &encoding_mat).unwrap();
+
+                    plnk::timeit(|| fec::decode::<F>(shards.clone()).unwrap())
+                },
+            );
+        }
+    }
 }
 
 #[derive(ValueEnum, Clone)]
 enum Encoding {
     Vandermonde,
     Random,
+    Fft,
 }
 
 #[derive(ValueEnum, Clone, Hash, PartialEq, Eq)]
@@ -73,6 +128,7 @@ enum Curve {
     BLS12381,
     BN254,
     Pallas,
+    FP128,
 }
 
 #[derive(Parser)]
@@ -124,6 +180,9 @@ fn main() {
                     cli.n,
                     &cli.encoding,
                 ),
+                Curve::FP128 => {
+                    template::<Fq128>(&b.with_name("FP128"), n, cli.k, cli.n, &cli.encoding)
+                }
             }
         }
     }

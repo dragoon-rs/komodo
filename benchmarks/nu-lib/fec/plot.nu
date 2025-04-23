@@ -24,7 +24,7 @@ export def encoding [
         | sort-by x
         | group-by k --to-table
         | reject items.k
-        | rename --column { group: "name", items: "points" }
+        | rename --column { k: "name", items: "points" }
         | update name { $"$k = ($in)$" }
 
     let options = [
@@ -56,7 +56,7 @@ export def decoding [
         | sort-by x
         | group-by k --to-table
         | reject items.k
-        | rename --column { group: "name", items: "points" }
+        | rename --column { k: "name", items: "points" }
         | update name { $"$k = ($in)$" }
 
     let options = [
@@ -89,7 +89,7 @@ export def e2e [
                 | update times { $it.items.0.times | zip $it.items.1.times | each { $in.0 + $in.1 } }
         }
         | flatten --all
-        | reject group foo
+        | reject foo
         | ns-to-ms times
         | compute-stats times
         | reject times
@@ -99,7 +99,7 @@ export def e2e [
         | sort-by x
         | group-by k --to-table
         | reject items.k
-        | rename --column { group: "name", items: "points" }
+        | rename --column { k: "name", items: "points" }
         | update name { $"$k = ($in)$" }
 
     let options = [
@@ -144,7 +144,7 @@ export def combined [
         }
         | reject items.shards
         | insert style.line.type "solid"
-        | rename --column { group: "name", items: "points" }
+        | rename --column { shards: "name", items: "points" }
         | update name { $"$k = ($in)$" }
 
     let re_encoding_graphs = open --raw $data
@@ -159,7 +159,7 @@ export def combined [
                 | update times { $it.items.0.times | zip $it.items.1.times | each { $in.0 + $in.1 } }
         }
         | flatten --all
-        | reject group key
+        | reject key
         | ns-to-ms times
         | compute-stats times
         | reject times
@@ -179,7 +179,7 @@ export def combined [
         }
         | insert style.line.type "dashed"
         | reject items.k
-        | rename --column { group: "name", items: "points" }
+        | rename --column { k: "name", items: "points" }
         | reject name
 
     let graphs = $recoding_graphs
@@ -254,7 +254,7 @@ export def ratio [
                 | update times { $it.items.0.times | zip $it.items.1.times | each { $in.0 + $in.1 } }
         }
         | flatten --all
-        | reject group key
+        | reject key
         | ns-to-ms times
         | compute-stats times
         | where name == "BLS12-381"
@@ -281,7 +281,7 @@ export def ratio [
             }
         }
         | reject items.k
-        | rename --column { group: "name", items: "points" }
+        | rename --column { k: "name", items: "points" }
         | update name { $"$k = ($in)$" }
 
     let options = [

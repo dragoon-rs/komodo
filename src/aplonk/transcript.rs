@@ -5,7 +5,7 @@ use rs_merkle::{algorithms::Sha256, Hasher};
 
 /// initialize the transcript of IPA
 ///
-/// this can be found in [aPlonk from [Ambrona et al.]][aPlonK] as *ts := (C_G, r, P)* in
+/// this can be found in [aPlonk from [Ambrona et al.]][aPlonK] as $ts := (C_G, r, P)$ in
 /// - page **15**. in IPA.Prove.1.
 ///
 /// [aPlonk]: https://eprint.iacr.org/2022/1352.pdf
@@ -24,7 +24,7 @@ pub(super) fn initialize<E: Pairing>(
 
 /// reset the transcript of IPA
 ///
-/// this can be found in [aPlonk from [Ambrona et al.]][aPlonK] as *ts := u_j* in
+/// this can be found in [aPlonk from [Ambrona et al.]][aPlonK] as $ts := u_j$ in
 /// - page **15**. in IPA.Prove.5.
 /// - page **15**. in IPA.Verify.3.
 ///
@@ -39,7 +39,7 @@ pub(super) fn reset<E: Pairing>(u: E::ScalarField) -> Result<Vec<u8>, Serializat
 /// hash curve elements into the transcript of IPA
 ///
 /// this can be found in [aPlonk from [Ambrona et al.]][aPlonK] as
-/// *ts := Hash(L_G^j, R_G^j, L_r^j, R_r^j, ts)* in
+/// $ts := \text{hash}(L_G^j, R_G^j, L_r^j, R_r^j, ts)$ in
 /// - page **15**. in IPA.Prove.5.
 /// - page **15**. in IPA.Verify.3.
 ///
