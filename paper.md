@@ -60,7 +60,7 @@ following on any input data in a distributed network or setup:
   redundancy to the data, making the network more resilient to failure,
   fragmentation, partitioning, loss or corruption.
 - `commit` and `prove`: all $n$ encoded shards are proven with one of three
-  available cryptographic protocols (see below for more information. This step
+  available cryptographic protocols (see below for more information). This step
   consists of attaching extra information to them and sharing augmented _blocks_
   of data onto the network. This extra information should guarantee, maybe only
   with a very high probability, that a given shard has been generated indeed
