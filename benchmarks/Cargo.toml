@@ -24,3 +24,4 @@ komodo = { path = "..", features = ["fri"] }
 plnk = { git = "https://gitlab.isae-supaero.fr/a.stevan/plnk", tag = "0.7.0", version = "0.7.0" }
 rand = "0.8.5"
 dragoonfri = { version = "0.1.0"}
+itertools = "0.14.0"
