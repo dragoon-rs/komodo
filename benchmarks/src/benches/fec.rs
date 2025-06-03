@@ -59,7 +59,7 @@ pub(crate) fn run<F: PrimeField>(
             let mut shards: Vec<fec::Shard<F>> = vec![];
             plnk::bench(
                 b,
-                crate::label! { nb_bytes: nb_bytes, step: "encode", method: "fft", k: k, n: n },
+                plnk::label! { nb_bytes: nb_bytes, step: "encode", method: "fft", k: k, n: n },
                 || {
                     plnk::timeit(|| {
                         let evaluations = fri::evaluate::<F>(&bytes, k, n);
@@ -77,7 +77,7 @@ pub(crate) fn run<F: PrimeField>(
 
             plnk::bench(
                 b,
-                crate::label! { nb_bytes: nb_bytes, step: "decode", method: "fft", k: k, n: n },
+                plnk::label! { nb_bytes: nb_bytes, step: "decode", method: "fft", k: k, n: n },
                 || {
                     plnk::timeit(|| {
                         fri::decode::<F, Sha3_512>(blocks.clone(), n);
@@ -90,7 +90,7 @@ pub(crate) fn run<F: PrimeField>(
 
             plnk::bench(
                 b,
-                crate::label! { nb_bytes: nb_bytes, step: "encode", method: "matrix", k: k, n: n },
+                plnk::label! { nb_bytes: nb_bytes, step: "encode", method: "matrix", k: k, n: n },
                 || {
                     let bytes = random_bytes(nb_bytes, &mut rng);
 
@@ -102,7 +102,7 @@ pub(crate) fn run<F: PrimeField>(
 
             plnk::bench(
                 b,
-                crate::label! { nb_bytes: nb_bytes, step: "decode", method: "matrix", k: k, n: n },
+                plnk::label! { nb_bytes: nb_bytes, step: "decode", method: "matrix", k: k, n: n },
                 || {
                     let bytes = random_bytes(nb_bytes, &mut rng);
                     let shards = fec::encode::<F>(&bytes, &encoding_mat).unwrap();

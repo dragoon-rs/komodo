@@ -7,7 +7,7 @@ pub(crate) fn run_inverse<F: PrimeField>(b: &Bencher, n: usize) {
     let mut rng = rand::thread_rng();
     let matrix = Matrix::<F>::random(n, n, &mut rng);
 
-    plnk::bench(b, crate::label! { operation: "inverse" }, || {
+    plnk::bench(b, plnk::label! { operation: "inverse" }, || {
         plnk::timeit(|| matrix.invert())
     });
 }
@@ -16,7 +16,7 @@ pub(crate) fn run_transpose<F: PrimeField>(b: &Bencher, n: usize) {
     let mut rng = rand::thread_rng();
     let matrix = Matrix::<F>::random(n, n, &mut rng);
 
-    plnk::bench(b, crate::label! { operation: "transpose" }, || {
+    plnk::bench(b, plnk::label! { operation: "transpose" }, || {
         plnk::timeit(|| matrix.transpose())
     });
 }
@@ -26,7 +26,7 @@ pub(crate) fn run_multiply<F: PrimeField>(b: &Bencher, n: usize) {
     let mat_a = Matrix::<F>::random(n, n, &mut rng);
     let mat_b = Matrix::<F>::random(n, n, &mut rng);
 
-    plnk::bench(b, crate::label! { operation: "multiply" }, || {
+    plnk::bench(b, plnk::label! { operation: "multiply" }, || {
         plnk::timeit(|| mat_a.mul(&mat_b))
     });
 }

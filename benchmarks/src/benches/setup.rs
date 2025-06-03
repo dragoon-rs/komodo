@@ -15,10 +15,10 @@ where
     P: DenseUVPolynomial<F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
-    let b = plnk::Bencher::new(nb_measurements).with_name(crate::label! { curve: curve });
+    let b = plnk::Bencher::new(nb_measurements).with_name(plnk::label! { curve: curve });
     let rng = &mut rand::thread_rng();
 
-    plnk::bench(&b, crate::label! { degree: degree }, || {
+    plnk::bench(&b, plnk::label! { degree: degree }, || {
         plnk::timeit(|| zk::setup::<F, G>(degree, rng))
     });
 }
@@ -30,10 +30,10 @@ where
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     let b = plnk::Bencher::new(nb_measurements)
-        .with_name(crate::label! { curve: format!("{curve}-ark") });
+        .with_name(plnk::label! { curve: format!("{curve}-ark") });
     let rng = &mut rand::thread_rng();
 
-    plnk::bench(&b, crate::label! { degree: degree }, || {
+    plnk::bench(&b, plnk::label! { degree: degree }, || {
         plnk::timeit(|| {
             let setup = KZG10::<E, P>::setup(degree, false, rng).unwrap();
             let powers_of_g = setup.powers_of_g[..=degree].to_vec();

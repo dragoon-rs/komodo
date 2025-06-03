@@ -14,13 +14,13 @@ where
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     let rng = &mut rand::thread_rng();
-    let b = plnk::Bencher::new(nb_measurements).with_name(crate::label! { curve: curve });
+    let b = plnk::Bencher::new(nb_measurements).with_name(plnk::label! { curve: curve });
 
     eprint!("building trusted setup for degree {degree}... ");
     let setup = zk::setup::<F, G>(degree, rng).unwrap();
     eprintln!("done");
 
-    plnk::bench(&b, crate::label! { degree: degree }, || {
+    plnk::bench(&b, plnk::label! { degree: degree }, || {
         let polynomial = P::rand(degree, rng);
         plnk::timeit(|| zk::commit(&setup, &polynomial))
     });
@@ -33,7 +33,7 @@ where
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
     let rng = &mut rand::thread_rng();
-    let b = plnk::Bencher::new(nb_measurements).with_name(crate::label! { curve: curve });
+    let b = plnk::Bencher::new(nb_measurements).with_name(plnk::label! { curve: curve });
 
     eprint!("building trusted setup for degree {degree}... ");
     let setup = {
@@ -47,7 +47,7 @@ where
     };
     eprintln!("done");
 
-    plnk::bench(&b, crate::label! { degree: degree }, || {
+    plnk::bench(&b, plnk::label! { degree: degree }, || {
         let polynomial = P::rand(degree, rng);
         plnk::timeit(|| KZG10::commit(&setup, &polynomial, None, None))
     })

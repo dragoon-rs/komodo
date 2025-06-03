@@ -46,6 +46,14 @@ def main [output_dir: path] {
     $commit | save --force ($target | path join "komodo.txt")
 
     let benchmarks = {
+        field: {
+            nb_measurements: 1000,
+            curves: [ bls12381, pallas, bn254 ],
+        },
+        group: {
+            nb_measurements: 1000,
+            curves: [ bls12381, pallas, bn254 ],
+        },
         linalg: {
             sizes: (seq 0 5 | each { 2 ** $in }),
             curves: [ bls12381, pallas, bn254 ],
@@ -70,13 +78,23 @@ def main [output_dir: path] {
             curves: [ bls12381 ],
             encoding: "random",
         },
-        field: {
-            nb_measurements: 1000,
-            curves: [ bls12381, pallas, bn254 ],
+        semi-avid: {
+            sizes: [(512 * 2 ** 10), (128 * 2 ** 20)],
+            ks: [8],
+            rhos: [0.5, 0.33],
+            curves: [ bls12381 ],
         },
-        group: {
-            nb_measurements: 1000,
-            curves: [ bls12381, pallas, bn254 ],
+        kzg: {
+            sizes: [(512 * 2 ** 10), (128 * 2 ** 20)],
+            ks: [8],
+            rhos: [0.5, 0.33],
+            curves: [ bls12381 ],
+        },
+        aplonk: {
+            sizes: [(512 * 2 ** 10), (128 * 2 ** 20)],
+            ks: [8],
+            rhos: [0.5, 0.33],
+            curves: [ bls12381 ],
         },
     }
 

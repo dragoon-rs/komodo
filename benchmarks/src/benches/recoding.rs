@@ -38,7 +38,7 @@ pub(crate) fn run<F: PrimeField>(b: &Bencher, nb_bytes: usize, k: usize, nb_shar
 
     plnk::bench(
         b,
-        crate::label! { bytes: nb_bytes, shards: nb_shards, k: k },
+        plnk::label! { bytes: nb_bytes, shards: nb_shards, k: k },
         || plnk::timeit(|| recode_with_coeffs(&shards, &coeffs)),
     );
 }
