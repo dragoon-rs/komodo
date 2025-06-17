@@ -251,11 +251,11 @@ The time to run `commit`, `prove` and `verify` has been measured for $k = 8$ and
 a code rate $\rho = \frac{1}{2}$, i.e. $n = 16$ on the BN-254 elliptic curve and
 for small and large input data.
 
-![Performance for small files.\label{fig:small}](figures/small.png)
+![Performance for small files.\label{fig:small}](figures/protocols-b507904-k8-n16.png)
 
 **Semi-AVID** is the best for small files as can be seen in \autoref{fig:small}.
 
-![Performance for large files.\label{fig:large}](figures/large.png)
+![Performance for large files.\label{fig:large}](figures/protocols-b130023424-k8-n16.png)
 
 **aPlonK** is slightly better for verifying large files, see
 \autoref{fig:large}, but still suffers from performance orders of magnitude
