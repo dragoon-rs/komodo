@@ -1,10 +1,7 @@
-const MODULES = [
-    "benchmarks/",
-]
+use log.nu [ "log info" ]
 
-def log-load [m: string] {
-    print $"[(ansi cyan_bold).env.nu(ansi reset)] loading (ansi purple)($m)(ansi reset)"
-}
+log info $"defining constant (ansi cyan)RESULTS_DIR(ansi reset)"
+const RESULTS_DIR = "../komodo-benchmark-results"
 
-log-load $MODULES.0
-use $MODULES.0
+log info $"importing module (ansi cyan)benchmarks(ansi reset)"
+use benchmarks

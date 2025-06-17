@@ -6,7 +6,7 @@
 //! edition = "2021"
 //!
 //! [dependencies]
-//! nob = { git = "https://gitlab.isae-supaero.fr/a.stevan/nob.rs", rev = "7ea6be855cf5600558440def6e59a83f78b8b543" }
+//! nob = { git = "https://gitlab.isae-supaero.fr/a.stevan/nob.rs", rev = "c2508fdd3fef8f01110a8c2fd0690afaecbc7b16" }
 //! clap = { version = "4.5.17", features = ["derive"] }
 //!
 //! # for `container --list`
@@ -87,6 +87,9 @@ enum Commands {
     /// Builds the container.
     #[command(subcommand)]
     Container(ContainerCommands),
+    /// Run benchmarks.
+    #[command(subcommand)]
+    Benchmark(BenchmarkCommands),
 }
 
 #[derive(Subcommand)]
@@ -103,6 +106,60 @@ enum ContainerCommands {
     Login,
     /// Push to the registry instead of building.
     Push,
+}
+
+#[derive(Subcommand)]
+enum BenchmarkCommands {
+    Field {
+        /// Arguments to pass to `benchmarks field`
+        #[arg(allow_hyphen_values = true, num_args = 0..)]
+        args: Vec<String>,
+    },
+    Group {
+        /// Arguments to pass to `benchmarks group`
+        #[arg(allow_hyphen_values = true, num_args = 0..)]
+        args: Vec<String>,
+    },
+    Linalg {
+        /// Arguments to pass to `benchmarks linalg`
+        #[arg(allow_hyphen_values = true, num_args = 0..)]
+        args: Vec<String>,
+    },
+    Setup {
+        /// Arguments to pass to `benchmarks setup`
+        #[arg(allow_hyphen_values = true, num_args = 0..)]
+        args: Vec<String>,
+    },
+    Commit {
+        /// Arguments to pass to `benchmarks commit`
+        #[arg(allow_hyphen_values = true, num_args = 0..)]
+        args: Vec<String>,
+    },
+    Fec {
+        /// Arguments to pass to `benchmarks fec`
+        #[arg(allow_hyphen_values = true, num_args = 0..)]
+        args: Vec<String>,
+    },
+    Recoding {
+        /// Arguments to pass to `benchmarks recoding`
+        #[arg(allow_hyphen_values = true, num_args = 0..)]
+        args: Vec<String>,
+    },
+    SemiAVID {
+        /// Arguments to pass to `benchmarks semi_avid`
+        #[arg(allow_hyphen_values = true, num_args = 0..)]
+        args: Vec<String>,
+    },
+    KZG {
+        /// Arguments to pass to `benchmarks kzg`
+        #[arg(allow_hyphen_values = true, num_args = 0..)]
+        args: Vec<String>,
+    },
+    Aplonk {
+        /// Arguments to pass to `benchmarks aplonk`
+        #[arg(allow_hyphen_values = true, num_args = 0..)]
+        args: Vec<String>,
+    },
 }
 
 fn fmt(check: bool) {
@@ -268,6 +325,23 @@ fn main() {
                     nob::run_cmd_and_fail!("docker", "push", &mirror_image);
                 }
             }
+        }
+        Some(Commands::Benchmark(benchmark_cmd)) => {
+            let mut cmd = vec!["cargo", "run", "--quiet", "--package", "benchmarks", "--"];
+            let (subcommand, args) = match benchmark_cmd {
+                BenchmarkCommands::Field { args } => ("field", args),
+                BenchmarkCommands::Group { args } => ("group", args),
+                BenchmarkCommands::Linalg { args } => ("linalg", args),
+                BenchmarkCommands::Setup { args } => ("setup", args),
+                BenchmarkCommands::Commit { args } => ("commit", args),
+                BenchmarkCommands::Fec { args } => ("fec", args),
+                BenchmarkCommands::Recoding { args } => ("recoding", args),
+                BenchmarkCommands::SemiAVID { args } => ("semi-avid", args),
+                BenchmarkCommands::KZG { args } => ("kzg", args),
+                BenchmarkCommands::Aplonk { args } => ("aplonk", args),
+            };
+            cmd.push(subcommand);
+            extend_and_run(&cmd, &args.iter().map(|x| &**x).collect::<Vec<&str>>());
         }
         None => {}
     }

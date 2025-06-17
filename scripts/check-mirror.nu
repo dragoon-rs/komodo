@@ -3,16 +3,7 @@ const GH_API_OPTIONS = [
     -H "X-GitHub-Api-Version: 2022-11-28"
 ]
 
-def "str color" [color: string]: [ string -> string ] {
-    $"(ansi $color)($in)(ansi reset)"
-}
-
-def __log [level: string, color: string, msg: string] {
-    print $"[(ansi $color)($level)(ansi reset)] ($msg)"
-}
-def "log error" [msg: string] { __log "ERR" "red"   $msg }
-def "log info"  [msg: string] { __log "INF" "cyan"  $msg }
-def "log ok"    [msg: string] { __log " OK" "green" $msg }
+use ../log.nu [ "log debug", "log info", "log ok", "log error", "str color" ]
 
 ^$nu.current-exe ./scripts/check-nushell-version.nu
 
@@ -21,18 +12,24 @@ def main [base: string, mirror: string, branch: string] {
     let mirror_remote = random uuid
 
     log info "adding remotes"
+    log debug $base_remote
     git remote add $base_remote $base
+    log debug $mirror_remote
     git remote add $mirror_remote $mirror
 
     log info "fetching"
+    log debug $base_remote
     git fetch --quiet $base_remote
+    log debug $mirror_remote
     git fetch --quiet $mirror_remote
 
     let base = git rev-parse $"($base_remote)/($branch)" | str trim
     let mirror = git rev-parse $"($mirror_remote)/($branch)" | str trim
 
     log info "cleaning"
+    log debug $base_remote
     git remote remove $base_remote
+    log debug $mirror_remote
     git remote remove $mirror_remote
 
     if $base != $mirror {
