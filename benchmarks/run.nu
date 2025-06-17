@@ -1,3 +1,5 @@
+use ../log.nu [ "log info", "log warning", "log error", "log hint", "str color" ]
+
 const CPU_FIELDS = [
     "Architecture",
     "CPU op-mode(s)",
@@ -24,6 +26,8 @@ const CPU_FIELDS = [
     "NUMA node0 CPU(s)",
 ]
 
+const BENCHES = [ field, group, setup, commit, linalg, fec, recoding, semi-avid, kzg, aplonk ]
+
 def lscpu []: [ nothing -> record ] {
     ^lscpu --json
         | from json
@@ -33,82 +37,106 @@ def lscpu []: [ nothing -> record ] {
         | into record
 }
 
-def main [output_dir: path] {
+def --wrapped bench [--rust-build: string, ...args: string] {
+    let rust_build = match $rust_build {
+            "release" => { cargo_flag: [ "--release" ], build: "release" },
+            "debug"   => { cargo_flag: [],              build: "debug"   },
+            _         => {
+                log warning $"unknown Rust build (ansi yellow)($rust_build)(ansi reset), defaulting to (ansi green)release(ansi reset) for best performance"
+                { cargo_flag: [ --release ], build: "release" }
+            },
+        }
+    let options = [
+        ...$rust_build.cargo_flag
+        --package benchmarks
+        --
+        --rust-build $rust_build.build
+        ...$args
+    ]
+
+    log info $"cargo run ($options | str join ' ')"
+    cargo run ...$options
+}
+
+export def main [
+    ...benches        : string,
+    --all,
+    --output-dir (-o) : path = "./a.out",
+    --curves          : list<string> = [],
+    --degrees         : list<int>    = [],
+    --matrix-sizes    : list<int>    = [],
+    --data-sizes      : list<int>    = [],
+    --ks              : list<int>    = [],
+    --rhos            : list<float>  = [],
+    --rust-build      : string       = "release",
+    --steps           : list<string>,
+    --overwrite,
+] {
+    let benches = match [ $all, ($benches | length) ] {
+        [ false, 0 ] => {
+            log error "nothing to do"
+            return
+        },
+        [ false, _ ] => $benches,
+        [  true, 0 ] => $BENCHES,
+        [  true, _ ] => {
+            log warning "--all is raised even though benches have been provided"
+            $BENCHES
+        },
+    }
+
+    let target_dir = $output_dir
+    let cpus_dir = $target_dir | path join "cpus"
+
+    if not ($target_dir | path exists) {
+        log warning $"creating directory ($target_dir | str color purple)"
+        mkdir $target_dir
+    }
+
+    let komodo_hash = git rev-parse HEAD
+    let src_hash = ls src/*.rs benchmarks/**/*.rs
+        | each { open $in.name | hash sha256 }
+        | str join
+        | hash sha256
     let cpu = lscpu | select ...$CPU_FIELDS
+    let cpu_hash = $cpu | to json | hash sha256
 
-    let commit = git rev-parse HEAD
-    let hash = $cpu | to json | $in + $commit | hash sha256
-
-    let target = $output_dir | path join $hash
-    mkdir $target
-
-    $cpu | to json | save --force ($target | path join "cpu.json")
-    $commit | save --force ($target | path join "komodo.txt")
-
-    let benchmarks = {
-        field: {
-            nb_measurements: 1000,
-            curves: [ bls12381, pallas, bn254 ],
-        },
-        group: {
-            nb_measurements: 1000,
-            curves: [ bls12381, pallas, bn254 ],
-        },
-        linalg: {
-            sizes: (seq 0 5 | each { 2 ** $in }),
-            curves: [ bls12381, pallas, bn254 ],
-        },
-        setup: {
-            degrees: (seq 0 10 | each { 2 ** $in }),
-            curves: [ bls12381, pallas, bn254 ],
-        },
-        commit: {
-            degrees: (seq 0 10 | each { 2 ** $in }),
-            curves: [ bls12381, pallas, bn254 ],
-        },
-        recoding: {
-            sizes: (seq 0 10 | each { 512 * 2 ** $in }),
-            ks: [2, 4, 8, 16],
-            curves: [ bls12381 ],
-        },
-        fec: {
-            sizes: (seq 0 10 | each { 512 * 2 ** $in }),
-            ks: [2, 4, 8, 16],
-            rhos: [0.5, 0.33],
-            curves: [ bls12381 ],
-            encoding: "random",
-        },
-        semi-avid: {
-            sizes: [(512 * 2 ** 10), (128 * 2 ** 20)],
-            ks: [8],
-            rhos: [0.5, 0.33],
-            curves: [ bls12381 ],
-        },
-        kzg: {
-            sizes: [(512 * 2 ** 10), (128 * 2 ** 20)],
-            ks: [8],
-            rhos: [0.5, 0.33],
-            curves: [ bls12381 ],
-        },
-        aplonk: {
-            sizes: [(512 * 2 ** 10), (128 * 2 ** 20)],
-            ks: [8],
-            rhos: [0.5, 0.33],
-            curves: [ bls12381 ],
-        },
+    def out [stem: string]: [ nothing -> path] {
+        { parent: $target_dir, stem: $stem, extension: "ndjson" } | path join
     }
 
-    for x in ($benchmarks | transpose k v) {
-        print $x.k
-        let opts = $x.v
-                | default 100 nb_measurements
-                | items { |k, v|
-                    [ $"--($k | str replace --all '_' '-')" ] | append $v
-                }
-                | flatten
-
-        let output = { parent: $target, stem: $x.k, extension: "ndjson" } | path join
-
-        cargo run --package benchmarks -- $x.k ...$opts out> $output
+    for b in $benches {
+        let opts = match $b {
+            "field"     => { out: $b          , args: { n: 10000, rest: [ --curves ...$curves --all ] } },
+            "group"     => { out: $b          , args: { n:  1000, rest: [ --curves ...$curves --all ] } },
+            "setup"     => { out: $b          , args: { n:    10, rest: [ --curves ...$curves --degrees ...$degrees ] } },
+            "commit"    => { out: $b          , args: { n:    10, rest: [ --curves ...$curves --degrees ...$degrees ] } },
+            "linalg"    => { out: $b          , args: { n:    10, rest: [ --curves ...$curves --sizes ...$matrix_sizes ] } },
+            "fec"       => { out: "fec"       , args: { n:    10, rest: [ --curves ...$curves --sizes ...$data_sizes --ks ...$ks --rhos ...$rhos --encoding random ] } },
+            "recoding"  => { out: "fec"       , args: { n:    10, rest: [ --curves ...$curves --sizes ...$data_sizes --ks ...$ks --shards ...$ks ] } },
+            "semi-avid" => { out: "protocols" , args: { n:    10, rest: [ --curves ...$curves --sizes ...$data_sizes --ks ...$ks --rhos ...$rhos ] } },
+            "kzg"       => { out: "protocols" , args: { n:     5, rest: [ --curves ...$curves --sizes ...$data_sizes --ks ...$ks --rhos ...$rhos ] } },
+            "aplonk"    => { out: "protocols" , args: { n:     1, rest: [ --curves ...$curves --sizes ...$data_sizes --ks ...$ks --rhos ...$rhos ] } },
+            _           => {
+                log error $"unknown bench `($b)`"
+                log hint $"    choose one of these: ($BENCHES | each { str color green })"
+                continue
+            },
+        }
+        let opts = [
+            (if $overwrite { --overwrite })
+            --git $komodo_hash
+            --cpu $cpu_hash
+            --src $src_hash
+            -n $opts.args.n
+            -o (out $opts.out)
+            $b
+            ...(if $steps != null { [--steps, ...$steps] } else { [] })
+            ...$opts.args.rest
+        ]
+        bench --rust-build $rust_build ...($opts | compact)
     }
+
+    mkdir $cpus_dir
+    $cpu | to json | save --force ({ parent: $cpus_dir, stem: $cpu_hash, extension: "json"} | path join)
 }

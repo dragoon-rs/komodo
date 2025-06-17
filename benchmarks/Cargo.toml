@@ -11,11 +11,16 @@ ark-poly-commit = { git = "https://gitlab.isae-supaero.fr/a.stevan/poly-commit",
 ark-serialize = "0.4.0"
 ark-std = "0.4.0"
 clap = { version = "4.5.4", features = ["derive"] }
-komodo = { path = "..", features = ["kzg", "aplonk", "fri"] }
-plnk = { git = "https://gitlab.isae-supaero.fr/a.stevan/plnk", tag = "1.1.0" }
-rand = "0.8.5"
+colored = "2.0.0"
+convert_case = "0.8.0"
 dragoonfri = { version = "0.1.0"}
+hex = "0.4.3"
+indicatif = "0.17.11"
 itertools = "0.14.0"
+komodo = { path = "..", features = ["kzg", "aplonk", "fri"] }
+plnk = { git = "https://gitlab.isae-supaero.fr/a.stevan/plnk", rev = "6768cb5b49c272f2f39e11497bd88800c93388f3" }
+rand = "0.8.5"
+size = "0.5.0"
 
 # elliptic curves
 ark-bls12-381 = "0.4.0"

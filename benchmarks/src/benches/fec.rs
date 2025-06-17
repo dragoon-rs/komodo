@@ -2,14 +2,13 @@ use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
 use clap::ValueEnum;
 use dragoonfri::algorithms::Sha3_512;
-use plnk::Bencher;
 use rand::{thread_rng, Rng, RngCore};
 
 use komodo::{algebra::linalg::Matrix, fec, fri};
 
 use crate::random::random_bytes;
 
-#[derive(ValueEnum, Clone)]
+#[derive(ValueEnum, Clone, Debug)]
 pub(crate) enum Encoding {
     Vandermonde,
     Random,
@@ -42,74 +41,76 @@ fn build_encoding_mat<F: PrimeField>(
     }
 }
 
-pub(crate) fn run<F: PrimeField>(
-    b: &Bencher,
+pub(crate) fn build<F: PrimeField>(
     nb_bytes: usize,
     k: usize,
     n: usize,
     encoding: &Encoding,
-) {
-    let mut rng = thread_rng();
-
+) -> Vec<(String, plnk::FnTimed<()>)> {
     match encoding {
         Encoding::Fft => {
             assert_eq!(n.count_ones(), 1, "n must be a power of 2");
             assert_eq!(k.count_ones(), 1, "k must be a power of 2");
-            let bytes = random_bytes(nb_bytes, &mut rng);
-            let mut shards: Vec<fec::Shard<F>> = vec![];
-            plnk::bench(
-                b,
-                plnk::label! { nb_bytes: nb_bytes, step: "encode", method: "fft", k: k, n: n },
-                || {
-                    plnk::timeit(|| {
+
+            vec![
+                (
+                    "encode".to_string(),
+                    plnk::closure! {
+                        let bytes = random_bytes(nb_bytes, &mut thread_rng());
+                        crate::timeit_and_discard_output! {
+                            fri::encode::<F>(&bytes, fri::evaluate::<F>(&bytes, k, n), k);
+                        }
+                    },
+                ),
+                (
+                    "decode".to_string(),
+                    plnk::closure! {
+                        let bytes = random_bytes(nb_bytes, &mut thread_rng());
                         let evaluations = fri::evaluate::<F>(&bytes, k, n);
-                        shards = fri::encode::<F>(&bytes, evaluations, k)
-                    })
-                },
-            );
+                        let shards = fri::encode::<F>(&bytes, evaluations.clone(), k);
 
-            let evaluations = fri::evaluate::<F>(&bytes, k, n);
-            let mut blocks =
-                fri::prove::<2, F, Sha3_512, DensePolynomial<F>>(evaluations, shards, 2, 2, 1)
-                    .unwrap();
+                        let mut blocks =
+                            fri::prove::<2, F, Sha3_512, DensePolynomial<F>>(evaluations, shards, 2, 2, 1)
+                                .unwrap();
 
-            random_loss(&mut blocks, k, &mut rng);
+                        random_loss(&mut blocks, k, &mut thread_rng());
 
-            plnk::bench(
-                b,
-                plnk::label! { nb_bytes: nb_bytes, step: "decode", method: "fft", k: k, n: n },
-                || {
-                    plnk::timeit(|| {
-                        fri::decode::<F, Sha3_512>(blocks.clone(), n);
-                    })
-                },
-            );
+                        plnk::timeit(|| {
+                            fri::decode::<F, Sha3_512>(blocks.clone(), n);
+                        })
+                    },
+                ),
+            ]
         }
         _ => {
-            let encoding_mat = build_encoding_mat(k, n, encoding, &mut rng);
+            let encoding_encode = encoding.clone();
+            let encoding_decode = encoding.clone();
+            vec![
+                (
+                    "encode".to_string(),
+                    plnk::closure! {
+                        let encoding_mat = build_encoding_mat(k, n, &encoding_encode, &mut thread_rng());
 
-            plnk::bench(
-                b,
-                plnk::label! { nb_bytes: nb_bytes, step: "encode", method: "matrix", k: k, n: n },
-                || {
-                    let bytes = random_bytes(nb_bytes, &mut rng);
+                        let bytes = random_bytes(nb_bytes, &mut thread_rng());
+                        crate::timeit_and_discard_output! {
+                            fec::encode::<F>(&bytes, &encoding_mat).unwrap();
+                        }
+                    },
+                ),
+                (
+                    "decode".to_string(),
+                    plnk::closure! {
+                        let encoding_mat = build_encoding_mat(k, k, &encoding_decode, &mut thread_rng());
 
-                    plnk::timeit(|| fec::encode::<F>(&bytes, &encoding_mat).unwrap())
-                },
-            );
+                        let bytes = random_bytes(nb_bytes, &mut thread_rng());
+                        let shards = fec::encode::<F>(&bytes, &encoding_mat).unwrap();
 
-            let encoding_mat = build_encoding_mat(k, k, encoding, &mut rng);
-
-            plnk::bench(
-                b,
-                plnk::label! { nb_bytes: nb_bytes, step: "decode", method: "matrix", k: k, n: n },
-                || {
-                    let bytes = random_bytes(nb_bytes, &mut rng);
-                    let shards = fec::encode::<F>(&bytes, &encoding_mat).unwrap();
-
-                    plnk::timeit(|| fec::decode::<F>(shards.clone()).unwrap())
-                },
-            );
+                        crate::timeit_and_discard_output! {
+                            fec::decode::<F>(shards.clone()).unwrap();
+                        }
+                    },
+                ),
+            ]
         }
     }
 }

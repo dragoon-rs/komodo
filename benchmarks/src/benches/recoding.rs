@@ -1,11 +1,11 @@
 use ark_ff::PrimeField;
 use ark_std::rand::Rng;
 
+use indicatif::ProgressBar;
 use komodo::{
     algebra,
     fec::{recode_with_coeffs, Shard},
 };
-use plnk::Bencher;
 
 fn to_curve<F: PrimeField>(n: u128) -> F {
     F::from_le_bytes_mod_order(&n.to_le_bytes())
@@ -26,7 +26,12 @@ fn create_fake_shard<F: PrimeField>(nb_bytes: usize, k: usize) -> Shard<F> {
     }
 }
 
-pub(crate) fn run<F: PrimeField>(b: &Bencher, nb_bytes: usize, k: usize, nb_shards: usize) {
+pub(crate) fn build<F: PrimeField>(
+    nb_bytes: usize,
+    k: usize,
+    nb_shards: usize,
+    setup_pb: &ProgressBar,
+) -> plnk::FnTimed<()> {
     let shards: Vec<Shard<F>> = (0..nb_shards)
         .map(|_| create_fake_shard(nb_bytes, k))
         .collect();
@@ -36,9 +41,7 @@ pub(crate) fn run<F: PrimeField>(b: &Bencher, nb_bytes: usize, k: usize, nb_shar
         .map(|_| to_curve::<F>(rng.gen::<u128>()))
         .collect();
 
-    plnk::bench(
-        b,
-        plnk::label! { bytes: nb_bytes, shards: nb_shards, k: k },
-        || plnk::timeit(|| recode_with_coeffs(&shards, &coeffs)),
-    );
+    crate::update_progress_bar_with_serializable_items!(setup_pb : shards, coeffs);
+
+    plnk::closure! { crate::timeit_and_discard_output! { recode_with_coeffs(&shards, &coeffs) } }
 }

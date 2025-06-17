@@ -1,32 +1,68 @@
-use benches::fec::Encoding;
-use clap::{command, Parser, Subcommand};
+use std::path::PathBuf;
 
 use ark_ec::pairing::Pairing;
 use ark_poly::univariate::DensePolynomial;
+use benches::fec::Encoding;
+use clap::{command, Parser, Subcommand};
+use indicatif::{ProgressBar, ProgressStyle};
+use itertools::iproduct;
 
 mod benches;
 mod curves;
 mod fields;
+mod macros;
+mod pretty;
 mod random;
 
-use curves::Curve;
-use itertools::iproduct;
+use crate::{
+    benches::{curve_group, field},
+    curves::Curve,
+};
+
+fn parse_hex(hex: &str, flag: &str) -> Vec<u8> {
+    match hex::decode(hex) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            eprintln!("Failed to decode `--{}` hex string: {}", flag, e);
+            std::process::exit(1)
+        }
+    }
+}
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
+    #[arg(short, long)]
+    nb_measurements: usize,
+
+    /// the hash of the Git repo
+    #[arg(long)]
+    git: String,
+    /// the hash of the source code
+    #[arg(long)]
+    src: String,
+    /// the hash of the CPU
+    #[arg(long)]
+    cpu: String,
+    /// the Rust build
+    #[arg(long)]
+    rust_build: String,
+
+    #[arg(long)]
+    overwrite: bool,
+
+    #[arg(short, long)]
+    output: Option<PathBuf>,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Clone, Debug)]
 enum Commands {
     Setup {
         #[arg(short, long, num_args = 1.., value_delimiter = ' ')]
         degrees: Vec<usize>,
-
-        #[arg(short, long)]
-        nb_measurements: usize,
 
         #[arg(short, long, num_args=1.., value_delimiter = ',')]
         curves: Vec<Curve>,
@@ -35,32 +71,32 @@ enum Commands {
         #[arg(short, long, num_args = 1.., value_delimiter = ' ')]
         degrees: Vec<usize>,
 
-        #[arg(short, long)]
-        nb_measurements: usize,
-
         #[arg(short, long, num_args=1.., value_delimiter = ',')]
         curves: Vec<Curve>,
     },
     Field {
-        #[arg(short, long)]
-        nb_measurements: usize,
-
         #[arg(short, long, num_args=1.., value_delimiter = ',')]
         curves: Vec<Curve>,
+
+        #[arg(short, long, num_args=1.., value_delimiter = ',')]
+        ops: Vec<field::Operation>,
+
+        #[arg(short, long)]
+        all: bool,
     },
     Group {
-        #[arg(short, long)]
-        nb_measurements: usize,
-
         #[arg(short, long, num_args=1.., value_delimiter = ',')]
         curves: Vec<Curve>,
+
+        #[arg(short, long, num_args=1.., value_delimiter = ',')]
+        ops: Vec<curve_group::Operation>,
+
+        #[arg(short, long)]
+        all: bool,
     },
     Linalg {
         #[arg(short, long, num_args = 1.., value_delimiter = ' ')]
         sizes: Vec<usize>,
-
-        #[arg(short, long)]
-        nb_measurements: usize,
 
         #[arg(short, long, num_args=1.., value_delimiter = ',')]
         curves: Vec<Curve>,
@@ -75,14 +111,14 @@ enum Commands {
         #[arg(short, long, num_args = 1.., value_delimiter = ' ')]
         rhos: Vec<f64>,
 
-        #[arg(short, long)]
-        nb_measurements: usize,
-
         #[arg(short, long, num_args=1.., value_delimiter = ',')]
         curves: Vec<Curve>,
 
         #[arg(short, long)]
         encoding: Encoding,
+
+        #[arg(long, num_args=1.., value_delimiter = ',', default_values = vec!["encode", "decode"])]
+        steps: Vec<String>,
     },
     Recoding {
         #[arg(short, long, num_args = 1.., value_delimiter = ' ')]
@@ -93,9 +129,6 @@ enum Commands {
 
         #[arg(long, num_args = 1.., value_delimiter = ' ')]
         shards: Vec<usize>,
-
-        #[arg(short, long)]
-        nb_measurements: usize,
 
         #[arg(short, long, num_args=1.., value_delimiter = ',')]
         curves: Vec<Curve>,
@@ -110,11 +143,11 @@ enum Commands {
         #[arg(short, long, num_args = 1.., value_delimiter = ' ')]
         rhos: Vec<f64>,
 
-        #[arg(short, long)]
-        nb_measurements: usize,
-
         #[arg(short, long, num_args=1.., value_delimiter = ',')]
         curves: Vec<Curve>,
+
+        #[arg(long, num_args=1.., value_delimiter = ',', default_values = vec!["commit", "proof", "verify"])]
+        steps: Vec<String>,
     },
     #[allow(clippy::upper_case_acronyms)]
     KZG {
@@ -127,11 +160,11 @@ enum Commands {
         #[arg(short, long, num_args = 1.., value_delimiter = ' ')]
         rhos: Vec<f64>,
 
-        #[arg(short, long)]
-        nb_measurements: usize,
-
         #[arg(short, long, num_args=1.., value_delimiter = ',')]
         curves: Vec<Curve>,
+
+        #[arg(long, num_args=1.., value_delimiter = ',', default_values = vec!["commit", "proof", "verify"])]
+        steps: Vec<String>,
     },
     Aplonk {
         #[arg(short, long, num_args = 1.., value_delimiter = ' ')]
@@ -143,12 +176,30 @@ enum Commands {
         #[arg(short, long, num_args = 1.., value_delimiter = ' ')]
         rhos: Vec<f64>,
 
-        #[arg(short, long)]
-        nb_measurements: usize,
-
         #[arg(short, long, num_args=1.., value_delimiter = ',')]
         curves: Vec<Curve>,
+
+        #[arg(long, num_args=1.., value_delimiter = ',', default_values = vec!["commit", "proof", "verify"])]
+        steps: Vec<String>,
     },
+}
+
+impl std::fmt::Display for Commands {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let repr = match self {
+            Self::Setup { .. } => "setup",
+            Self::Commit { .. } => "commit",
+            Self::Field { .. } => "field",
+            Self::Group { .. } => "group",
+            Self::Linalg { .. } => "linalg",
+            Self::Fec { .. } => "fec",
+            Self::Recoding { .. } => "recoding",
+            Self::SemiAVID { .. } => "semi_avid",
+            Self::KZG { .. } => "kzg",
+            Self::Aplonk { .. } => "aplonk",
+        };
+        write!(f, "{}", repr)
+    }
 }
 
 macro_rules! unsupported {
@@ -158,362 +209,566 @@ macro_rules! unsupported {
     }};
 }
 
-#[rustfmt::skip]
-fn setup(degrees: &[usize], nb_measurements: usize, curves: &[Curve]) {
-    macro_rules! bench {
-        ($c:ident, $e:ident, $d:expr, $label:tt) => {
-            benches::setup::ark_run::<$c::$e, DensePolynomial<<$c::$e as Pairing>::ScalarField>>(
-                $d,
-                nb_measurements,
-                $label,
-            )
-        };
-        ($c:ident, $f:ident, $g:ident, $d:expr, $label:tt) => {
-            benches::setup::run::<$c::$f, $c::$g, DensePolynomial<$c::$f>>($d, nb_measurements, $label)
-        };
-    }
-
+fn setup(degrees: &[usize], curves: &[Curve]) -> Vec<plnk::LabeledFnTimed<()>> {
+    let mut benches = Vec::new();
     for (&deg, curve) in iproduct!(degrees, curves) {
-        match curve {
-            Curve::ARKBLS12381 => { bench!(ark_bls12_381,      Bls12_381                   , deg , "BLS12-381"  ) }
-            Curve::ARKBN254    => { bench!(ark_bn254,          Bn254                       , deg , "BN254"      ) }
-            Curve::BLS12381    => { bench!(ark_bls12_381,      Fr,        G1Projective     , deg , "BLS12-381"  ) }
-            Curve::BN254       => { bench!(ark_bn254,          Fr,        G1Projective     , deg , "BN254"      ) }
-            Curve::CP6782      => { bench!(ark_cp6_782,        Fr,        G1Projective     , deg , "CP6-782"    ) }
-            Curve::EDOnMnt4298 => { bench!(ark_ed_on_mnt4_298, Fr,        EdwardsProjective, deg , "ED-MNT4-298") }
+        macro_rules! bench {
+            ($c:ident, E=$e:ident) => {
+                benches::setup::ark_build::<$c::$e, DensePolynomial<<$c::$e as Pairing>::ScalarField>>(
+                    deg,
+                )
+            };
+            ($c:ident, F=$f:ident, G1=$g:ident) => {
+                benches::setup::build::<$c::$f, $c::$g, DensePolynomial<$c::$f>>(deg)
+            };
+        }
+        #[rustfmt::skip]
+        let func = match curve {
+            Curve::ARKBLS12381 => bench!(ark_bls12_381,      E = Bls12_381                 ),
+            Curve::ARKBN254    => bench!(ark_bn254,          E = Bn254                     ),
+            Curve::BLS12381    => bench!(ark_bls12_381,      F = Fr, G1 = G1Projective     ),
+            Curve::BN254       => bench!(ark_bn254,          F = Fr, G1 = G1Projective     ),
+            Curve::CP6782      => bench!(ark_cp6_782,        F = Fr, G1 = G1Projective     ),
+            Curve::EDOnMnt4298 => bench!(ark_ed_on_mnt4_298, F = Fr, G1 = EdwardsProjective),
+            Curve::MNT4753     => bench!(ark_mnt4_753,       F = Fr, G1 = G1Projective     ),
+            Curve::Pallas      => bench!(ark_pallas,         F = Fr, G1 = Projective       ),
+            Curve::SECP256K1   => bench!(ark_secp256k1,      F = Fr, G1 = Projective       ),
+            Curve::SECP256R1   => bench!(ark_secp256r1,      F = Fr, G1 = Projective       ),
+            Curve::Vesta       => bench!(ark_vesta,          F = Fr, G1 = Projective       ),
+
             Curve::FQ128       => unsupported!("FQ128", "setup"),
-            Curve::MNT4753     => { bench!(ark_mnt4_753,       Fr,        G1Projective     , deg , "MNT4-753"   ) }
-            Curve::Pallas      => { bench!(ark_pallas,         Fr,        Projective       , deg , "PALLAS"     ) }
-            Curve::SECP256K1   => { bench!(ark_secp256k1,      Fr,        Projective       , deg , "SECP256-K1" ) }
-            Curve::SECP256R1   => { bench!(ark_secp256r1,      Fr,        Projective       , deg , "SECP256-R1" ) }
-            Curve::Vesta       => { bench!(ark_vesta,          Fr,        Projective       , deg , "VESTA"      ) }
-        }
+        };
+
+        benches.push(plnk::LabeledFnTimed {
+            label: plnk::label! { curve: curve.to_string(), degree: deg }.to_string(),
+            func,
+        });
     }
+
+    benches
 }
 
-#[rustfmt::skip]
-fn commit(degrees: &[usize], nb_measurements: usize, curves: &[Curve]) {
-    macro_rules! bench {
-        ($c:ident, G1=$g:ident, $d:expr, name=$n:expr) => {
-            benches::commit::run::<$c::Fr, $c::$g, DensePolynomial<$c::Fr>>($d, nb_measurements, $n)
-        };
-        ($c:ident, G1=$g:ident, E=$e:ident, $d:expr, name=$n:expr) => {
-            benches::commit::ark_run::<$c::$e, DensePolynomial<<$c::$e as Pairing>::ScalarField>>($d, nb_measurements, concat!($n, "-ark"))
-        };
-    }
+fn commit(degrees: &[usize], curves: &[Curve]) -> Vec<plnk::LabeledFnTimed<()>> {
+    let style = ProgressStyle::with_template(
+        "[{elapsed_precise}] {bar:40.yellow/orange} {pos:>10}/{len:10} {msg}",
+    )
+    .unwrap()
+    .progress_chars("##-");
+    let setup_pb = ProgressBar::new((curves.len() * degrees.len()) as u64)
+        .with_style(style.clone())
+        .with_message("(setup) building ZK setups 0 b 0");
 
+    let mut benches = Vec::new();
     for (&deg, curve) in iproduct!(degrees, curves) {
-        match curve {
-            Curve::ARKBLS12381 => { bench!(ark_bls12_381      , G1 = G1Projective      , E = Bls12_381 , deg, name = "BLS12-381"  ) }
-            Curve::ARKBN254    => { bench!(ark_bn254          , G1 = G1Projective      , E = Bn254     , deg, name = "BN254"      ) }
-            Curve::BLS12381    => { bench!(ark_bls12_381      , G1 = G1Projective                      , deg, name = "BLS12-381"  ) }
-            Curve::BN254       => { bench!(ark_bn254          , G1 = G1Projective                      , deg, name = "BN254"      ) }
-            Curve::CP6782      => { bench!(ark_cp6_782        , G1 = G1Projective                      , deg, name = "CP6-782"    ) }
-            Curve::EDOnMnt4298 => { bench!(ark_ed_on_mnt4_298 , G1 = EdwardsProjective                 , deg, name = "ED-MNT4-298") }
+        macro_rules! bench {
+            ($c:ident, G1=$g:ident) => {
+                benches::commit::build::<$c::Fr, $c::$g, DensePolynomial<$c::Fr>>(deg, &setup_pb)
+            };
+            ($c:ident, E=$e:ident) => {
+                benches::commit::ark_build::<
+                    $c::$e,
+                    DensePolynomial<<$c::$e as Pairing>::ScalarField>,
+                >(deg, &setup_pb)
+            };
+        }
+        #[rustfmt::skip]
+        let func = match curve {
+            Curve::ARKBLS12381 => bench!(ark_bls12_381      ,  E = Bls12_381        ),
+            Curve::ARKBN254    => bench!(ark_bn254          ,  E = Bn254            ),
+            Curve::BLS12381    => bench!(ark_bls12_381      , G1 = G1Projective     ),
+            Curve::BN254       => bench!(ark_bn254          , G1 = G1Projective     ),
+            Curve::CP6782      => bench!(ark_cp6_782        , G1 = G1Projective     ),
+            Curve::EDOnMnt4298 => bench!(ark_ed_on_mnt4_298 , G1 = EdwardsProjective),
+            Curve::MNT4753     => bench!(ark_mnt4_753       , G1 = G1Projective     ),
+            Curve::Pallas      => bench!(ark_pallas         , G1 = Projective       ),
+            Curve::SECP256K1   => bench!(ark_secp256k1      , G1 = Projective       ),
+            Curve::SECP256R1   => bench!(ark_secp256r1      , G1 = Projective       ),
+            Curve::Vesta       => bench!(ark_vesta          , G1 = Projective       ),
+
             Curve::FQ128       => unsupported!("FQ128", "commit"),
-            Curve::MNT4753     => { bench!(ark_mnt4_753       , G1 = G1Projective                      , deg, name = "MNT4-753"   ) }
-            Curve::Pallas      => { bench!(ark_pallas         , G1 = Projective                        , deg, name = "PALLAS"     ) }
-            Curve::SECP256K1   => { bench!(ark_secp256k1      , G1 = Projective                        , deg, name = "SECP256-K1" ) }
-            Curve::SECP256R1   => { bench!(ark_secp256r1      , G1 = Projective                        , deg, name = "SECP256-R1" ) }
-            Curve::Vesta       => { bench!(ark_vesta          , G1 = Projective                        , deg, name = "VESTA"      ) }
-        }
-    }
-}
-
-#[rustfmt::skip]
-fn field(nb_measurements: usize, curves: &[Curve]) {
-    let bencher = plnk::Bencher::new(nb_measurements);
-
-    macro_rules! bench {
-        ($f:path, name=$name:expr) => {
-            benches::field::run::<$f>(&bencher.with_name(plnk::label!{ curve: $name }))
         };
+
+        benches.push(plnk::LabeledFnTimed {
+            label: plnk::label! { curve: curve.to_string(), degree: deg }.to_string(),
+            func,
+        });
     }
-    for curve in curves {
-        match curve {
-            Curve::ARKBLS12381 => unsupported!("ARKBLS12381", "field"),
-            Curve::ARKBN254    => unsupported!("ARKBN254", "field"),
-            Curve::BLS12381    => { bench!(ark_bls12_381::Fr,         name = "BLS12-381"  ) }
-            Curve::BN254       => { bench!(ark_bn254::Fr,             name = "BN254"      ) }
-            Curve::CP6782      => { bench!(ark_cp6_782::Fr,           name = "CP6-782"    ) }
-            Curve::EDOnMnt4298 => { bench!(ark_ed_on_mnt4_298::Fr,    name = "ED-MNT4-298") }
-            Curve::FQ128       => { bench!(fields::Fq128,             name = "Fq128"      ) }
-            Curve::MNT4753     => { bench!(ark_mnt4_753::Fr,          name = "MNT4-753"   ) }
-            Curve::Pallas      => { bench!(ark_pallas::Fr,            name = "PALLAS"     ) }
-            Curve::SECP256K1   => { bench!(ark_secp256k1::Fr,         name = "SECP256-K1" ) }
-            Curve::SECP256R1   => { bench!(ark_secp256r1::Fr,         name = "SECP256-R1" ) }
-            Curve::Vesta       => { bench!(ark_vesta::Fr,             name = "VESTA"      ) }
-        }
-    }
+
+    setup_pb.finish_with_message(format!("{} done", setup_pb.message()));
+
+    benches
 }
 
-#[rustfmt::skip]
-fn curve_group(nb_measurements: usize, curves: &[Curve]) {
-    let bencher = plnk::Bencher::new(nb_measurements);
-
+fn field(curves: &[Curve], ops: &[field::Operation]) -> Vec<plnk::LabeledFnTimed<()>> {
     macro_rules! bench {
-        ($c:ident, G1=$g:ident, name=$n:expr) => {
-            benches::curve_group::run::<$c::Fr, $c::$g>(&bencher.with_name(plnk::label! { curve: $n }))
+        ($f:path) => {
+            benches::field::build::<$f>(ops)
         };
     }
 
+    let mut benches = Vec::new();
     for curve in curves {
-        match curve {
-            Curve::ARKBLS12381 => unsupported!("ARKBLS12381", "group"),
-            Curve::ARKBN254    => unsupported!("ARKBN254", "group"),
-            Curve::BLS12381    => { bench!(ark_bls12_381      , G1 = G1Projective      , name = "BLS12-381"  ) }
-            Curve::BN254       => { bench!(ark_bn254          , G1 = G1Projective      , name = "BN254"      ) }
-            Curve::CP6782      => { bench!(ark_cp6_782        , G1 = G1Projective      , name = "CP6-782"    ) }
-            Curve::EDOnMnt4298 => { bench!(ark_ed_on_mnt4_298 , G1 = EdwardsProjective , name = "ED-MNT4-298") }
+        #[rustfmt::skip]
+        let funcs = match curve {
+            Curve::ARKBLS12381 => bench!(ark_bls12_381::Fr),
+            Curve::ARKBN254    => bench!(ark_bn254::Fr),
+            Curve::BLS12381    => bench!(ark_bls12_381::Fr),
+            Curve::BN254       => bench!(ark_bn254::Fr),
+            Curve::CP6782      => bench!(ark_cp6_782::Fr),
+            Curve::EDOnMnt4298 => bench!(ark_ed_on_mnt4_298::Fr),
+            Curve::FQ128       => bench!(fields::Fq128),
+            Curve::MNT4753     => bench!(ark_mnt4_753::Fr),
+            Curve::Pallas      => bench!(ark_pallas::Fr),
+            Curve::SECP256K1   => bench!(ark_secp256k1::Fr),
+            Curve::SECP256R1   => bench!(ark_secp256r1::Fr),
+            Curve::Vesta       => bench!(ark_vesta::Fr),
+        };
+
+        for (op, func) in funcs {
+            benches.push(plnk::LabeledFnTimed {
+                label: plnk::label! { curve: curve.to_string(), operation: op }.to_string(),
+                func,
+            });
+        }
+    }
+
+    benches
+}
+
+fn curve_group(curves: &[Curve], ops: &[curve_group::Operation]) -> Vec<plnk::LabeledFnTimed<()>> {
+    macro_rules! bench {
+        ($c:ident, G1=$g:ident) => {
+            benches::curve_group::build::<$c::Fr, $c::$g>(ops)
+        };
+    }
+
+    let mut benches = Vec::new();
+    for curve in curves {
+        #[rustfmt::skip]
+        let funcs = match curve {
+            Curve::ARKBLS12381 => bench!(ark_bls12_381      , G1 = G1Projective     ),
+            Curve::ARKBN254    => bench!(ark_bn254          , G1 = G1Projective     ),
+            Curve::BLS12381    => bench!(ark_bls12_381      , G1 = G1Projective     ),
+            Curve::BN254       => bench!(ark_bn254          , G1 = G1Projective     ),
+            Curve::CP6782      => bench!(ark_cp6_782        , G1 = G1Projective     ),
+            Curve::EDOnMnt4298 => bench!(ark_ed_on_mnt4_298 , G1 = EdwardsProjective),
+            Curve::MNT4753     => bench!(ark_mnt4_753       , G1 = G1Projective     ),
+            Curve::Pallas      => bench!(ark_pallas         , G1 = Projective       ),
+            Curve::SECP256K1   => bench!(ark_secp256k1      , G1 = Projective       ),
+            Curve::SECP256R1   => bench!(ark_secp256r1      , G1 = Projective       ),
+            Curve::Vesta       => bench!(ark_vesta          , G1 = Projective       ),
+
             Curve::FQ128       => unsupported!("FQ128", "group"),
-            Curve::MNT4753     => { bench!(ark_mnt4_753       , G1 = G1Projective      , name = "MNT4-753"   ) }
-            Curve::Pallas      => { bench!(ark_pallas         , G1 = Projective        , name = "PALLAS"     ) }
-            Curve::SECP256K1   => { bench!(ark_secp256k1      , G1 = Projective        , name = "SECP256-K1" ) }
-            Curve::SECP256R1   => { bench!(ark_secp256r1      , G1 = Projective        , name = "SECP256-R1" ) }
-            Curve::Vesta       => { bench!(ark_vesta          , G1 = Projective        , name = "VESTA"      ) }
+        };
+
+        for (op, func) in funcs {
+            benches.push(plnk::LabeledFnTimed {
+                label: plnk::label! { curve: curve.to_string(), operation: op }.to_string(),
+                func,
+            });
         }
     }
+
+    benches
 }
 
-#[rustfmt::skip]
-fn linalg(sizes: &[usize], nb_measurements: usize, curves: &[Curve]) {
-    let b = plnk::Bencher::new(nb_measurements);
-
-    macro_rules! bench {
-        ($f:path : $name:tt, $n: expr) => {{
-            let name = plnk::label! { curve: $name, size : $n };
-            benches::linalg::run_inverse::<$f>(&b.with_name(name), $n);
-            benches::linalg::run_transpose::<$f>(&b.with_name(name), $n);
-            benches::linalg::run_multiply::<$f>(&b.with_name(name), $n);
-        }};
-    }
-
+fn linalg(sizes: &[usize], curves: &[Curve]) -> Vec<plnk::LabeledFnTimed<()>> {
+    let mut benches = Vec::new();
     for (&size, curve) in iproduct!(sizes, curves) {
-        match curve {
-            Curve::ARKBLS12381 => { bench!(ark_bls12_381::Fr       : "BLS12-381"   , size) }
-            Curve::ARKBN254    => { bench!(ark_bn254::Fr           : "BN254"       , size) }
-            Curve::BLS12381    => { bench!(ark_bls12_381::Fr       : "BLS12-381"   , size) }
-            Curve::BN254       => { bench!(ark_bn254::Fr           : "BN254"       , size) }
-            Curve::CP6782      => { bench!(ark_cp6_782::Fr         : "CP6-782"     , size) }
-            Curve::EDOnMnt4298 => { bench!(ark_ed_on_mnt4_298::Fr  : "ED-MNT4-298" , size) }
-            Curve::FQ128       => unsupported!("FQ128", "linalg"),
-            Curve::MNT4753     => { bench!(ark_mnt4_753::Fr        : "MNT4-753"    , size) }
-            Curve::Pallas      => { bench!(ark_pallas::Fr          : "PALLAS"      , size) }
-            Curve::SECP256K1   => { bench!(ark_secp256k1::Fr       : "SECP256-K1"  , size) }
-            Curve::SECP256R1   => { bench!(ark_secp256r1::Fr       : "SECP256-R1"  , size) }
-            Curve::Vesta       => { bench!(ark_vesta::Fr           : "VESTA"       , size) }
+        macro_rules! bench {
+            ($f:path) => {
+                vec![
+                    ("inverse", benches::linalg::inverse::<$f>(size)),
+                    ("transpose", benches::linalg::transpose::<$f>(size)),
+                    ("multiply", benches::linalg::multiply::<$f>(size)),
+                ]
+            };
+        }
+        #[rustfmt::skip]
+        let funcs = match curve {
+            Curve::ARKBLS12381 => bench!(ark_bls12_381::Fr),
+            Curve::ARKBN254    => bench!(ark_bn254::Fr),
+            Curve::BLS12381    => bench!(ark_bls12_381::Fr),
+            Curve::BN254       => bench!(ark_bn254::Fr),
+            Curve::CP6782      => bench!(ark_cp6_782::Fr),
+            Curve::EDOnMnt4298 => bench!(ark_ed_on_mnt4_298::Fr),
+            Curve::FQ128       => bench!(fields::Fq128),
+            Curve::MNT4753     => bench!(ark_mnt4_753::Fr),
+            Curve::Pallas      => bench!(ark_pallas::Fr),
+            Curve::SECP256K1   => bench!(ark_secp256k1::Fr),
+            Curve::SECP256R1   => bench!(ark_secp256r1::Fr),
+            Curve::Vesta       => bench!(ark_vesta::Fr),
+        };
+        for (op, func) in funcs {
+            benches.push(plnk::LabeledFnTimed {
+                label: plnk::label! { curve: curve.to_string(), operation: op, size: size }
+                    .to_string(),
+                func,
+            });
         }
     }
+
+    benches
 }
 
-#[rustfmt::skip]
-fn fec(sizes: &[usize], params: &[(usize, usize)], nb_measurements: usize, curves: &[Curve], encoding: benches::fec::Encoding) {
-    let b = plnk::Bencher::new(nb_measurements);
-
+fn fec(
+    sizes: &[usize],
+    params: &[(usize, usize)],
+    curves: &[Curve],
+    encoding: benches::fec::Encoding,
+    steps: &[String],
+) -> Vec<plnk::LabeledFnTimed<()>> {
+    let mut benches = Vec::new();
     for (&nb_bytes, (k, n), curve) in iproduct!(sizes, params, curves) {
-        match curve {
+        macro_rules! bench {
+            ($f:path) => {
+                benches::fec::build::<$f>(nb_bytes, *k, *n, &encoding)
+            };
+        }
+        #[rustfmt::skip]
+        let funcs = match curve {
+            Curve::BLS12381    => bench!(ark_bls12_381::Fr),
+            Curve::BN254       => bench!(ark_bn254::Fr),
+            Curve::CP6782      => bench!(ark_cp6_782::Fr),
+            Curve::EDOnMnt4298 => bench!(ark_ed_on_mnt4_298::Fr),
+            Curve::FQ128       => bench!(fields::Fq128),
+            Curve::MNT4753     => bench!(ark_mnt4_753::Fr),
+            Curve::Pallas      => bench!(ark_pallas::Fr),
+            Curve::SECP256K1   => bench!(ark_secp256k1::Fr),
+            Curve::SECP256R1   => bench!(ark_secp256r1::Fr),
+            Curve::Vesta       => bench!(ark_vesta::Fr),
+
             Curve::ARKBLS12381 => unsupported!("ARKBLS12381", "fec"),
             Curve::ARKBN254    => unsupported!("ARKBN254", "fec"),
-            Curve::BLS12381    => { benches::fec::run::<ark_bls12_381::Fr>     (&b.with_name(plnk::label! { curve: "BLS12-381" }),   nb_bytes, *k, *n, &encoding) }
-            Curve::BN254       => { benches::fec::run::<ark_bn254::Fr>         (&b.with_name(plnk::label! { curve: "BN254" }),       nb_bytes, *k, *n, &encoding) }
-            Curve::CP6782      => { benches::fec::run::<ark_cp6_782::Fr>       (&b.with_name(plnk::label! { curve: "CP6-782" }),     nb_bytes, *k, *n, &encoding) }
-            Curve::EDOnMnt4298 => { benches::fec::run::<ark_ed_on_mnt4_298::Fr>(&b.with_name(plnk::label! { curve: "ED-MNT4-298" }), nb_bytes, *k, *n, &encoding) }
-            Curve::FQ128       => { benches::fec::run::<fields::Fq128>         (&b.with_name(plnk::label! { curve: "Fq128" }),       nb_bytes, *k, *n, &encoding) }
-            Curve::MNT4753     => { benches::fec::run::<ark_mnt4_753::Fr>      (&b.with_name(plnk::label! { curve: "MNT4-753" }),    nb_bytes, *k, *n, &encoding) }
-            Curve::Pallas      => { benches::fec::run::<ark_pallas::Fr>        (&b.with_name(plnk::label! { curve: "PALLAS" }),      nb_bytes, *k, *n, &encoding) }
-            Curve::SECP256K1   => { benches::fec::run::<ark_secp256k1::Fr>     (&b.with_name(plnk::label! { curve: "SECP256-K1" }),  nb_bytes, *k, *n, &encoding) }
-            Curve::SECP256R1   => { benches::fec::run::<ark_secp256r1::Fr>     (&b.with_name(plnk::label! { curve: "SECP256-R1" }),  nb_bytes, *k, *n, &encoding) }
-            Curve::Vesta       => { benches::fec::run::<ark_vesta::Fr>         (&b.with_name(plnk::label! { curve: "VESTA" }),       nb_bytes, *k, *n, &encoding) }
+        };
+        for (step, func) in funcs {
+            if steps.contains(&step) {
+                benches.push(plnk::LabeledFnTimed {
+                    label: plnk::label! {
+                        curve: curve.to_string(),
+                        nb_bytes: nb_bytes,
+                        k: k,
+                        n: n,
+                        step: step,
+                    }
+                    .to_string(),
+                    func,
+                });
+            }
         }
     }
+
+    benches
 }
 
-#[rustfmt::skip]
-fn recoding(sizes: &[usize],ks: &[usize], shards: &[usize], nb_measurements: usize, curves: &[Curve]) {
-    let bencher = plnk::Bencher::new(nb_measurements);
+fn recoding(
+    sizes: &[usize],
+    ks: &[usize],
+    shards: &[usize],
+    curves: &[Curve],
+) -> Vec<plnk::LabeledFnTimed<()>> {
+    let style = ProgressStyle::with_template(
+        "[{elapsed_precise}] {bar:40.yellow/orange} {pos:>10}/{len:10} {msg}",
+    )
+    .unwrap()
+    .progress_chars("##-");
+    let setup_pb = ProgressBar::new((sizes.len() * ks.len() * shards.len() * curves.len()) as u64)
+        .with_style(style.clone())
+        .with_message("(setup) creating shards 0 b 0");
 
+    let mut benches = Vec::new();
     for (&nb_bytes, &nb_shards, &k, curve) in iproduct!(sizes, shards, ks, curves) {
-        match curve {
-            Curve::ARKBLS12381 => { benches::recoding::run::<ark_bls12_381::Fr     >(&bencher.with_name(plnk::label! { curve: "BLS12-381"   }), nb_bytes, k, nb_shards) }
-            Curve::ARKBN254    => { benches::recoding::run::<ark_bn254::Fr         >(&bencher.with_name(plnk::label! { curve: "BN254"       }), nb_bytes, k, nb_shards) }
-            Curve::BLS12381    => { benches::recoding::run::<ark_bls12_381::Fr     >(&bencher.with_name(plnk::label! { curve: "BLS12-381"   }), nb_bytes, k, nb_shards) }
-            Curve::BN254       => { benches::recoding::run::<ark_bn254::Fr         >(&bencher.with_name(plnk::label! { curve: "BN254"       }), nb_bytes, k, nb_shards) }
-            Curve::CP6782      => { benches::recoding::run::<ark_cp6_782::Fr       >(&bencher.with_name(plnk::label! { curve: "CP6-782"     }), nb_bytes, k, nb_shards) }
-            Curve::EDOnMnt4298 => { benches::recoding::run::<ark_ed_on_mnt4_298::Fr>(&bencher.with_name(plnk::label! { curve: "ED-MNT4-298" }), nb_bytes, k, nb_shards) }
-            Curve::FQ128       => { benches::recoding::run::<fields::Fq128         >(&bencher.with_name(plnk::label! { curve: "FQ128"       }), nb_bytes, k, nb_shards) }
-            Curve::MNT4753     => { benches::recoding::run::<ark_mnt4_753::Fr      >(&bencher.with_name(plnk::label! { curve: "MNT4-753"    }), nb_bytes, k, nb_shards) }
-            Curve::Pallas      => { benches::recoding::run::<ark_pallas::Fr        >(&bencher.with_name(plnk::label! { curve: "PALLAS"      }), nb_bytes, k, nb_shards) }
-            Curve::SECP256K1   => { benches::recoding::run::<ark_secp256k1::Fr     >(&bencher.with_name(plnk::label! { curve: "SECP256-K1"  }), nb_bytes, k, nb_shards) }
-            Curve::SECP256R1   => { benches::recoding::run::<ark_secp256r1::Fr     >(&bencher.with_name(plnk::label! { curve: "SECP256-R1"  }), nb_bytes, k, nb_shards) }
-            Curve::Vesta       => { benches::recoding::run::<ark_vesta::Fr         >(&bencher.with_name(plnk::label! { curve: "VESTA"       }), nb_bytes, k, nb_shards) }
+        macro_rules! bench {
+            ($f:path) => {
+                benches::recoding::build::<$f>(nb_bytes, k, nb_shards, &setup_pb)
+            };
         }
+        #[rustfmt::skip]
+        let func = match curve {
+            Curve::ARKBLS12381 => bench!(ark_bls12_381::Fr     ),
+            Curve::ARKBN254    => bench!(ark_bn254::Fr         ),
+            Curve::BLS12381    => bench!(ark_bls12_381::Fr     ),
+            Curve::BN254       => bench!(ark_bn254::Fr         ),
+            Curve::CP6782      => bench!(ark_cp6_782::Fr       ),
+            Curve::EDOnMnt4298 => bench!(ark_ed_on_mnt4_298::Fr),
+            Curve::FQ128       => bench!(fields::Fq128         ),
+            Curve::MNT4753     => bench!(ark_mnt4_753::Fr      ),
+            Curve::Pallas      => bench!(ark_pallas::Fr        ),
+            Curve::SECP256K1   => bench!(ark_secp256k1::Fr     ),
+            Curve::SECP256R1   => bench!(ark_secp256r1::Fr     ),
+            Curve::Vesta       => bench!(ark_vesta::Fr         ),
+        };
+        benches.push(plnk::LabeledFnTimed {
+            label: plnk::label! {
+                curve: curve.to_string(),
+                nb_bytes: nb_bytes,
+                nb_shards: nb_shards,
+                k: k,
+                step: "recode",
+            }
+            .to_string(),
+            func,
+        });
     }
+
+    benches
 }
 
-#[rustfmt::skip]
-fn semi_avid(sizes: &[usize], params: &[(usize, usize)], nb_measurements: usize, curves: &[Curve]) {
-    macro_rules! bench {
-        ($field:path, $group:path : $name:tt, $k:expr, $n:expr, $nb_bytes:expr) => {{
-            let b = plnk::Bencher::new(nb_measurements).with_name(plnk::label! { curve: $name });
-            benches::semi_avid::run::<$field, $group, DensePolynomial<$field>>(&b, $k, $n, $nb_bytes)
-        }};
-    }
-
+fn semi_avid(
+    sizes: &[usize],
+    params: &[(usize, usize)],
+    curves: &[Curve],
+    steps: &[String],
+) -> Vec<plnk::LabeledFnTimed<()>> {
+    let mut benches = Vec::new();
     for (&nb_bytes, (k, n), curve) in iproduct!(sizes, params, curves) {
-        match curve {
+        macro_rules! bench {
+            ($c:ident, F=$f:ident, G1=$g:ident) => {{
+                benches::semi_avid::build::<$c::$f, $c::$g, DensePolynomial<$c::$f>>(
+                    *k, *n, nb_bytes,
+                )
+            }};
+        }
+        #[rustfmt::skip]
+        let funcs = match curve {
+            Curve::BLS12381    => bench!(ark_bls12_381     , F = Fr, G1 = G1Projective),
+            Curve::BN254       => bench!(ark_bn254         , F = Fr, G1 = G1Projective),
+            Curve::CP6782      => bench!(ark_cp6_782       , F = Fr, G1 = G1Projective),
+            Curve::EDOnMnt4298 => bench!(ark_ed_on_mnt4_298, F = Fr, G1 = EdwardsProjective),
+            Curve::MNT4753     => bench!(ark_mnt4_753      , F = Fr, G1 = G1Projective),
+            Curve::Pallas      => bench!(ark_pallas        , F = Fr, G1 = Projective),
+            Curve::SECP256K1   => bench!(ark_secp256k1     , F = Fr, G1 = Projective),
+            Curve::SECP256R1   => bench!(ark_secp256r1     , F = Fr, G1 = Projective),
+            Curve::Vesta       => bench!(ark_vesta         , F = Fr, G1 = Projective),
+
             Curve::ARKBLS12381 => unsupported!("ARKBLS12381", "semi_avid"),
             Curve::ARKBN254    => unsupported!("ARKBN254", "semi_avid"),
-            Curve::BLS12381    => { bench!(ark_bls12_381::Fr,      ark_bls12_381::G1Projective           : "BLS12-381"  , *k, *n, nb_bytes) }
-            Curve::BN254       => { bench!(ark_bn254::Fr,          ark_bn254::G1Projective               : "BN254"      , *k, *n, nb_bytes) }
-            Curve::CP6782      => { bench!(ark_cp6_782::Fr,        ark_cp6_782::G1Projective             : "CP6-782"    , *k, *n, nb_bytes) }
-            Curve::EDOnMnt4298 => { bench!(ark_ed_on_mnt4_298::Fr, ark_ed_on_mnt4_298::EdwardsProjective : "ED-MNT4-298", *k, *n, nb_bytes) }
             Curve::FQ128       => unsupported!("FQ128", "semi_avid"),
-            Curve::MNT4753     => { bench!(ark_mnt4_753::Fr,       ark_mnt4_753::G1Projective            : "MNT4-753"   , *k, *n, nb_bytes) }
-            Curve::Pallas      => { bench!(ark_pallas::Fr,         ark_pallas::Projective                : "PALLAS"     , *k, *n, nb_bytes) }
-            Curve::SECP256K1   => { bench!(ark_secp256k1::Fr,      ark_secp256k1::Projective             : "SECP256-K1" , *k, *n, nb_bytes) }
-            Curve::SECP256R1   => { bench!(ark_secp256r1::Fr,      ark_secp256r1::Projective             : "SECP256-R1" , *k, *n, nb_bytes) }
-            Curve::Vesta       => { bench!(ark_vesta::Fr,          ark_vesta::Projective                 : "VESTA"      , *k, *n, nb_bytes) }
+        };
+        for (step, func) in funcs {
+            if steps.contains(&step) {
+                benches.push(plnk::LabeledFnTimed {
+                    label: plnk::label! {
+                        protocol: "semi_avid",
+                        curve: curve.to_string(),
+                        nb_bytes: nb_bytes,
+                        k: k,
+                        n: n,
+                        step: step,
+                    }
+                    .to_string(),
+                    func,
+                });
+            }
         }
     }
+
+    benches
 }
 
-#[rustfmt::skip]
-fn kzg(sizes: &[usize], params: &[(usize, usize)], nb_measurements: usize, curves: &[Curve]) {
-    macro_rules! bench {
-        ($field:path, $curve:path : $name:tt, $k:expr, $n:expr, $nb_bytes:expr) => {{
-            let b = plnk::Bencher::new(nb_measurements).with_name(plnk::label! { curve: $name });
-            benches::kzg::run::<$curve, DensePolynomial<$field>>(&b, $k, $n, $nb_bytes)
-        }};
-    }
-
+fn kzg(
+    sizes: &[usize],
+    params: &[(usize, usize)],
+    curves: &[Curve],
+    steps: &[String],
+) -> Vec<plnk::LabeledFnTimed<()>> {
+    let mut benches = Vec::new();
     for (&nb_bytes, (k, n), curve) in iproduct!(sizes, params, curves) {
-        match curve {
+        macro_rules! bench {
+            ($c:ident, F=$f:ident, C=$c_:ident) => {{
+                benches::kzg::build::<$c::$c_, DensePolynomial<$c::$f>>(*k, *n, nb_bytes)
+            }};
+        }
+        #[rustfmt::skip]
+        let funcs = match curve {
+            Curve::BLS12381    => bench!(ark_bls12_381 , F = Fr, C = Bls12_381),
+            Curve::BN254       => bench!(ark_bn254     , F = Fr, C = Bn254    ),
+            Curve::CP6782      => bench!(ark_cp6_782   , F = Fr, C = CP6_782  ),
+            Curve::MNT4753     => bench!(ark_mnt4_753  , F = Fr, C = MNT4_753 ),
+
             Curve::ARKBLS12381 => unsupported!("ARKBLS12381", "kzg"),
             Curve::ARKBN254    => unsupported!("ARKBN254", "kzg"),
-            Curve::BLS12381    => { bench!(ark_bls12_381::Fr,      ark_bls12_381::Bls12_381: "BLS12-381"  , *k, *n, nb_bytes) }
-            Curve::BN254       => { bench!(ark_bn254::Fr,          ark_bn254::Bn254: "BN254"      , *k, *n, nb_bytes) }
-            Curve::CP6782      => { bench!(ark_cp6_782::Fr,        ark_cp6_782::CP6_782: "CP6-782"    , *k, *n, nb_bytes) }
             Curve::EDOnMnt4298 => unsupported!("EDOnMnt4298", "kzg"),
             Curve::FQ128       => unsupported!("FQ128", "kzg"),
-            Curve::MNT4753     => { bench!(ark_mnt4_753::Fr,       ark_mnt4_753::MNT4_753: "MNT4-753"   , *k, *n, nb_bytes) }
             Curve::Pallas      => unsupported!("Pallas", "kzg"),
             Curve::SECP256K1   => unsupported!("SECP256K1", "kzg"),
             Curve::SECP256R1   => unsupported!("SECP256R1", "kzg"),
             Curve::Vesta       => unsupported!("Vesta", "kzg"),
+        };
+        for (step, func) in funcs {
+            if steps.contains(&step) {
+                benches.push(plnk::LabeledFnTimed {
+                    label: plnk::label! {
+                        protocol: "kzg",
+                        curve: curve.to_string(),
+                        nb_bytes: nb_bytes,
+                        k: k,
+                        n: n,
+                        step: step,
+                    }
+                    .to_string(),
+                    func,
+                });
+            }
         }
     }
+
+    benches
 }
 
-#[rustfmt::skip]
-fn aplonk(sizes: &[usize], params: &[(usize, usize)], nb_measurements: usize, curves: &[Curve]) {
-    macro_rules! bench {
-        ($field:path, $curve:path : $name:tt, $k:expr, $n:expr, $nb_bytes:expr) => {{
-            let b = plnk::Bencher::new(nb_measurements).with_name(plnk::label! { curve: $name });
-            benches::aplonk::run::<$curve, DensePolynomial<$field>>(&b, $k, $n, $nb_bytes)
-        }};
-    }
-
+fn aplonk(
+    sizes: &[usize],
+    params: &[(usize, usize)],
+    curves: &[Curve],
+    steps: &[String],
+) -> Vec<plnk::LabeledFnTimed<()>> {
+    let mut benches = Vec::new();
     for (&nb_bytes, (k, n), curve) in iproduct!(sizes, params, curves) {
-        match curve {
+        macro_rules! bench {
+            ($crate_:ident, F=$field:ident, C=$curve:ident) => {{
+                benches::aplonk::build::<$crate_::$curve, DensePolynomial<$crate_::$field>>(
+                    *k, *n, nb_bytes,
+                )
+            }};
+        }
+        #[rustfmt::skip]
+        let funcs = match curve {
+            Curve::BLS12381    => bench!(ark_bls12_381 , F = Fr , C = Bls12_381),
+            Curve::BN254       => bench!(ark_bn254     , F = Fr , C = Bn254    ),
+            Curve::CP6782      => bench!(ark_cp6_782   , F = Fr , C = CP6_782  ),
+            Curve::MNT4753     => bench!(ark_mnt4_753  , F = Fr , C = MNT4_753 ),
+
             Curve::ARKBLS12381 => unsupported!("ARKBLS12381", "kzg"),
             Curve::ARKBN254    => unsupported!("ARKBN254", "kzg"),
-            Curve::BLS12381    => { bench!(ark_bls12_381::Fr,      ark_bls12_381::Bls12_381: "BLS12-381"  , *k, *n, nb_bytes) }
-            Curve::BN254       => { bench!(ark_bn254::Fr,          ark_bn254::Bn254: "BN254"      , *k, *n, nb_bytes) }
-            Curve::CP6782      => { bench!(ark_cp6_782::Fr,        ark_cp6_782::CP6_782: "CP6-782"    , *k, *n, nb_bytes) }
             Curve::EDOnMnt4298 => unsupported!("EDOnMnt4298", "kzg"),
             Curve::FQ128       => unsupported!("FQ128", "kzg"),
-            Curve::MNT4753     => { bench!(ark_mnt4_753::Fr,       ark_mnt4_753::MNT4_753: "MNT4-753"   , *k, *n, nb_bytes) }
             Curve::Pallas      => unsupported!("Pallas", "kzg"),
             Curve::SECP256K1   => unsupported!("SECP256K1", "kzg"),
             Curve::SECP256R1   => unsupported!("SECP256R1", "kzg"),
             Curve::Vesta       => unsupported!("Vesta", "kzg"),
+        };
+        for (step, func) in funcs {
+            if steps.contains(&step) {
+                benches.push(plnk::LabeledFnTimed {
+                    label: plnk::label! {
+                        protocol: "aplonk",
+                        curve: curve.to_string(),
+                        nb_bytes: nb_bytes,
+                        k: k,
+                        n: n,
+                        step: step,
+                    }
+                    .to_string(),
+                    func,
+                });
+            }
         }
     }
+
+    benches
 }
 
 fn main() {
     let cli = Cli::parse();
 
-    match &cli.command {
-        Some(Commands::Setup {
-            degrees,
-            nb_measurements,
-            curves,
-        }) => setup(degrees, *nb_measurements, curves),
-        Some(Commands::Commit {
-            degrees,
-            nb_measurements,
-            curves,
-        }) => commit(degrees, *nb_measurements, curves),
-        Some(Commands::Field {
-            nb_measurements,
-            curves,
-        }) => field(*nb_measurements, curves),
-        Some(Commands::Group {
-            nb_measurements,
-            curves,
-        }) => curve_group(*nb_measurements, curves),
-        Some(Commands::Linalg {
-            sizes,
-            nb_measurements,
-            curves,
-        }) => linalg(sizes, *nb_measurements, curves),
-        Some(Commands::Fec {
+    if cli.command.is_none() {
+        eprintln!("WARNING: nothing to do");
+        std::process::exit(0);
+    }
+
+    let command = cli.command.unwrap();
+
+    let benches = match command.clone() {
+        Commands::Setup { degrees, curves } => setup(&degrees, &curves),
+        Commands::Commit { degrees, curves } => commit(&degrees, &curves),
+        Commands::Field { curves, ops, all } => field(
+            &curves,
+            &if all {
+                field::ALL_OPERATIONS.to_vec()
+            } else {
+                ops
+            },
+        ),
+        Commands::Group { curves, ops, all } => curve_group(
+            &curves,
+            &if all {
+                curve_group::ALL_OPERATIONS.to_vec()
+            } else {
+                ops
+            },
+        ),
+        Commands::Linalg { sizes, curves } => linalg(&sizes, &curves),
+        Commands::Fec {
             sizes,
             ks,
             rhos,
-            nb_measurements,
             curves,
             encoding,
-        }) => {
+            steps,
+        } => {
             let params = iproduct!(ks, rhos)
-                .map(|(&k, &r)| (k, ((k as f64) / r).round() as usize))
+                .map(|(k, r)| (k, ((k as f64) / r).round() as usize))
                 .collect::<Vec<(usize, usize)>>();
-            fec(sizes, &params, *nb_measurements, curves, encoding.clone())
+            fec(&sizes, &params, &curves, encoding.clone(), &steps)
         }
-        Some(Commands::Recoding {
+        Commands::Recoding {
             sizes,
             shards,
             ks,
-            nb_measurements,
             curves,
-        }) => recoding(sizes, ks, shards, *nb_measurements, curves),
-        Some(Commands::SemiAVID {
+        } => recoding(&sizes, &ks, &shards, &curves),
+        Commands::SemiAVID {
             sizes,
             ks,
             rhos,
-            nb_measurements,
             curves,
-        }) => {
+            steps,
+        } => {
             let params = iproduct!(ks, rhos)
-                .map(|(&k, &r)| (k, ((k as f64) / r).round() as usize))
+                .map(|(k, r)| (k, ((k as f64) / r).round() as usize))
                 .collect::<Vec<(usize, usize)>>();
-            semi_avid(sizes, &params, *nb_measurements, curves)
+            eprintln!("steps: {:?}", steps);
+            semi_avid(&sizes, &params, &curves, &steps)
         }
-        Some(Commands::KZG {
+        Commands::KZG {
             sizes,
             ks,
             rhos,
-            nb_measurements,
             curves,
-        }) => {
+            steps,
+        } => {
             let params = iproduct!(ks, rhos)
-                .map(|(&k, &r)| (k, ((k as f64) / r).round() as usize))
+                .map(|(k, r)| (k, ((k as f64) / r).round() as usize))
                 .collect::<Vec<(usize, usize)>>();
-            kzg(sizes, &params, *nb_measurements, curves)
+            kzg(&sizes, &params, &curves, &steps)
         }
-        Some(Commands::Aplonk {
+        Commands::Aplonk {
             sizes,
             ks,
             rhos,
-            nb_measurements,
             curves,
-        }) => {
+            steps,
+        } => {
             let params = iproduct!(ks, rhos)
-                .map(|(&k, &r)| (k, ((k as f64) / r).round() as usize))
+                .map(|(k, r)| (k, ((k as f64) / r).round() as usize))
                 .collect::<Vec<(usize, usize)>>();
-            aplonk(sizes, &params, *nb_measurements, curves)
+            aplonk(&sizes, &params, &curves, &steps)
         }
-        None => eprintln!("WARNING: nothing to do"),
+    };
+
+    let mut bencher = plnk::Bencher::new(cli.nb_measurements).with_name(plnk::label! {
+        command: command.to_string(),
+        git: hex::encode(parse_hex(&cli.git, "git")),
+        cpu: hex::encode(parse_hex(&cli.cpu, "cpu")),
+        src: hex::encode(parse_hex(&cli.src, "src")),
+        build: cli.rust_build,
+    });
+    if let Some(file) = cli.output {
+        if cli.overwrite {
+            bencher = bencher.with_file(file).overwrite();
+        } else {
+            bencher = bencher.with_file(file).append();
+        }
     }
+    bencher.bench_multiple(benches)
 }
