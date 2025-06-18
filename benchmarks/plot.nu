@@ -246,8 +246,13 @@ def pretty-duration []: [ list<number> -> list<string> ] {
         }
     }
 }
-def pretty-filesize []: [ list<number> -> list<string> ] {
-    into filesize | each {
+def pretty-filesize []: [
+    number         -> string,
+    filesize       -> string,
+    list<number>   -> list<string>,
+    list<filesize> -> list<string>,
+] {
+    def convert []: [ filesize -> string ] {
         if $in < 1kib {
             format filesize B
         } else if $in < 1mib {
@@ -261,6 +266,11 @@ def pretty-filesize []: [ list<number> -> list<string> ] {
         } else {
             format filesize PiB
         }
+    }
+
+    $in | into filesize | match ($in | describe --detailed).type {
+        "list" => { each { convert } },
+        _      => { convert },
     }
 }
 
@@ -721,7 +731,7 @@ export def main [
                 ] {
                     open (in "protocols") | (plot-bars
                         -o (out $"protocols-b($params.nb_bytes)-k($params.k)-n($params.n)")
-                        -t $"time to run cryptographic \\textit{protocols} data of size $($params.nb_bytes)$, $k = ($params.k)$ on \\textbf{BN254} \(r: $(curve-to-field-modulus 'BN254' | get r)$ bits\), $\\rho = \\frac{1}{2}$"
+                        -t $"time to run cryptographic \\textit{protocols} on data of size $($params.nb_bytes)$ \(($params.nb_bytes | pretty-filesize)\), $k = ($params.k)$ on \\textbf{BN254} \(r: $(curve-to-field-modulus 'BN254' | get r)$ bits\), $\\rho = \\frac{1}{2}$"
                         -l "time in %unit"
                         --log-scale
                         --grid
