@@ -1,6 +1,6 @@
 [package]
 name = "komodo"
-version = "1.0.2"
+version = "1.1.0"
 edition = "2021"
 description = "Komodo: cryptographically-proven erasure coding for distributed systems"
 repository = "https://gitlab.isae-supaero.fr/dragoon/komodo"
