@@ -298,8 +298,18 @@ where
     );
 
     debug!("transposing the polynomials to commit");
-    let polynomials_to_commit = (0..polynomials[0].coeffs().len())
-        .map(|i| P::from_coefficients_vec(polynomials.iter().map(|p| p.coeffs()[i]).collect()))
+    let polynomials_to_commit = (0..k)
+        .map(|i| {
+            P::from_coefficients_vec(
+                polynomials
+                    .iter()
+                    .map(|p| {
+                        #[allow(clippy::clone_on_copy)]
+                        p.coeffs().get(i).unwrap_or(&F::zero()).clone()
+                    })
+                    .collect(),
+            )
+        })
         .collect::<Vec<P>>();
 
     debug!("committing the polynomials");
@@ -359,12 +369,13 @@ mod tests {
     use ark_ff::PrimeField;
     use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
     use ark_std::{ops::Div, test_rng};
+    use rand::{rngs::StdRng, SeedableRng};
 
     use crate::{
         algebra::linalg::Matrix,
         error::KomodoError,
         fec::{decode, encode, Shard},
-        zk::{setup, Commitment},
+        zk::{setup, Commitment, Powers},
     };
 
     use super::{build, prove, recode, verify, Block};
@@ -675,5 +686,14 @@ mod tests {
                 ],
             )
         });
+    }
+
+    #[test]
+    fn prove_with_holes() {
+        let mut rng = StdRng::seed_from_u64(42);
+        let powers: Powers<Fr, G1Projective> = setup(300, &mut rng).unwrap();
+
+        let data = std::fs::read("assets/bin_with_holes").unwrap();
+        prove::<Fr, G1Projective, DensePolynomial<Fr>>(&data, &powers, 5).unwrap();
     }
 }
