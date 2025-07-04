@@ -1,15 +1,8 @@
 # Table of contents
 - [Requirements](#requirements)
 - [Run](#run)
-- [Plot](#plot)
 
 ## Requirements
-> [!note] NOTE
->
-> these should only be required for plotting results
-
-- install [GPLT](https://gitlab.isae-supaero.fr/a.stevan/gplt) (for plotting)
-- install [Virtualenv](https://github.com/pypa/virtualenv) (for managing Python virtual environments)
 - activate the `benchmarks` module
 ```bash
 use benchmarks
@@ -167,45 +160,6 @@ const RESULTS_DIR = "/path/to/komodo-benchmark-results/"
 >     $"($op)\t| (ansi cyan)($now)(ansi reset) | (ansi purple)($filename)(ansi reset)"
 > }
 > ```
-
-## Plot
-```bash
-benchmarks plot -i $RESULTS_DIR -o out field group setup commit linalg fec --cpu-hash-pattern '^ee672bb3' --src-hash-pattern '^c8f3481f' --rust-build 'debug'
-```
-```bash
-benchmarks plot -i $RESULTS_DIR -o out field group setup commit linalg fec --cpu-hash-pattern '^ee672bb3' --src-hash-pattern '^(00086216|04541a50)' --rust-build 'release'
-```
-```bash
-use regex.nu *
-
-let srcs = [
-    "00086216", # 909176b0, da197416
-    "b4212615", # 825cec65
-    "04541a50", # a780eb1d, 206fe9d2, 5727d551
-    "544835dd", # 5727d551
-    "fa141146", # 5727d551
-    "491b37ea", # 5727d551
-    "4daad4a0", # 5727d551
-    "b92ecb2d", # 5727d551
-    "64f25f1d", # 5727d551
-    "53e7bf81", # 5727d551
-    "e591a733", # 5727d551
-    "43ad9f18", # 062a39b5
-    "90394e42", # 057569f7
-    "18b67518", # 0acf66a2
-    "e8d6f8fa", # 943e5932
-    "0d0768b9", # e7b9968c
-]
-(benchmarks plot
-    -i $RESULTS_DIR
-    -o out
-    protocols
-    --git-hash-pattern ''
-    --cpu-hash-pattern ('ee672bb315ea00fe5815f0e20db6aa88017c1ba8355794f411c10a6057377e57' | regex exact)
-    --src-hash-pattern ($srcs | regex or | regex start)
-    --rust-build 'release'
-)
-```
 
 [gitlab.isae-supaero.fr:dragoon/komodo-benchmark-results]: https://gitlab.isae-supaero.fr/dragoon/komodo-benchmark-results
 [`nuenv`]: https://github.com/nushell/nu_scripts/blob/main/nu-hooks/nu-hooks/nuenv/hook.nu
