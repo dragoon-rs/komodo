@@ -65,5 +65,24 @@ note that the following people have contributed to this code base:
 - @a.stevan
 - @j.detchart
 
+## citation
+If you use the `komodo` library in your research projects, please cite it using the following template:
+
+```bibtex
+@software{komodo@main,
+  author  = {Komodo contributors},
+  title   = {\texttt{komodo}: Cryptographically-proven Erasure Coding},
+  url     = {https://gitlab.isae-supaero.fr/dragoon/komodo/-/tree/main},
+  crate   = {},
+  mirror  = {https://github.com/dragoon-rs/komodo/tree/main},
+  docs    = {},
+  version = {main},
+  year    = {2023},
+}
+```
+
+> [!tip] TIP
+> mentions to `main` can be removed
+
 [pcs-fec-id]: https://gitlab.isae-supaero.fr/dragoon/pcs-fec-id
 [gitlab.isae-supaero.fr:dragoon/komodo@containers]: https://gitlab.isae-supaero.fr/dragoon/komodo/container_registry/42
