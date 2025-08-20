@@ -25,3 +25,4 @@ test:
     - fmt
   script:
     - ./make.rs ci --test
+    - ./scripts/check-lock-file.sh
