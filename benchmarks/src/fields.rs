@@ -1,3 +1,4 @@
+#![allow(non_local_definitions)]
 use ark_ff::{Fp128, MontBackend, MontConfig};
 
 #[derive(MontConfig)]

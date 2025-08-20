@@ -493,9 +493,9 @@ impl<T: Field> std::fmt::Display for Matrix<T> {
     /// - elements that are bigger than the format size will be cropped, i.e.
     ///     - by default, the format size is undefined an thus elements won't be cropped
     ///     - if the format looks like `{:5}`, any element whose representation is bigger than 5
-    ///     characters will be cropped
+    ///       characters will be cropped
     /// - the default cropping is done with `...` but adding `#` to the format string will use `*`
-    /// instead
+    ///   instead
     ///
     /// a few examples of a matrix with some random elements that are too big to be shown in 5
     /// characters

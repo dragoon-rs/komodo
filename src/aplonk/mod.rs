@@ -231,10 +231,7 @@ where
 
         // open.6.
         let (ipa_proof, u) =
-            match ipa::prove(polynomials.len(), &params.ipa.ck_tau, com_f, r, mu_hat, &mu) {
-                Ok(proof) => proof,
-                Err(error) => return Err(error),
-            };
+            ipa::prove(polynomials.len(), &params.ipa.ck_tau, com_f, r, mu_hat, &mu)?;
         let mut u_inv = Vec::new();
         for u_i in &u {
             if let Some(inverse) = u_i.inverse() {

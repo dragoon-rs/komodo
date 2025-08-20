@@ -29,14 +29,14 @@ fn to_binary(number: usize, width: usize) -> Vec<u8> {
 ///     g(X) &= (u_0^{-1} + u_0 X) \\\\
 ///          &=\quad u_0^{-1} + \\\\
 ///          &\quad+ u_0 X
-/// \end{split} \end{align}
+///   \end{split} \end{align}
 /// - $\kappa = 2$: \begin{align} \begin{split}
 ///     g(X) &= (u_0^{-1} + u_0 X)(u_1^{-1} + u_1 X^2) \\\\
 ///          &=\quad u_1^{-1} u_0^{-1}      \\\\
 ///          &\quad+  u_1^{-1} u_0        X \\\\
 ///          &\quad+  u_1      u_0^{-1} X^2 \\\\
 ///          &\quad+  u_1      u_0      X^3
-/// \end{split} \end{align}
+///   \end{split} \end{align}
 /// - $\kappa = 3$: \begin{align} \begin{split}
 ///     g(X) &= (u_0^{-1} + u_0 X)(u_1^{-1} + u_1 X^2)(u_2^{-1} + u_2 X^2) \\\\
 ///          &=\quad u_2^{-1} u_1^{-1} u_0^{-1}     \\\\
@@ -47,7 +47,7 @@ fn to_binary(number: usize, width: usize) -> Vec<u8> {
 ///          &\quad+ u_2      u_1^{-1} u_0      X^5 \\\\
 ///          &\quad+ u_2      u_1      u_0^{-1} X^6 \\\\
 ///          &\quad+ u_2      u_1      u_0      X^7
-/// \end{split} \end{align}
+///   \end{split} \end{align}
 ///
 /// we can see that the $j$-the coefficient of $g(X)$ for a given $\kappa$ is
 /// a product of a combination of $(u_i)$ and their inverse elements directly
