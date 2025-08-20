@@ -15,7 +15,7 @@
 //! prettytable = "0.10.0"
 //! ```
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use prettytable::{format, Cell, Row, Table};
 use serde_json::Value;
 
@@ -23,6 +23,9 @@ const REGISTRY: &str = "gitlab-registry.isae-supaero.fr";
 const MIRROR_REGISTRY: &str = "ghcr.io/dragoon-rs";
 const IMAGE: &str = "dragoon/komodo";
 const DOCKERFILE: &str = ".env.dockerfile";
+
+const BASE: &str = "https://gitlab.isae-supaero.fr/dragoon/komodo";
+const MIRROR: &str = "https://github.com/dragoon-rs/komodo";
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -84,6 +87,27 @@ enum Commands {
     /// Run benchmarks.
     #[command(subcommand)]
     Benchmark(BenchmarkCommands),
+    #[command(subcommand)]
+    Script(Script),
+}
+
+#[derive(Subcommand)]
+enum Script {
+    /// alias to `scripts/set-mirror.nu`
+    MirrorSet {
+        user: String,
+        password: Option<String>,
+    },
+    /// alias to `scripts/check-mirror.nu`
+    MirrorCheck { branch: String },
+    /// alias to `scripts/get-mirror-pipelines.nu`
+    MirrorGetPipelines { branch: String },
+    /// alias to `scripts/get-arkworks-curves.nu`
+    GetArkworksCurves,
+    /// alias to `scripts/check-nushell-version.nu`
+    CheckNushellVersion,
+    /// alias to `scripts/check-lock-file.sh`
+    CheckLockFile,
 }
 
 #[derive(Subcommand)]
@@ -313,7 +337,35 @@ fn main() {
             cmd.push(subcommand);
             extend_and_run(&cmd, &args.iter().map(|x| &**x).collect::<Vec<&str>>());
         }
-        None => {}
+        Some(Commands::Script(script)) => {
+            nob::run_cmd_as_vec_and_fail!(match script {
+                Script::MirrorSet { user, password } => {
+                    if let Some(password) = password {
+                        vec!["nu", "./scripts/set-mirror.nu", user, password]
+                    } else {
+                        vec!["nu", "./scripts/set-mirror.nu", user]
+                    }
+                }
+                Script::MirrorCheck { branch } => {
+                    vec!["nu", "./scripts/check-mirror.nu", BASE, MIRROR, branch]
+                }
+                Script::MirrorGetPipelines { branch } => {
+                    vec!["nu", "./scripts/get-mirror-pipelines.nu", branch]
+                }
+                Script::GetArkworksCurves => {
+                    vec!["nu", "./scripts/get-arkworks-curves.nu"]
+                }
+                Script::CheckNushellVersion => {
+                    vec!["nu", "./scripts/check-nushell-version.nu"]
+                }
+                Script::CheckLockFile => {
+                    vec!["./scripts/check-lock-file.sh"]
+                }
+            });
+        }
+        None => {
+            Cli::command().print_help().expect("Could not print help");
+        }
     }
 }
 
