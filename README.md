@@ -30,7 +30,14 @@ Then, run the script with `./make.rs --help`
 Other examples that showcase the Komodo API are available in [`examples/`](examples/).
 
 ## the benchmarks
-see [`benchmarks/`](benchmarks/README.md)
+> [!important] IMPORTANT
+> this branch (`v1.0.2`) is only used to pin the version of Komodo.
+>
+> thus, the code is up to date with version `1.0.2` of the library, but things
+> like the benchmarks haven't been updated.
+
+> [!tip] TIP
+> please use the [`benchmarks` on the `main` branch](https://gitlab.isae-supaero.fr/dragoon/komodo/-/tree/main/benchmarks) instead
 
 the results can be found in [`dragoon/komodo-benchmark-results`](https://gitlab.isae-supaero.fr/dragoon/komodo-benchmark-results).
 
