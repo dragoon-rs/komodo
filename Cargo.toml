@@ -30,7 +30,6 @@ simple-mermaid = "0.2.0"
 
 [workspace]
 members = [
-    "benchmarks",
     "bins/rank",
 ]
 
