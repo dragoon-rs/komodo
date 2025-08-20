@@ -548,7 +548,7 @@ impl<T: Field> std::fmt::Display for Matrix<T> {
                         if f.alternate() {
                             write!(f, "{:width$}", "*", width = w)?;
                         } else {
-                            let t = if w > 3 { w - 3 } else { 0 };
+                            let t = w.saturating_sub(3);
                             write!(
                                 f,
                                 "{:width$}",

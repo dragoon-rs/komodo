@@ -108,6 +108,8 @@ enum Script {
     CheckNushellVersion,
     /// alias to `scripts/check-lock-file.sh`
     CheckLockFile,
+    /// alias to `scripts/update-registry-revision.sh`
+    UpdateRegistryRevision { revision: String },
 }
 
 #[derive(Subcommand)]
@@ -360,6 +362,9 @@ fn main() {
                 }
                 Script::CheckLockFile => {
                     vec!["./scripts/check-lock-file.sh"]
+                }
+                Script::UpdateRegistryRevision { revision } => {
+                    vec!["./scripts/update-registry-revision.sh", revision]
                 }
             });
         }

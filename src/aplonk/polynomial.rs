@@ -12,6 +12,7 @@ fn to_binary(number: usize, width: usize) -> Vec<u8> {
         .collect()
 }
 
+#[allow(clippy::doc_overindented_list_items)]
 /// compute the polynomial $g(X)$ in [aPlonk from [Ambrona et al.]][aPlonk]
 ///
 /// $g(X)$ can be found, at
