@@ -34,7 +34,7 @@ impl<T: Field> Matrix<T> {
     ///     . & . & 3 & . \\\\
     ///     . & . & . & 4 \\\\
     /// \end{pmatrix} $.
-    fn from_diagonal(diagonal: Vec<T>) -> Self {
+    pub fn from_diagonal(diagonal: Vec<T>) -> Self {
         let size = diagonal.len();
 
         let mut elements = Vec::new();
@@ -59,7 +59,7 @@ impl<T: Field> Matrix<T> {
     ///     . & 1 & . \\\\
     ///     . & . & 1 \\\\
     /// \end{pmatrix} $.
-    fn identity(size: usize) -> Self {
+    pub fn identity(size: usize) -> Self {
         Self::from_diagonal(vec![T::one(); size])
     }
 

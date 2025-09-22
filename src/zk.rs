@@ -37,7 +37,7 @@ use crate::error::KomodoError;
 /// >
 /// > This is a simpler version of [`ark_poly_commit::kzg10::UniversalParams`].
 #[derive(Debug, Clone, Default, CanonicalSerialize, CanonicalDeserialize, PartialEq)]
-pub struct Powers<F: PrimeField, G: CurveGroup<ScalarField = F>>(Vec<G::Affine>);
+pub struct Powers<F: PrimeField, G: CurveGroup<ScalarField = F>>(pub Vec<G::Affine>);
 
 impl<F: PrimeField, G: CurveGroup<ScalarField = F>> Powers<F, G> {
     fn len(&self) -> usize {
