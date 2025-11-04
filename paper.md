@@ -61,11 +61,11 @@ following on any input data in a distributed network or setup:
   fragmentation, partitioning, loss or corruption.
 - `commit` and `prove`: all $n$ encoded shards are proven with one of three
   available cryptographic protocols (see below for more information). This step
-  consists of attaching extra information to them and sharing augmented _blocks_
-  of data onto the network. This extra information should guarantee, maybe only
-  with a very high probability, that a given shard has been generated indeed
+  consists in attaching extra information to them and sharing augmented _blocks_
+  of data onto the network. This extra information should guarantee
+  with a very high probability that a given shard has been generated indeed
   though an expected encoding process, namely a polynomial evaluation or vector
-  innner-product encoding such as Reed-Solomon.
+  inner-product encoding such as Reed-Solomon.
 - `verify`: any shard is verified individually for its validity. This allows to
   discriminate invalid or corrupted shards without requiring a full decoding of
   the original data.
@@ -81,7 +81,7 @@ integrity of encoded data:
   Finally, a proof, unique per shard, is computed and attached to the associated
   shard. The multi-polynomial extension allows to scale to bigger data by still
   computing a single proof per shard regardless of the size of the input data.
-- **aPlonK**: This method is based on the following work: PlonK
+- **aPlonK**: This method is based on the following works: **PlonK**
   [@gabizon2019plonk] and **aPlonK** [@ambrona2022aplonk]. Through recursion and
   tree _folding_, it achieves smaller commitment sizes as compared to **KZG+**
   at the cost of very expensive proving times.
@@ -196,7 +196,7 @@ let bytes: Vec<u8> = vec![
 let powers = setup::<F, G>(bytes.len(), &mut rng)?;
 ```
 
-The next step, following the diagram above is to encode and prove the data to
+Following the diagram above, the next step is to encode and prove the data to
 generate $n$ encoded and proven blocks.
 
 ```rust
@@ -216,6 +216,7 @@ for b in &blocks {
 ```
 
 And the original data can be decoded using any subset of $k$ valid blocks
+
 ```rust
 assert_eq!(
     bytes,
@@ -248,16 +249,17 @@ Building on the work from [@stevan2024performance], we have conducted some
 measurements of the performance of the three methods.
 
 The time to run `commit`, `prove` and `verify` has been measured for $k = 8$ and
-a code rate $\rho = \frac{1}{2}$, i.e. $n = 16$ on the BN-254 elliptic curve and
+a code rate $\rho = \frac{1}{2}$, i.e. $n = 16$, on the BN-254 elliptic curve, and
 for small and large input data.
 
 ![Performance for small files.\label{fig:small}](figures/protocols-b507904-k8-n16.png)
 
-**Semi-AVID** is the best for small files as can be seen in \autoref{fig:small}.
+**Semi-AVID** is the best for committing, proving and verifying small files,
+as can be seen in \autoref{fig:small}.
 
 ![Performance for large files.\label{fig:large}](figures/protocols-b130023424-k8-n16.png)
 
-**aPlonK** is slightly better for verifying large files, see
+**aPlonK** is slightly better for verifying large files, as can be seen in
 \autoref{fig:large}, but still suffers from performance orders of magnitude
 worst than **Semi-AVID** for committing and proving.
 
@@ -302,7 +304,7 @@ information about where the source code is hosted.
 **Komodo** is fully written in _Rust_.
 
 One can install _Cargo_ [^3], e.g. with _rustup_ [^4], and the exact version
-is taken care of by `rust-toolchain.toml`
+is taken care of by `rust-toolchain.toml`.
 
 [^3]: _Cargo_: [https://doc.rust-lang.org/cargo/](https://doc.rust-lang.org/cargo/)
 [^4]: `rustup`: [https://rustup.rs/](https://rustup.rs/)
@@ -316,7 +318,7 @@ measurements have been conducted on regular _home_ computers.
 
 All dependencies are taken care of by _Cargo_ and `Cargo.toml`.
 
-## Software location:
+## Software location
 
 **Code repository**: GitLab
 
