@@ -100,9 +100,11 @@ A beta version of **Komodo** has been used in a previous evaluation paper
 implementations of elliptic curves, fields and polynomial algebra used in all
 the proving protocols.
 
-> mention Merkle trees [@merkle1987digital] and Fiat-Shamir [@fiat1986prove]?
+> TODO: mention Merkle trees [@merkle1987digital] and Fiat-Shamir [@fiat1986prove]?
 
 ## General data flow in **Komodo**
+
+> TODO: develop this
 
 \tikzset{
     block/.style = {draw, fill=white, rectangle, minimum height=3em, minimum width=3em},
@@ -224,6 +226,7 @@ assert_eq!(
 );
 ```
 
+<!-- this is outdated -->
 > **Note**
 >
 > A more complete CLI application of **Semi-AVID** is available in
@@ -239,6 +242,7 @@ and decoding process and the three cryptographic protocols.
 
 To run the test suite, please run
 
+<!-- this is outdated -->
 ```bash
 make check clippy test
 ```
@@ -266,6 +270,8 @@ worst than **Semi-AVID** for committing and proving.
 **KZG+** is neither good nor too bad.
 
 # Statement of need
+
+> TODO: develop this
 
 the use case is any system that meet the following criteria
 
