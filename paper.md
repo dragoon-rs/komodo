@@ -340,14 +340,6 @@ proof protocols, just as with the `kzg`, `aplonk` and `semi_avid` modules
 
 and Tezos [@tezos2024aplonk].
 
-contact us at `firstname.lastname@isae-supaero.fr` or at one of the
-_support pages_ below
-
-**support**: we provide support on GitHub
-
-- bug reports and feature requests [https://gitlab.isae-supaero.fr/dragoon/komodo/-/issues](https://gitlab.isae-supaero.fr/dragoon/komodo/-/issues)
-- contributions [https://gitlab.isae-supaero.fr/dragoon/komodo/-/merge_requests](https://gitlab.isae-supaero.fr/dragoon/komodo/-/merge_requests)
-
 # Availability
 
 This section details requirements for **Komodo** to work properly and
@@ -423,6 +415,12 @@ All dependencies are taken care of by _Cargo_ and `Cargo.toml`.
 ## Language
 
 Everything is written in english.
+
+## Contact
+Contact us at `firstname.lastname@isae-supaero.fr` or at one of
+
+- bug reports and feature requests [https://gitlab.isae-supaero.fr/dragoon/komodo/-/issues](https://gitlab.isae-supaero.fr/dragoon/komodo/-/issues)
+- contributions [https://gitlab.isae-supaero.fr/dragoon/komodo/-/merge_requests](https://gitlab.isae-supaero.fr/dragoon/komodo/-/merge_requests)
 
 # Acknowledgements
 
