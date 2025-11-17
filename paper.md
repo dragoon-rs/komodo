@@ -64,7 +64,7 @@ following on any input data in a distributed network or setup:
   consists in attaching extra information to them and sharing augmented _blocks_
   of data onto the network. This extra information should guarantee
   with a very high probability that a given shard has been generated indeed
-  though an expected encoding process, namely a polynomial evaluation or vector
+  through an expected encoding process, namely a polynomial evaluation or vector
   inner-product encoding such as Reed-Solomon.
 - `verify`: any shard is verified individually for its validity. This allows to
   discriminate invalid or corrupted shards without requiring a full decoding of
