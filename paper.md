@@ -261,12 +261,6 @@ assert_eq!(
 );
 ```
 
-<!-- this is outdated -->
-> **Note**
->
-> A more complete CLI application of **Semi-AVID** is available in
-> `bins/saclin/`.
-
 ## Quality control
 
 **Komodo** provides a test suite to give the highest confidence possible in the
