@@ -372,6 +372,34 @@ is taken care of by `rust-toolchain.toml`.
 This depends on the data for the memory usage but all experiments and
 measurements have been conducted on regular _home_ computers.
 
+> ```json
+> {
+>   "Architecture": "x86_64",
+>   "CPU op-mode(s)": "32-bit, 64-bit",
+>   "Address sizes": "46 bits physical, 48 bits virtual",
+>   "Byte Order": "Little Endian",
+>   "CPU(s)": "20",
+>   "On-line CPU(s) list": "0-19",
+>   "Model name": "12th Gen Intel(R) Core(TM) i7-12800H",
+>   "CPU family": "6",
+>   "Model": "154",
+>   "Thread(s) per core": "2",
+>   "Core(s) per socket": "14",
+>   "Socket(s)": "1",
+>   "Stepping": "3",
+>   "CPU max MHz": "4800.0000",
+>   "CPU min MHz": "400.0000",
+>   "BogoMIPS": "5606.40",
+>   "Virtualization": "VT-x",
+>   "L1d cache": "544 KiB (14 instances)",
+>   "L1i cache": "704 KiB (14 instances)",
+>   "L2 cache": "11.5 MiB (8 instances)",
+>   "L3 cache": "24 MiB (1 instance)",
+>   "NUMA node(s)": "1",
+>   "NUMA node0 CPU(s)": "0-19"
+> }
+> ```
+
 ## Dependencies
 
 All dependencies are taken care of by _Cargo_ and `Cargo.toml`.
