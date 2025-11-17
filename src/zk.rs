@@ -37,7 +37,7 @@ use crate::error::KomodoError;
 /// >
 /// > This is a simpler version of [`ark_poly_commit::kzg10::UniversalParams`].
 #[derive(Debug, Clone, Default, CanonicalSerialize, CanonicalDeserialize, PartialEq)]
-pub struct Powers<F: PrimeField, G: CurveGroup<ScalarField = F>>(Vec<G::Affine>);
+pub struct Powers<F: PrimeField, G: CurveGroup<ScalarField = F>>(pub Vec<G::Affine>);
 
 impl<F: PrimeField, G: CurveGroup<ScalarField = F>> Powers<F, G> {
     fn len(&self) -> usize {
@@ -120,9 +120,7 @@ fn skip_leading_zeros_and_convert_to_bigints<F: PrimeField, P: DenseUVPolynomial
 
 fn convert_to_bigints<F: PrimeField>(p: &[F]) -> Vec<F::BigInt> {
     let to_bigint_time = start_timer!(|| "Converting polynomial coeffs to bigints");
-    let coeffs = ark_std::cfg_iter!(p)
-        .map(|s| s.into_bigint())
-        .collect::<Vec<_>>();
+    let coeffs = p.iter().map(|s| s.into_bigint()).collect::<Vec<_>>();
     end_timer!(to_bigint_time);
     coeffs
 }

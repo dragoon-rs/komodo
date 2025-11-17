@@ -156,13 +156,16 @@
 //! This is great because any node in the system can locally augment its local pool of shards.
 //! However, this operation will introduce linear dependencies between recoded shards and their
 //! _parents_, which might decrease the diversity of shards and harm the decoding process.
+
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::ops::Div;
 use ark_std::rand::RngCore;
-
+use serde::de::Visitor;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt;
 use tracing::{debug, info};
 
 use crate::{
@@ -180,6 +183,66 @@ use crate::{
 pub struct Block<F: PrimeField, G: CurveGroup<ScalarField = F>> {
     pub shard: fec::Shard<F>,
     proof: Vec<Commitment<F, G>>,
+}
+
+/// Block serialization and deserialization.
+/// In order to serialize and deserialize a block, we need to use the [`ark_serialize`] crate.
+/// [`Block`] cannot directly implement [`Serialize`] and [`Deserialize`] because of its fields.
+/// Instead, we implement [`Serialize`] and [`Deserialize`] for [`Block`] using the [`ark_serialize`] methods.
+///
+/// The first step is to use [`CanonicalSerialize::serialize_with_mode`] to serialize the block with compression.
+/// Once we get the bytes, we can serialize them using serde and [`Serializer::serialize_bytes`].
+///
+/// For the deserialization, we first need to deserialize the bytes using serde and [`Deserializer::deserialize_bytes`].
+/// To do that with deserialize_bytes, we need to implement a custom visitor, [`ByteVisitor`], that will
+/// convert the bytes into a [`Vec<u8>`].
+/// Then, we can use [`CanonicalDeserialize::deserialize_with_mode`] to deserialize the block from the [`Vec<u8>`]
+///
+/// By doing that, we are fully compatible with serde, but the Block will always be serialized the same way.
+struct ByteVisitor;
+
+impl Visitor<'_> for ByteVisitor {
+    type Value = Vec<u8>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a byte array")
+    }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(v.to_vec())
+    }
+}
+
+impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> Deserialize<'de> for Block<F, G> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let bytes = deserializer.deserialize_bytes(ByteVisitor)?;
+        let block = Self::deserialize_with_mode(
+            bytes.as_slice(),
+            ark_serialize::Compress::Yes,
+            ark_serialize::Validate::Yes,
+        );
+        block.map_err(serde::de::Error::custom)
+    }
+}
+
+impl<F: PrimeField, G: CurveGroup<ScalarField = F>> Serialize for Block<F, G> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut bytes = Vec::new();
+
+        self.serialize_with_mode(&mut bytes, ark_serialize::Compress::Yes)
+            .map_err(serde::ser::Error::custom)?;
+
+        serializer.serialize_bytes(&bytes)
+    }
 }
 
 impl<F: PrimeField, G: CurveGroup<ScalarField = F>> std::fmt::Display for Block<F, G> {
@@ -298,8 +361,18 @@ where
     );
 
     debug!("transposing the polynomials to commit");
-    let polynomials_to_commit = (0..polynomials[0].coeffs().len())
-        .map(|i| P::from_coefficients_vec(polynomials.iter().map(|p| p.coeffs()[i]).collect()))
+    let polynomials_to_commit = (0..k)
+        .map(|i| {
+            P::from_coefficients_vec(
+                polynomials
+                    .iter()
+                    .map(|p| {
+                        #[allow(clippy::clone_on_copy)]
+                        p.coeffs().get(i).unwrap_or(&F::zero()).clone()
+                    })
+                    .collect(),
+            )
+        })
         .collect::<Vec<P>>();
 
     debug!("committing the polynomials");
@@ -359,12 +432,14 @@ mod tests {
     use ark_ff::PrimeField;
     use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
     use ark_std::{ops::Div, test_rng};
+    use rand::{rngs::StdRng, SeedableRng};
+    use serde::{Deserialize, Serialize};
 
     use crate::{
         algebra::linalg::Matrix,
         error::KomodoError,
         fec::{decode, encode, Shard},
-        zk::{setup, Commitment},
+        zk::{setup, Commitment, Powers},
     };
 
     use super::{build, prove, recode, verify, Block};
@@ -675,5 +750,70 @@ mod tests {
                 ],
             )
         });
+    }
+
+    #[test]
+    fn test_serde() {
+        #[derive(Debug, Serialize, Deserialize)]
+        enum EncapsulatedBLock {
+            EBlock {
+                block_id: String,
+                block: Block<Fr, G1Projective>,
+            },
+            EBlockNotFound {
+                block_id: String,
+            },
+        }
+
+        let mut rng = ark_std::test_rng();
+
+        let (k, n) = (3, 6_usize);
+
+        let bytes = bytes();
+
+        let powers = setup::<Fr, G1Projective>(bytes.len(), &mut rng).unwrap();
+        let encoding_mat = Matrix::random(k, n, &mut rng);
+        let shards = encode(&bytes, &encoding_mat).unwrap();
+        let proof =
+            prove::<Fr, G1Projective, DensePolynomial<Fr>>(&bytes, &powers, encoding_mat.height)
+                .unwrap();
+
+        let blocks = build::<Fr, G1Projective, DensePolynomial<Fr>>(&shards, &proof);
+
+        // Test serialization and deserialization of a vector of blocks
+        let bytes = bincode::serialize(&blocks).unwrap();
+        let deser_blocks: Vec<Block<Fr, G1Projective>> = bincode::deserialize(&bytes).unwrap();
+        for (block, deser_block) in blocks.iter().zip(deser_blocks.iter()) {
+            assert_eq!(block, deser_block);
+        }
+
+        // Test serialization and deserialization of a single block
+        let bytes = bincode::serialize(&blocks[0]).unwrap();
+        let b = bincode::deserialize::<Block<Fr, G1Projective>>(&bytes).unwrap();
+        assert_eq!(blocks[0], b);
+
+        // Test serialization and deserialization of an enum encapsulating a block
+        let eblock = EncapsulatedBLock::EBlock {
+            block_id: "1".to_string(),
+            block: blocks[0].clone(),
+        };
+        let bytes = bincode::serialize(&eblock).unwrap();
+        let deser_eblock: EncapsulatedBLock = bincode::deserialize(&bytes).unwrap();
+        match deser_eblock {
+            EncapsulatedBLock::EBlock { block_id, block } => {
+                assert_eq!(block_id, "1");
+                assert_eq!(block, blocks[0]);
+            }
+            _ => panic!("Expected EncapsulatedBLock::EBlock"),
+        };
+    }
+
+    #[test]
+    fn prove_with_holes() {
+        let mut rng = StdRng::seed_from_u64(42);
+        let powers: Powers<Fr, G1Projective> = setup(300, &mut rng).unwrap();
+
+        let data = std::fs::read("assets/bin_with_holes").unwrap();
+        prove::<Fr, G1Projective, DensePolynomial<Fr>>(&data, &powers, 5).unwrap();
     }
 }

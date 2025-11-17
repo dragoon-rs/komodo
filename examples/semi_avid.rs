@@ -53,7 +53,7 @@ where
         .serialize_with_mode(&mut serialized[..], Compress::No)
         .unwrap();
     // -> attack the `data` field of the [`komodo::fec::Shard`] structure
-    let field_element_size = (F::MODULUS_BIT_SIZE as usize + 7) / 8;
+    let field_element_size = (F::MODULUS_BIT_SIZE as usize).div_ceil(8);
     const VEC_LEN_SIZE: usize = 8;
     const HASH_SIZE: usize = 32;
     const U32_SIZE: usize = 4;

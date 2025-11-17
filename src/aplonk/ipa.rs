@@ -191,9 +191,9 @@ pub(super) fn prove<E: Pairing>(
 /// Arguments:
 /// - k: number of polynomials (must be a power of 2)
 /// - ck_tau: commitment key of IPA containing *k* values from *G_2*
-/// when set to `None`, will turn *IPA.Verify* into *IPA.Verify'*, without the
-/// "scalar product" guard and which is the version of the algorithm used in
-/// the *Open* algorithm of aPlonK.
+///   when set to `None`, will turn *IPA.Verify* into *IPA.Verify'*, without the
+///   "scalar product" guard and which is the version of the algorithm used in
+///   the *Open* algorithm of aPlonK.
 /// - c_g: sum of pairing of commit, i.e. *com_f* in *Commit-Polys* page **13**
 /// - r: random scalar
 /// - P: random linear combination of the commits
