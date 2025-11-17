@@ -275,13 +275,6 @@ validity of the source code.
 To achieve this goal, all matrix operations are tested as well as the encoding
 and decoding process and the three cryptographic protocols.
 
-To run the test suite, please run
-
-<!-- this is outdated -->
-```bash
-make check clippy test
-```
-
 ## Some measurements
 
 Building on the work from [@stevan2024performance], we have conducted some
