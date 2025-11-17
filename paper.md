@@ -243,11 +243,17 @@ generate $n$ encoded and proven blocks.
 > let blocks = build::<F, G, DP<F>>(&shards, &proofs);
 > ```
 
+Only $k$ blocks need to be received.
+
+> ```rust
+> let received_blocks = vec![ /* any subset of at least k blocks */ ]
+> ```
+
 Finally, these blocks can be verified with `verify`.
 
 > ```rust
 > // we assume here that all blocks are still valid
-> for b in &blocks {
+> for b in &received_blocks {
 >     assert!(verify::<F, G, DP<F>>(b, &powers)?);
 > }
 > ```
@@ -257,7 +263,7 @@ And the original data can be decoded using any subset of $k$ valid blocks
 > ```rust
 > assert_eq!(
 >     bytes,
->     decode(blocks[0..k].iter().cloned().map(|b| b.shard).collect())?;
+>     decode(received_blocks[0..k].iter().cloned().map(|b| b.shard).collect())?;
 > );
 > ```
 
