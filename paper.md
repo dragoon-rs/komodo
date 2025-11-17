@@ -114,7 +114,22 @@ A beta version of **Komodo** has been used in a previous evaluation paper
 implementations of elliptic curves, fields and polynomial algebra used in all
 the proving protocols.
 
-> TODO: mention Merkle trees [@merkle1987digital] and Fiat-Shamir [@fiat1986prove]?
+A first method that has been considered was _Merkle trees_ [@merkle1987digital].
+They cut the data in leaves of a binary tree where the value inside a node is
+computed as the hash of the concatenation of its two children. This process
+produces a root, the _Merkle root_, and any leaf can be proven as being part of
+the tree by giving a _Merkle path_ in the tree, which is simply a path of
+intermediate hashes that allow to recompute the _Merkle root_ from the leaf.
+This method, once applied to our use case and despite its simplicity, was
+unfortunately only proving that one shard was part of the _Merkle tree_ and not
+that it had been generated through a valid encoding.
+
+As described in [@stevan2024performance], the protocols are usually introduced
+interactively, i.e. the _prover_ and the _verifier_ need to be involved in an
+interactive discussion where the _verifier_ imposes challenges to the _prover_
+and the latter tries to convince the former. This is not very practical and the
+implementation uses a technic known as the _Fiat-Shamir transform_ from
+[@fiat1986prove].
 
 ## General data flow in **Komodo**
 
