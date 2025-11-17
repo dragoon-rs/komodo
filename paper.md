@@ -133,7 +133,9 @@ implementation uses a technic known as the _Fiat-Shamir transform_ from
 
 ## General data flow in **Komodo**
 
-> TODO: develop this
+This section shows a high-level overview of the data flow in **Komodo**.
+Some data $D$ is first encoded. Then _commitments_ and _proofs_ are computed.
+Finally, on the other end, blocks are verified and decoded.
 
 \tikzset{
     block/.style = {draw, fill=white, rectangle, minimum height=3em, minimum width=3em},
@@ -145,13 +147,16 @@ implementation uses a technic known as the _Fiat-Shamir transform_ from
 }
 
 \begin{tikzpicture}[auto, node distance=2cm,>=latex']
-    \node [block, fill=red!50] (source) {$(s_i)$};
+    \node [block, fill=green!50] (data) {$D$};
+    \node [block, below of=data, fill=red!50] (source) {$(s_i)$};
     \node [block, right of=source, node distance=4cm] (encoded) {$(e_j)$};
     \node [block, right of=encoded, node distance=3cm, fill=yellow!20] (commitment) {$c$};
     \node [block, below of=commitment, node distance=1.3cm, fill=yellow!30] (proof) {$(\pi_j)$};
     \node [block, right of=commitment, node distance=1.5cm, fill=blue!50] (blocks) {$(b_j)$};
     \node [block, right of=blocks, node distance=3cm, fill=blue!20] (verified) {$(b^*_j)$};
-    \node [block, below of=verified, node distance=2cm, fill=red!20] (decoded) {$(\tilde{s}_i)$};
+    \node [block, above of=verified, node distance=2cm, fill=red!20] (decoded) {$(\tilde{s}_i)$};
+    \node [block, left of=decoded, fill=green!20] (data_) {$\tilde{D}$};
+    \draw [->] (data) -- node{split into elements of $\mathbb{F}$} (source);
     \draw [->] (source) -- node{\texttt{encode(k, n)}} (encoded);
     \draw [->] (encoded) -- node[name=a,anchor=south]{\texttt{commit}} (commitment);
     \draw [->] (a) |- node[anchor=north]{\texttt{prove}} (proof);
@@ -159,6 +164,7 @@ implementation uses a technic known as the _Fiat-Shamir transform_ from
     \draw [->] (proof) -| (blocks);
     \draw [->] (blocks) -- node{\texttt{verify}} (verified);
     \draw [->] (verified) -- node{\texttt{decode}} (decoded);
+    \draw [->] (decoded) -- (data_);
 \end{tikzpicture}
 
 where
@@ -176,7 +182,7 @@ A valid and robust system should satisfy and guarantee the two following
 properties:
 
 - all blocks $(b^*_j)$ are valid and all other blocks are invalid
-- $(\tilde{s}_i) \stackrel{?}{=} (s_i)$
+- $(\tilde{s}_i) \stackrel{?}{=} (s_i)$ and thus $\tilde{D} \stackrel{?}{=} D$
 
 > **Note**
 >
