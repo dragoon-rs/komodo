@@ -209,57 +209,57 @@ section.
 
 First, some definitions need to be imported.
 
-```rust
-// definitions used to specify generic types
-use ark_bls12_381::{Fr as F, G1Projective as G};
-use ark_poly::univariate::DensePolynomial as DP;
-
-// the code from the Komodo library
-use komodo::{algebra::linalg::Matrix, fec::{decode, encode}, zk::setup}
-```
+> ```rust
+> // definitions used to specify generic types
+> use ark_bls12_381::{Fr as F, G1Projective as G};
+> use ark_poly::univariate::DensePolynomial as DP;
+>
+> // the code from the Komodo library
+> use komodo::{algebra::linalg::Matrix, fec::{decode, encode}, zk::setup}
+> ```
 
 Then we can define a pseudo-random number generator, the parameters of our code
 $(k, n)$, the input bytes and a _trusted setup_, which is a sequence of powers
 of a secret element of $\mathbb{F}$.
 
-```rust
-let mut rng = ark_std::test_rng();
-
-let (k, n) = (3, 6);
-let bytes: Vec<u8> = vec![
-  // fill with real data
-];
-
-let powers = setup::<F, G>(bytes.len(), &mut rng)?;
-```
+> ```rust
+> let mut rng = ark_std::test_rng();
+>
+> let (k, n) = (3, 6);
+> let bytes: Vec<u8> = vec![
+>   // fill with real data
+> ];
+>
+> let powers = setup::<F, G>(bytes.len(), &mut rng)?;
+> ```
 
 Following the diagram above, the next step is to encode and prove the data to
 generate $n$ encoded and proven blocks.
 
-```rust
-let encoding_matrix = Matrix::random(k, n, &mut rng);
-let shards = encode(&bytes, &encoding_matrix)?;
-let proofs = prove::<F, G, DP<F>>(&bytes, &powers, encoding_matrix.height)?;
-let blocks = build::<F, G, DP<F>>(&shards, &proofs);
-```
+> ```rust
+> let encoding_matrix = Matrix::random(k, n, &mut rng);
+> let shards = encode(&bytes, &encoding_matrix)?;
+> let proofs = prove::<F, G, DP<F>>(&bytes, &powers, encoding_matrix.height)?;
+> let blocks = build::<F, G, DP<F>>(&shards, &proofs);
+> ```
 
 Finally, these blocks can be verified with `verify`.
 
-```rust
-// we assume here that all blocks are still valid
-for b in &blocks {
-    assert!(verify::<F, G, DP<F>>(b, &powers)?);
-}
-```
+> ```rust
+> // we assume here that all blocks are still valid
+> for b in &blocks {
+>     assert!(verify::<F, G, DP<F>>(b, &powers)?);
+> }
+> ```
 
 And the original data can be decoded using any subset of $k$ valid blocks
 
-```rust
-assert_eq!(
-    bytes,
-    decode(blocks[0..k].iter().cloned().map(|b| b.shard).collect())?;
-);
-```
+> ```rust
+> assert_eq!(
+>     bytes,
+>     decode(blocks[0..k].iter().cloned().map(|b| b.shard).collect())?;
+> );
+> ```
 
 ## Quality control
 
