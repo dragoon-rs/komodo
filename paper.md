@@ -71,6 +71,20 @@ following on any input data in a distributed network or setup:
   the original data.
 - `decode`: the original data is decoded using any subset of $k$ valid shards.
 
+The previous key steps of all the protocols implemented use some basic
+mathematical objects.
+On one hand, `encode` and `decode` use elements of a finite field $\mathbb{F}$
+with a large prime order $p$. $p$ is required to be large, usually $64$ bits or
+more, for security reasons, to avoid collisions between shards. Elements in
+$\mathbb{F}$ follow the usual operations on numbers: _addition_, _substraction_,
+_multiplication_ and _division_.
+On the other hand, `commit`, `prove` and `verify` use elements of the additive
+subgroup $\mathbb{G}$ of an elliptic curve $\mathbb{E}$. For consistency, there
+has to be an isomorphism between $\mathbb{G}$ and $\mathbb{F}$. Elements in
+$\mathbb{G}$ follow the rules of any additive group: _addition_ and _subtraction_.
+Multiplication by an integer scalar value can be constructed as a repeated
+_addition_.
+
 This version of **Komodo** ships three cryptographic methods to prove the
 integrity of encoded data:
 
