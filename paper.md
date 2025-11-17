@@ -279,6 +279,30 @@ the use case is any system that meet the following criteria
 - need for data robustness, e.g. by introducing redundancy
 - no trust in others nor the environment, need to prove the integrity of the data
 
+A few libraries provide similar functionalities, with a few gaps filled by
+`Komodo`.
+
+The `arkworks` ecosystem [@arkworks] is probably the closest library, providing
+many of the necessary building bricks involved in Data Availability Sampling:
+prime fields, possibly paired with elliptic curves like BLS12-381 or BN254 among
+many others; linear algebra operations like polynomial operations and matrix
+operations; and polynomial commitment. On top of those features, `Komodo` adds
+Reed-Solomon encoding, tightly integrated with proof generation.
+
+The Rust implementation of Reed-Solomon erasure coding [@rust-rse] provides
+mechanisms to encode and decode data into raw shards, using elements of finite
+fields $\mathbb{F}_{2^8}$ or $\mathbb{F}_{2^{16}}$, containing respectively
+$2^8$ and $2^{16}$ elements. `Komodo` adds the proving mechanisms, and makes it
+possible to use elements from `arkworks`' prime fields, possibly paired with
+elliptic curves.
+
+`Komodo` also adds a unified high-level API, allowing to benchmark and compare
+different combinations of prime fields, elliptic curves and polynomial
+commitment schemes, as we did in two publications [@stevan2024performance; @stevan2025performance].
+Finally, a modular design allows to extend `Komodo` with new polynomial
+commitment schemes, which performance can be evaluated in the same benchmarking
+conditions.
+
 Scroll [@scroll2024], Avail [@avail2024] and Danksharding [@danksharding2024].
 
 **Komodo** can be extended with either
