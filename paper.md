@@ -49,39 +49,43 @@ availability sampling settings.
 
 # Keywords
 
-Cryptography; Erasure codes; Distributed systems; Data availability sampling;
+Cryptography; Erasure codes; Distributed systems; Verifiable information
+dispersal; Data availability;
 
 # Summary
 
 **Komodo** is a software library that provides a _Rust_ API to achieve the
 following on any input data in a distributed network or setup:
 
-- `encode`: data is encoded into _shards_ with a $(k, n)$ code. This adds
+- `encode`: encodes data into _shards_ with a $(k, n)$ code. This adds
   redundancy to the data, making the network more resilient to failure,
   fragmentation, partitioning, loss or corruption.
-- `commit` and `prove`: all $n$ encoded shards are proven with one of three
-  available cryptographic protocols (see below for more information). This step
-  consists in attaching extra information to them and sharing augmented _blocks_
-  of data onto the network. This extra information should guarantee
-  with a very high probability that a given shard has been generated indeed
-  through an expected encoding process, namely a polynomial evaluation or vector
-  inner-product encoding such as Reed-Solomon.
-- `verify`: any shard is verified individually for its validity. This allows to
-  discriminate invalid or corrupted shards without requiring a full decoding of
-  the original data.
-- `decode`: the original data is decoded using any subset of $k$ valid shards.
+- `commit` and `prove`: generate cryptographic commitments and proofs for all
+  $n$ encoded shards with one of three available cryptographic protocols (see
+  below for more information). This step consists in attaching extra information
+  to them and sharing augmented _blocks_ of data onto the network. This extra
+  information should guarantee with a very high probability that a given shard
+  has been generated indeed through an expected encoding process, namely a
+  polynomial evaluation or vector inner-product encoding such as Reed-Solomon.
+- `verify`: verifies any shard individually for its validity. This allows to
+  discriminate invalid or corrupted shards without any decoding attempt. Without
+  this shard-level verification step, it is impossible to know if a shard is
+  valid until the decoding step. Then, when decoding fails, it is not
+  possible to know which shards were invalid, leading to a _try-and-error_
+  process that is not scalable.
+- `decode`: decodes the original data using any subset of $k$ valid shards.
 
 The previous key steps of all the protocols implemented use some basic
 mathematical objects.
 On one hand, `encode` and `decode` use elements of a finite field $\mathbb{F}$
 with a large prime order $p$. $p$ is required to be large, usually $64$ bits or
 more, for security reasons, to avoid collisions between shards. Elements in
-$\mathbb{F}$ follow the usual operations on numbers: _addition_, _substraction_,
+$\mathbb{F}$ support the usual operations on numbers: _addition_, _substraction_,
 _multiplication_ and _division_.
 On the other hand, `commit`, `prove` and `verify` use elements of the additive
 subgroup $\mathbb{G}$ of an elliptic curve $\mathbb{E}$. For consistency, there
 has to be an isomorphism between $\mathbb{G}$ and $\mathbb{F}$. Elements in
-$\mathbb{G}$ follow the rules of any additive group: _addition_ and _subtraction_.
+$\mathbb{G}$ support the operations of any additive group: _addition_ and _subtraction_.
 Multiplication by an integer scalar value can be constructed as a repeated
 _addition_.
 
@@ -120,9 +124,10 @@ computed as the hash of the concatenation of its two children. This process
 produces a root, the _Merkle root_, and any leaf can be proven as being part of
 the tree by giving a _Merkle path_ in the tree, which is simply a path of
 intermediate hashes that allow to recompute the _Merkle root_ from the leaf.
-This method, once applied to our use case and despite its simplicity, was
-unfortunately only proving that one shard was part of the _Merkle tree_ and not
-that it had been generated through a valid encoding.
+This method, once applied to our use case and despite its simplicity, was only
+proving that one shard was part of the _Merkle tree_ and not that it had been
+generated with a $(k,n)$ code, thus allowing reconstruction from any subset of
+$k$ shards.
 
 As described in [@stevan2024performance], the protocols are usually introduced
 interactively, i.e. the _prover_ and the _verifier_ need to be involved in an
@@ -133,9 +138,10 @@ implementation uses a technic known as the _Fiat-Shamir transform_ from
 
 ## General data flow in **Komodo**
 
-This section shows a high-level overview of the data flow in **Komodo**.
-Some data $D$ is first encoded. Then _commitments_ and _proofs_ are computed.
-Finally, on the other end, blocks are verified and decoded.
+This section shows a high-level overview of the data flow in **Komodo**. Some
+data $D$ is first encoded on the sender side. Then _commitments_ and _proofs_
+are computed. Eventually, on the receiver side, blocks are verified and decoded.
+Here is how the sender side works:
 
 \tikzset{
     block/.style = {draw, fill=white, rectangle, minimum height=3em, minimum width=3em},
@@ -152,19 +158,15 @@ Finally, on the other end, blocks are verified and decoded.
     \node [block, right of=source, node distance=4cm] (encoded) {$(e_j)$};
     \node [block, right of=encoded, node distance=3cm, fill=yellow!20] (commitment) {$c$};
     \node [block, below of=commitment, node distance=1.3cm, fill=yellow!30] (proof) {$(\pi_j)$};
-    \node [block, right of=commitment, node distance=1.5cm, fill=blue!50] (blocks) {$(b_j)$};
-    \node [block, right of=blocks, node distance=3cm, fill=blue!20] (verified) {$(b^*_j)$};
-    \node [block, above of=verified, node distance=2cm, fill=red!20] (decoded) {$(\tilde{s}_i)$};
-    \node [block, left of=decoded, fill=green!20] (data_) {$\tilde{D}$};
+    \node [block, right of=commitment, node distance=3cm, fill=blue!50] (blocks) {$(b_j)$};
+    \coordinate (below_proof) at ([yshift=-3mm] proof.south);
     \draw [->] (data) -- node{split into elements of $\mathbb{F}$} (source);
     \draw [->] (source) -- node{\texttt{encode(k, n)}} (encoded);
     \draw [->] (encoded) -- node[name=a,anchor=south]{\texttt{commit}} (commitment);
     \draw [->] (a) |- node[anchor=north]{\texttt{prove}} (proof);
-    \draw [->] (commitment) -- (blocks);
-    \draw [->] (proof) -| (blocks);
-    \draw [->] (blocks) -- node{\texttt{verify}} (verified);
-    \draw [->] (verified) -- node{\texttt{decode}} (decoded);
-    \draw [->] (decoded) -- (data_);
+    \draw [->] (commitment) -- node[name=b,anchor=south]{\texttt{build}} (blocks);
+    \draw [->] (proof) -| (b);
+    \draw [->] (encoded.south) |- (below_proof) -| (b);
 \end{tikzpicture}
 
 where
@@ -178,11 +180,38 @@ where
 - $(\pi_j)_{1 \leq j \leq n} \in \mathbb{F}^{n}$ are the proofs for each _shard_
 - $(b_j)_{1 \leq j \leq n}$ are the final proven blocks, i.e. $(e_j, c, \pi_j)$
 
-A valid and robust system should satisfy and guarantee the two following
-properties:
+Once blocks are proven on the sender side, they can be dispersed, e.g. for
+distributed storage. During this dispersion process, they can be corrupted,
+either during transmission or on the storage nodes. Eventually, on the receiver
+side, they should be verified and decoded properly. Here is how the receiver
+side works:
 
-- all blocks $(b^*_j)$ are valid and all other blocks are invalid
-- $(\tilde{s}_i) \stackrel{?}{=} (s_i)$ and thus $\tilde{D} \stackrel{?}{=} D$
+\begin{tikzpicture}[auto, node distance=2cm,>=latex']
+    \node [block, right of=commitment, node distance=3cm, fill=blue!50] (blocks) {$(\tilde{r}_j)$};
+    \node [block, right of=blocks, node distance=3cm, fill=blue!20] (verified) {$(\tilde{b}^*_j)$};
+    \node [block, right of=verified, node distance=3cm, fill=red!20] (decoded) {$(\tilde{s}_i)$};
+    \node [block, right of=decoded, node distance=3cm, fill=green!20] (data_) {$\tilde{D}$};
+    \draw [->] (blocks) -- node{\texttt{verify}} (verified);
+    \draw [->] (verified) -- node{\texttt{decode}} (decoded);
+    \draw [->] (decoded) -- node{merge} (data_);
+\end{tikzpicture}
+
+where
+
+- $(\tilde{r}_j)_{1 \leq j \leq n}$ are the raw received blocks
+- $(\tilde{b}^*_j)_{1 \leq j \leq n}$ are the valid verified received blocks (invalid
+  blocks are discarded)
+- $(\tilde{s}_i)_{1 \leq i \leq k}$ are the decoded source shards, reconstructed
+  from any subset of $k$ valid verified blocks. They are the identical to the
+  original source shards $(s_i)$ if all previous steps were correct
+- $\tilde{D}$ is the reassembled original data from the decoded source shards
+
+A valid and robust
+system should satisfy and guarantee the two following properties:
+
+- on the receiver side, all blocks $(\tilde{b}^*_j)$ are valid and all other
+  blocks are invalid
+- $(\tilde{s}_i) = (s_i)$ and thus $\tilde{D} = D$
 
 > **Note**
 >
@@ -278,7 +307,11 @@ and decoding process and the three cryptographic protocols.
 ## Some measurements
 
 Building on the work from [@stevan2024performance], we have conducted some
-measurements of the performance of the three methods.
+measurements of the performance of the three methods. All experiments were run
+on a laptop with x86‑64 Intel Core i7‑12800H (14 cores / 20 threads,
+0.4–4.8 GHz) system with a 3-level cache hierarchy (L1d 544 KiB, L1i 704 KiB, L2
+11.5 MiB, L3 24 MiB) and a single NUMA node. Only one thread was used for all
+experiments.
 
 The time to run `commit`, `prove` and `verify` has been measured for $k = 8$ and
 a code rate $\rho = \frac{1}{2}$, i.e. $n = 16$, on the BN-254 elliptic curve, and
@@ -299,19 +332,25 @@ worst than **Semi-AVID** for committing and proving.
 
 # Statement of need
 
-> TODO: develop this
+Komodo provides mechanisms that satisfy various distributed systems' needs such
+as verifiable information dispersal or data availability. Such systems range
+from private drone swarms to public blockchains.
 
-the use case is any system that meet the following criteria
+For instance, in a distributed storage system, nodes can encode data into
+shards, prove their integrity, and distribute them across the network. Other
+nodes can then verify the shards' validity before storing or retrieving them,
+ensuring data robustness and trustworthiness.
 
-- distributed, e.g. drones
-- need for data robustness, e.g. by introducing redundancy
-- no trust in others nor the environment, need to prove the integrity of the data
+In blockchain systems, Komodo can be used as the key enabling mechanism for
+checking data availability, similar to how 2D Reed-Solomon codes and Danksharding
+[@danksharding2024] are used within Ethereum 2.0, or similar mechanisms in the
+Celestia or Avail blockchains, among many others.
 
 A few libraries provide similar functionalities, with a few gaps filled by
 `Komodo`.
 
 The `arkworks` ecosystem [@arkworks] is probably the closest library, providing
-many of the necessary building bricks involved in Data Availability Sampling:
+many of the necessary building blocks involved in Data Availability Sampling:
 prime fields, possibly paired with elliptic curves like BLS12-381 or BN254 among
 many others; linear algebra operations like polynomial operations and matrix
 operations; and polynomial commitment. On top of those features, `Komodo` adds
@@ -326,19 +365,10 @@ elliptic curves.
 
 `Komodo` also adds a unified high-level API, allowing to benchmark and compare
 different combinations of prime fields, elliptic curves and polynomial
-commitment schemes, as we did in two publications [@stevan2024performance; @stevan2025performance].
-Finally, a modular design allows to extend `Komodo` with new polynomial
-commitment schemes, which performance can be evaluated in the same benchmarking
-conditions.
-
-Scroll [@scroll2024], Avail [@avail2024] and Danksharding [@danksharding2024].
-
-**Komodo** can be extended with either
-
-new encoding methods in the `fec` module
-proof protocols, just as with the `kzg`, `aplonk` and `semi_avid` modules
-
-and Tezos [@tezos2024aplonk].
+commitment schemes, as we did in two publications [@stevan2024performance;
+@stevan2025performance]. Finally, a modular design allows to extend `Komodo`
+with new polynomial commitment schemes or new encoding methods, which
+performance can be evaluated in the same benchmarking conditions.
 
 # Availability
 
@@ -352,45 +382,6 @@ information about where the source code is hosted.
 ## Programming language
 
 **Komodo** is fully written in _Rust_.
-
-One can install _Cargo_ [^3], e.g. with _rustup_ [^4], and the exact version
-is taken care of by `rust-toolchain.toml`.
-
-[^3]: _Cargo_: [https://doc.rust-lang.org/cargo/](https://doc.rust-lang.org/cargo/)
-[^4]: `rustup`: [https://rustup.rs/](https://rustup.rs/)
-
-## Additional system requirements
-
-This depends on the data for the memory usage but all experiments and
-measurements have been conducted on regular _home_ computers.
-
-> ```json
-> {
->   "Architecture": "x86_64",
->   "CPU op-mode(s)": "32-bit, 64-bit",
->   "Address sizes": "46 bits physical, 48 bits virtual",
->   "Byte Order": "Little Endian",
->   "CPU(s)": "20",
->   "On-line CPU(s) list": "0-19",
->   "Model name": "12th Gen Intel(R) Core(TM) i7-12800H",
->   "CPU family": "6",
->   "Model": "154",
->   "Thread(s) per core": "2",
->   "Core(s) per socket": "14",
->   "Socket(s)": "1",
->   "Stepping": "3",
->   "CPU max MHz": "4800.0000",
->   "CPU min MHz": "400.0000",
->   "BogoMIPS": "5606.40",
->   "Virtualization": "VT-x",
->   "L1d cache": "544 KiB (14 instances)",
->   "L1i cache": "704 KiB (14 instances)",
->   "L2 cache": "11.5 MiB (8 instances)",
->   "L3 cache": "24 MiB (1 instance)",
->   "NUMA node(s)": "1",
->   "NUMA node0 CPU(s)": "0-19"
-> }
-> ```
 
 ## Dependencies
 
@@ -412,11 +403,8 @@ All dependencies are taken care of by _Cargo_ and `Cargo.toml`.
 - Licence: MIT
 - Date published: 05/11/2024
 
-## Language
-
-Everything is written in english.
-
 ## Contact
+
 Contact us at `firstname.lastname@isae-supaero.fr` or at one of
 
 - bug reports and feature requests [https://gitlab.isae-supaero.fr/dragoon/komodo/-/issues](https://gitlab.isae-supaero.fr/dragoon/komodo/-/issues)
