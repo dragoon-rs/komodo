@@ -75,6 +75,47 @@ following on any input data in a distributed network or setup:
   process that is not scalable.
 - `decode`: decodes the original data using any subset of $k$ valid shards.
 
+# Statement of need
+
+Komodo provides mechanisms that satisfy various distributed systems' needs such
+as verifiable information dispersal or data availability. Such systems range
+from private drone swarms to public blockchains.
+
+For instance, in a distributed storage system, nodes can encode data into
+shards, prove their integrity, and distribute them across the network. Other
+nodes can then verify the shards' validity before storing or retrieving them,
+ensuring data robustness and trustworthiness.
+
+In blockchain systems, Komodo can be used as the key enabling mechanism for
+checking data availability, similar to how 2D Reed-Solomon codes and Danksharding
+[@danksharding2024] are used within Ethereum 2.0, or similar mechanisms in the
+Celestia or Avail blockchains, among many others.
+
+A few libraries provide similar functionalities, with a few gaps filled by
+`Komodo`.
+
+The `arkworks` ecosystem [@arkworks] is probably the closest library, providing
+many of the necessary building blocks involved in Data Availability Sampling:
+prime fields, possibly paired with elliptic curves like BLS12-381 or BN254 among
+many others; linear algebra operations like polynomial operations and matrix
+operations; and polynomial commitment. On top of those features, `Komodo` adds
+Reed-Solomon encoding, tightly integrated with proof generation.
+
+The Rust implementation of Reed-Solomon erasure coding [@rust-rse] provides
+mechanisms to encode and decode data into raw shards, using elements of finite
+fields $\mathbb{F}_{2^8}$ or $\mathbb{F}_{2^{16}}$, containing respectively
+$2^8$ and $2^{16}$ elements. `Komodo` adds the proving mechanisms, and makes it
+possible to use elements from `arkworks`' prime fields, possibly paired with
+elliptic curves.
+
+`Komodo` also adds a unified high-level API, allowing to benchmark and compare
+different combinations of prime fields, elliptic curves and polynomial
+commitment schemes, as we did in two publications [@stevan2024performance;
+@stevan2025performance]. Finally, a modular design allows to extend `Komodo`
+with new polynomial commitment schemes or new encoding methods, which
+performance can be evaluated in the same benchmarking conditions.
+
+# Komodo
 The previous key steps of all the protocols implemented use some basic
 mathematical objects.
 On one hand, `encode` and `decode` use elements of a finite field $\mathbb{F}$
@@ -329,46 +370,6 @@ as can be seen in \autoref{fig:small}.
 worst than **Semi-AVID** for committing and proving.
 
 **KZG+** is neither good nor too bad.
-
-# Statement of need
-
-Komodo provides mechanisms that satisfy various distributed systems' needs such
-as verifiable information dispersal or data availability. Such systems range
-from private drone swarms to public blockchains.
-
-For instance, in a distributed storage system, nodes can encode data into
-shards, prove their integrity, and distribute them across the network. Other
-nodes can then verify the shards' validity before storing or retrieving them,
-ensuring data robustness and trustworthiness.
-
-In blockchain systems, Komodo can be used as the key enabling mechanism for
-checking data availability, similar to how 2D Reed-Solomon codes and Danksharding
-[@danksharding2024] are used within Ethereum 2.0, or similar mechanisms in the
-Celestia or Avail blockchains, among many others.
-
-A few libraries provide similar functionalities, with a few gaps filled by
-`Komodo`.
-
-The `arkworks` ecosystem [@arkworks] is probably the closest library, providing
-many of the necessary building blocks involved in Data Availability Sampling:
-prime fields, possibly paired with elliptic curves like BLS12-381 or BN254 among
-many others; linear algebra operations like polynomial operations and matrix
-operations; and polynomial commitment. On top of those features, `Komodo` adds
-Reed-Solomon encoding, tightly integrated with proof generation.
-
-The Rust implementation of Reed-Solomon erasure coding [@rust-rse] provides
-mechanisms to encode and decode data into raw shards, using elements of finite
-fields $\mathbb{F}_{2^8}$ or $\mathbb{F}_{2^{16}}$, containing respectively
-$2^8$ and $2^{16}$ elements. `Komodo` adds the proving mechanisms, and makes it
-possible to use elements from `arkworks`' prime fields, possibly paired with
-elliptic curves.
-
-`Komodo` also adds a unified high-level API, allowing to benchmark and compare
-different combinations of prime fields, elliptic curves and polynomial
-commitment schemes, as we did in two publications [@stevan2024performance;
-@stevan2025performance]. Finally, a modular design allows to extend `Komodo`
-with new polynomial commitment schemes or new encoding methods, which
-performance can be evaluated in the same benchmarking conditions.
 
 # Availability
 
