@@ -26,7 +26,7 @@ authors:
 affiliations:
  - name: ISAE-SUPAERO, France
    index: 1
-date: 01 January 1970
+date: 24 November 2025
 bibliography: paper.bib
 ---
 
