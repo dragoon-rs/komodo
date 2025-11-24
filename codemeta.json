@@ -1,0 +1,44 @@
+{
+  "@context": "https://raw.githubusercontent.com/codemeta/codemeta/master/codemeta.jsonld",
+  "@type": "Code",
+  "author": [
+    {
+      "@id": "http://orcid.org/0009-0003-5684-5862",
+      "@type": "Person",
+      "email": "antoine.stevan@isae-supaero.fr",
+      "name": "Antoine Stevan",
+      "affiliation": "ISAE-SUPAERO"
+    },
+    {
+      "@id": "http://orcid.org/0000-0002-4237-5981",
+      "@type": "Person",
+      "email": "jonathan.detchart@isae-supaero.fr",
+      "name": "Jonathan Detchart",
+      "affiliation": "ISAE-SUPAERO"
+    },
+    {
+      "@id": "http://orcid.org/0009-0002-2542-0004",
+      "@type": "Person",
+      "email": "tanguy.perennou@isae-supaero.fr",
+      "name": "Tanguy Pérennou",
+      "affiliation": "ISAE-SUPAERO"
+    },
+    {
+      "@id": "http://orcid.org/0000-0002-3121-4824",
+      "@type": "Person",
+      "email": "jerome.lacan@isae-supaero.fr",
+      "name": "Jérôme Lacan",
+      "affiliation": "ISAE-SUPAERO"
+    }
+  ],
+  "identifier": "",
+  "codeRepository": "https://gitlab.isae-supaero.fr/dragoon/komodo",
+  "datePublished": "2024-11-05",
+  "dateModified": "2025-11-24",
+  "dateCreated": "2023-11-30",
+  "description": "Cryptographically-proven Erasure Coding",
+  "keywords": "Cryptography, Erasure codes, Distributed systems, Verifiable information dispersal, Data availability",
+  "license": "MIT",
+  "title": "Komodo: Cryptographically-proven Erasure Coding",
+  "version": "v1.0.1"
+}
