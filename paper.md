@@ -32,7 +32,7 @@ bibliography: paper.bib
 
 \usetikzlibrary{shapes,arrows,positioning,calc}
 
-# Abstract
+# Summary
 
 We present **Komodo**, a library that allows to encode data with erasure-code
 techniques such as Reed-Solomon encoding, prove the resulting shards with
@@ -44,17 +44,7 @@ available on the ISAE-SUPAERO GitLab instance [^1] with a mirror on GitHub [^2].
 cryptographically-proven shards of data in distributed systems or data
 availability sampling settings.
 
-[^1]: GitLab source code: [https://gitlab.isae-supaero.fr/dragoon/komodo](https://gitlab.isae-supaero.fr/dragoon/komodo)
-[^2]: GitHub mirror for issues and pull requests: [https://github.com/dragoon-rs/komodo](https://github.com/dragoon-rs/komodo)
-
-# Keywords
-
-Cryptography; Erasure codes; Distributed systems; Verifiable information
-dispersal; Data availability;
-
-# Summary
-
-**Komodo** is a software library that provides a _Rust_ API to achieve the
+**Komodo** provides a _Rust_ API to achieve the
 following on any input data in a distributed network or setup:
 
 - `encode`: encodes data into _shards_ with a $(k, n)$ code. This adds
@@ -74,6 +64,14 @@ following on any input data in a distributed network or setup:
   possible to know which shards were invalid, leading to a _try-and-error_
   process that is not scalable.
 - `decode`: decodes the original data using any subset of $k$ valid shards.
+
+[^1]: GitLab source code: [https://gitlab.isae-supaero.fr/dragoon/komodo](https://gitlab.isae-supaero.fr/dragoon/komodo)
+[^2]: GitHub mirror for issues and pull requests: [https://github.com/dragoon-rs/komodo](https://github.com/dragoon-rs/komodo)
+
+# Keywords
+
+Cryptography; Erasure codes; Distributed systems; Verifiable information
+dispersal; Data availability;
 
 # Statement of need
 
