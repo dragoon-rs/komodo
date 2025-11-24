@@ -375,10 +375,6 @@ performance can be evaluated in the same benchmarking conditions.
 This section details requirements for **Komodo** to work properly and
 information about where the source code is hosted.
 
-## Operating system
-
-**Komodo** has been made on Linux but should be crossplatform by construction.
-
 ## Programming language
 
 **Komodo** is fully written in _Rust_.
