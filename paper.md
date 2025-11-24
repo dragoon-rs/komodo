@@ -116,8 +116,9 @@ with new polynomial commitment schemes or new encoding methods, which
 performance can be evaluated in the same benchmarking conditions.
 
 # Komodo
-The previous key steps of all the protocols implemented use some basic
-mathematical objects.
+The following section introduces the **Komodo** library with more details about the implemented protocols, a graphical representation of the flow of data in an end-to-end communication, a simplified code example and some key performance results.
+
+**Komodo**, whose key steps have been introduced in _Summary_, use some basic mathematical objects.
 On one hand, `encode` and `decode` use elements of a finite field $\mathbb{F}$
 with a large prime order $p$. $p$ is required to be large, usually $64$ bits or
 more, for security reasons, to avoid collisions between shards. Elements in
