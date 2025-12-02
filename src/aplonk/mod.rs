@@ -1,6 +1,4 @@
-//! aPlonK: an extension of KZG+ where commits are _folded_ into one
-//!
-//! > references:
+//! $\text{aPlonK}$: an extension of $\text{KZG}^+$ where commits are _folded_ into one
 //! > - [Ambrona et al., 2022](https://link.springer.com/chapter/10.1007/978-3-031-41326-1_11)
 //!
 #![doc = simple_mermaid::mermaid!("mod.mmd")]

@@ -1,8 +1,7 @@
 //! $\text{KZG}^+$: the multipolynomial and non-interactive extension of $\text{KZG}$
-//!
-//! > references:
 //! > - [Kate et al., 2010](https://link.springer.com/chapter/10.1007/978-3-642-17373-8_11)
-//! > - [Boneh et al., 2020](https://eprint.iacr.org/2020/081)
+//! (`10.1007/978-3-642-17373-8_11`; [PDF](https://www.cypherpunks.ca/~iang/pubs/PolyCommit-AsiaCrypt.pdf))
+//! > - [Boneh et al., 2020](https://eprint.iacr.org/2020/081) ([PDF](https://eprint.iacr.org/2020/081.pdf))
 //!
 //! # The protocol
 //! Here, we assume that the input data has been encoded with a _Reed-Solomon_ encoding, as can be
@@ -17,7 +16,6 @@
 //! >
 //! > Also, $H$ is a secure hash function and
 //! > $E: \mathbb{G}_1 \times \mathbb{G}_2 \mapsto \mathbb{G}_T$ is the bilinear pairing mapping
-//! > defined on _pairing-friendly_ elliptic curves $(\mathbb{G}_1, \mathbb{G}_2, \mathbb{G}_T)$
 //! > such as BLS12-381.
 #![doc = simple_mermaid::mermaid!("kzg.mmd")]
 //!

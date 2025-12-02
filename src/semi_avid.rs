@@ -1,11 +1,10 @@
-//! Semi-AVID: a proving scheme suited for an _information dispersal_ context
+//! $\text{Semi-AVID}$: a proving scheme suited for an _information dispersal_ context
 //!
-//! In their paper, [Nazirkhanova et al.](https://arxiv.org/abs/2111.12323) introduce a new proving
-//! scheme.
+//! In their paper, [Nazirkhanova et al., 2022](https://arxiv.org/abs/2111.12323)
+//! ([PDF](https://eprint.iacr.org/2021/1544.pdf)) introduce a new proving scheme.
 //!
-//! In opposition to how it is commonly done in protocols such as
-//! [KZG](https://link.springer.com/chapter/10.1007/978-3-642-17373-8_11), the data is interpreted
-//! as column-oriented polynomials.
+//! In opposition to how it is commonly done in protocols such as [`crate::kzg`], the data is
+//! interpreted as column-oriented polynomials.
 //!
 //! Using FEC notations, there are $k$ such column-oriented polynomials, i.e. the $k$ source shards.
 //! They are all commited using a common trusted setup and these $k$ commitments are used to prove
@@ -32,7 +31,7 @@
 //! > - $0 \leq i \leq m - 1$
 //! > - $0 \leq j \leq k - 1$
 //!
-//! Let’s explain with a very simple example how things operate with Semi-AVID. The setup is that a
+//! Let’s explain with a very simple example how things operate with $\text{Semi-AVID}$. The setup is that a
 //! prover wants to show a verifier that a shard of encoded data $s_\alpha$ has indeed been
 //! generated with a linear combination of the $k$ source shards from data $\Delta$. $\alpha$ is
 //! the number that identifies shard $s_\alpha$ and $\text{lincomb}(s_\alpha)$ is the linear combination
@@ -47,7 +46,7 @@
 //! > once and Rust will take care of _carrying_ the types in the rest of the code. Also, `DP<F>`
 //! > will likely be its own generic type, usually written `P` in this code base.
 //! >
-//! > See the Semi-AVID example for a fully-typed code.
+//! > See the $\text{Semi-AVID}$ example for a fully-typed code.
 //!
 //! - first, let's import some types...
 //! ```
@@ -63,7 +62,7 @@
 //! let bytes = include_bytes!("../assets/dragoon_133x133.png").to_vec();
 //! # }
 //! ```
-//! - then, Semi-AVID requires a trusted setup to prove and verify. This example shows a trusted
+//! - then, $\text{Semi-AVID}$ requires a trusted setup to prove and verify. This example shows a trusted
 //! setup big enough to support data as big as $10 \times 1024$ elements of $\mathbb{F}_p$, to
 //! allow users to reuse it with multiple files of varying lengths.
 //! ```
@@ -149,7 +148,7 @@
 //! ```
 //!
 //! # Recoding
-//! By constrution, Semi-AVID supports an operation on shards known as _recoding_. This allows to
+//! By constrution, $\text{Semi-AVID}$ supports an operation on shards known as _recoding_. This allows to
 //! combine an arbitrary number of shards together on the fly, without decoding the data and then
 //! re-encoding brand new shards.
 //!

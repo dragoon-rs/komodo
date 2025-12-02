@@ -2,6 +2,26 @@
 - [Requirements](#requirements)
 - [Run](#run)
 
+> [!important]
+> $\text{FRI}$ does not have a proper benchmark... it uses the
+> [`fri.rs` example](../examples/fri.rs) instead which takes the full list of
+> parameters and outputs the time of each step of the protocol
+> > [!tip] Nushell snippet
+>
+> ```bash
+> cargo run --example fri --features fri -- ...[
+>     --seed 1234
+>     --data-size 1025
+>     -k 4
+>     --blowup-factor 2
+>     --remainder-degree-plus-one 1
+>     --folding-factor 2
+>     --nb-queries 32
+>     --hash blake3
+>     --finite-field fp128
+> ]
+> ```
+
 ## Requirements
 - activate the `benchmarks` module
 ```bash

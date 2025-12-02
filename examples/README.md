@@ -1,7 +1,8 @@
 the following examples have the same general structure:
-- [_aPlonK_](aplonk.rs)
-- [_KZG+_](kzg.rs)
-- [_Semi-AVID_](semi_avid.rs)
+- [$\text{aPlonK}$](aplonk.rs)
+- [$\text{KZG}^+$](kzg.rs)
+- [$\text{Semi-AVID}$](semi_avid.rs)
+- [$\text{FRI}$](fri.rs)
 
 ```rust
 // some imports
