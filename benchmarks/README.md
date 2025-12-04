@@ -1,185 +1,149 @@
-# Table of contents
-- [Requirements](#requirements)
-- [Run](#run)
+> [!note]
+> missing benchmarks from previous version (1.0.1) are listed in [`TODO.md`](TODO.md)
+
+> [!tip]
+> everything below is made to be run from the root of the _Komodo_ repo
+
+## an example
+```bash
+use benchmarks/make.nu
+make bench (0..18 | each { 1024 * 2 ** $in }) -k 2 -n 6 --nb-rounds 10
+```
+
+## run all
+```bash
+use benchmarks/make.nu
+
+let cpu = make lscpu | to json | hash sha256
+let git = git rev-parse HEAD | str trim
+
+const RHO = 1 / 2
+let BN254_F_SIZE = 254 / 8 | math floor | $in * 8
+
+make build
+
+mkdir benchmarks/results
+
+1..6
+    | each { 2 ** $in }
+    | each {{ k: $in, n: ($in / $RHO | into int) }}
+    | each { |it|
+        make bench (0..8 | each { 1024 * 2 ** $in }) -k $it.k -n $it.n --nb-rounds 1 --protocol semi-avid
+            | insert k $it.k
+            | insert n $it.n
+    }
+    | flatten
+    | insert git $git
+    | insert cpu $cpu
+    | save --force benchmarks/results/semi-avid.ndjson
+
+1..6
+    | each { 2 ** $in }
+    | each {{ k: $in, n: ($in / $RHO | into int) }}
+    | each { |it|
+        make bench (0..8 | each { 1024 * 2 ** $in }) -k $it.k -n $it.n --nb-rounds 1 --protocol kzg
+            | insert k $it.k
+            | insert n $it.n
+    }
+    | flatten
+    | insert git $git
+    | insert cpu $cpu
+    | save --force benchmarks/results/kzg.ndjson
+
+1..6
+    | each { 2 ** $in }
+    | each {{ k: $in, n: ($in / $RHO | into int) }}
+    | each { |it|
+        make bench (0..8 | each { $BN254_F_SIZE * 2 ** $in }) -k $it.k -n $it.n --nb-rounds 1 --protocol aplonk
+            | insert k $it.k
+            | insert n $it.n
+    }
+    | flatten
+    | insert git $git
+    | insert cpu $cpu
+    | save --force benchmarks/results/aplonk.ndjson
+
+1..6
+    | each { 2 ** $in }
+    | each {{ k: $in, n: ($in / $RHO | into int) }}
+    | each { |it|
+        make bench (0..8 | each { 1024 * 2 ** $in }) -k $it.k -n $it.n --nb-rounds 1 --protocol fri --fri-ff 2 --fri-bf (1 / $RHO | into int) --fri-rpo 1 --fri-q 50
+            | insert k $it.k
+            | insert n $it.n
+    }
+    | flatten
+    | insert git $git
+    | insert cpu $cpu
+    | save --force benchmarks/results/fri.ndjson
+```
+
+## plot all
+```bash
+def get-values []: [ table -> list<float> ] {
+    update times { try { math avg } }
+        | group-by --to-table k
+        | sort-by { $in.k | into int }
+        | reverse
+        | get items
+        | each { each { try { $in.times | math log 10 } catch { -1 } } }
+        | flatten
+        | wrap _
+        | update _ { if $in == -1 { "NaN" } else { $in }}
+        | get _
+}
+
+def plot-steps [
+    data: table,
+    steps: list<string>,
+    --name: string,
+    --width (-W): int,
+    --height (-H): int,
+] {
+    for step in $steps {
+        $data
+            | where step == $step
+            | get-values
+            | uv run benchmarks/heat_map.py ...$in -W $width -H $height --save $"($name)-($step).png"
+    }
+}
+
+plot-steps (open benchmarks/results/semi-avid.ndjson) --name semi-avid -W 9 -H 6 ["t_prove_k", "t_build_n", "t_verify_n"]
+plot-steps (open benchmarks/results/kzg.ndjson      ) --name kzg       -W 9 -H 6 ["t_commit_m", "t_prove_n", "t_verify_n", "t_verify_batch_3"]
+plot-steps (open benchmarks/results/aplonk.ndjson   ) --name aplonk    -W 9 -H 6 ["t_commit_m", "t_prove_n", "t_verify_n"]
+plot-steps (open benchmarks/results/fri.ndjson      ) --name fri       -W 9 -H 6 ["t_evaluate_kn", "t_encode_n", "t_prove_n", "t_verify_n", "t_decode_k"]
+```
+
 
 > [!important]
-> $\text{FRI}$ does not have a proper benchmark... it uses the
-> [`fri.rs` example](../examples/fri.rs) instead which takes the full list of
-> parameters and outputs the time of each step of the protocol
-> > [!tip] Nushell snippet
 >
-> ```bash
-> cargo run --example fri --features fri -- ...[
->     --seed 1234
->     --data-size 1025
->     -k 4
->     --blowup-factor 2
->     --remainder-degree-plus-one 1
->     --folding-factor 2
->     --nb-queries 32
->     --hash blake3
->     --finite-field fp128
-> ]
-> ```
-
-## Requirements
-- activate the `benchmarks` module
-```bash
-use benchmarks
-```
-
-> [!tip] TIP
+> ---
 >
-> the `benchmarks` module is imported in `.env.nu` and can be used automatically
-> with tools like [`nuenv`].
-
-## Run
-> [!note] NOTE
+> **Notations**: in the following, for any $n \in \mathbb{N}$ and $f$ a function
+> from $\mathbb{N}$ to $\mathbb{N}$,
 >
-> the FRI benchmarks don't use a module from [src/bin/](src/bin/) with PLNK but rather an
-> [example](../examples/fri.rs)
-
-```bash
-const RESULTS_DIR = "/path/to/komodo-benchmark-results/"
-```
-
-> [!tip] TIP
+> $$n = f(\bullet) \leftrightarrow \exists k \in \mathbb{N}: n = f(k)$$
+> e.g with $f: x \mapsto 2^x$, $n = 2^\bullet$ means that $n$ is a power of $2$.
 >
-> during the course of development of this project, the benchmarks results,
-> synched with [gitlab.isae-supaero.fr:dragoon/komodo-benchmark-results], have
-> been stored locally in `../komodo-benchmark-results`.
+> ---
 >
-> therefore, the `$RESULTS_DIR` constant is defined in `.env.nu` and can be
-> exported automatically with tools like [`nuenv`].
-
-```bash
-(benchmarks run -o $RESULTS_DIR
-    --rust-build "release"
-    field group setup commit linalg fec
-    --curves [ "bls12381", "pallas", "bn254" ]
-    --degrees (0..13 | each { 2 ** $in })
-    --matrix-sizes (0..7 | each { 2 ** $in })
-    --data-sizes (0..18 | each { 512 * 2 ** $in })
-    --ks [2, 4, 8, 16, 32, 64]
-    --rhos [1.00, 0.50, 0.33, 0.20]
-)
-```
-```bash
-(benchmarks run -o $RESULTS_DIR
-    --rust-build "release"
-    semi-avid kzg aplonk
-    --curves     [ "bn254" ]
-    --data-sizes ([ 496kib, 124mib ] | into int)
-    --ks         [ 8 ]
-    --rhos       [ 0.5 ]
-)
-```
-
-> [!important] IMPORTANT NOTE about aPlonK
+> The $\text{aPlonK}$ method requires the data to have a certain shape.
+> Once the data has been arranged in an $m \times k$ matrix, the number of
+> polynomials is $m = 2^\bullet$.
 >
-> The aPlonK method requires the data to have a certain shape. Namely the number of polynomials,
-> once the data has been arranged in a matrix needs to be a power of 2. We can use the script below
-> to list all the possible input sizes for BLS12-381 (381 bits) and BN254 (254 bits):
-> ```bash
-> def pretty-filesize []: [
->     number -> string,
->     list<number> -> list<string>,
-> ] {
->     def convert []: [ filesize -> string ] {
->         if $in < 1kib {
->             format filesize B
->         } else if $in < 1mib {
->             format filesize KiB
->         } else if $in < 1gib {
->             format filesize MiB
->         } else if $in < 1tib {
->             format filesize GiB
->         } else if $in < 1pib {
->             format filesize TiB
->         } else {
->             format filesize PiB
->         }
->     }
->     $in | into filesize | if ($in | describe --detailed).type == "list" { each { convert } } else { convert }
-> }
+> $\text{aPlonK}$ also requires $k = 2^\bullet$ for the folding of $\text{IPA}$
+> to work.
 >
-> def possible-aplonk-inputs [bits: int, n: int] {
->     let bits = ($bits / 8 | math floor) * 8
+> Finally, the relation between $k$, $m$, the size $\phi$ of an element of
+> $\mathbb{F}$ _without bit truncation_ and the size $\delta$ of the input data
+> $\Delta$ is
 >
->     seq 0 $n | each { |i|
->         let x = $bits * 2 ** $i
->         {
->             bits: $x,
->             literal: ($x | pretty-filesize | str replace ' ' '' | str downcase),
->         }
->     }
-> }
-> ```
-> ## BLS12-381
-> | bits      | literal    |
-> | --------- | ---------- |
-> | 376       | 376b       |
-> | 752       | 752b       |
-> | 1504      | 1.46875kib |
-> | 3008      | 2.9375kib  |
-> | 6016      | 5.875kib   |
-> | 12032     | 11.75kib   |
-> | 24064     | 23.5kib    |
-> | 48128     | 47kib      |
-> | 96256     | 94kib      |
-> | 192512    | 188kib     |
-> | 385024    | 376kib     |
-> | 770048    | 752kib     |
-> | 1540096   | 1.46875mib |
-> | 3080192   | 2.9375mib  |
-> | 6160384   | 5.875mib   |
-> | 12320768  | 11.75mib   |
-> | 24641536  | 23.5mib    |
-> | 49283072  | 47mib      |
-> | 98566144  | 94mib      |
-> | 197132288 | 188mib     |
-> | 394264576 | 376mib     |
-> | 788529152 | 752mib     |
+> $$\delta = km\delta = \delta \times 2^\bullet$$
 >
-> ## BN254
-> | bits       | literal   |
-> | ---------- | --------- |
-> | 248        | 248b      |
-> | 496        | 496b      |
-> | 992        | 992b      |
-> | 1984       | 1.9375kib |
-> | 3968       | 3.875kib  |
-> | 7936       | 7.75kib   |
-> | 15872      | 15.5kib   |
-> | 31744      | 31kib     |
-> | 63488      | 62kib     |
-> | 126976     | 124kib    |
-> | 253952     | 248kib    |
-> | 507904     | 496kib    |
-> | 1015808    | 992kib    |
-> | 2031616    | 1.9375mib |
-> | 4063232    | 3.875mib  |
-> | 8126464    | 7.75mib   |
-> | 16252928   | 15.5mib   |
-> | 32505856   | 31mib     |
-> | 65011712   | 62mib     |
-> | 130023424  | 124mib    |
-> | 260046848  | 248mib    |
-> | 520093696  | 496mib    |
-> | 1040187392 | 992mib    |
-
-> [!tip] TIP
+> In the end, the size of $\Delta$ is a _power of 2 multiple_ of $\delta$ and
+> below are values of $\phi$ with the corresponding elliptic curve and number of
+> bits in the prime order $p$ of $\mathbb{F}$
 >
-> the following `watch` can be used to see the results as they are dumped to `$RESULTS_DIR`
-> ```bash
-> let target = $RESULTS_DIR | path expand
-> clear
-> watch $target --glob '*.ndjson' { |op, path|
->     let now = date now | format date '%Y-%m-%dT%H:%M:%S'
->     let filename = $path | str replace $target '' | str trim --left --char '/'
->     $"($op)\t| (ansi cyan)($now)(ansi reset) | (ansi purple)($filename)(ansi reset)"
-> }
-> ```
-
-[gitlab.isae-supaero.fr:dragoon/komodo-benchmark-results]: https://gitlab.isae-supaero.fr/dragoon/komodo-benchmark-results
-[`nuenv`]: https://github.com/nushell/nu_scripts/blob/main/nu-hooks/nu-hooks/nuenv/hook.nu
+> | curve              | $p$ | $\phi$ |
+> | ------------------ | --- | ------ |
+> | $\text{BLS12-381}$ | 381 | 376    |
+> | $\text{BN254}$     | 254 | 248    |

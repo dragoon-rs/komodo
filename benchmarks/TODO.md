@@ -1,0 +1,8 @@
+- [ ] atomic operations on $\mathbb{F}$ ($\texttt{arkworks}$)
+- [ ] atomic operations on $\mathbb{G}$ ($\texttt{arkworks}$)
+- [ ] encoding ($\texttt{fec}$)
+- [ ] decoding ($\texttt{fec}$)
+- [ ] recoding ($\texttt{fec}$)
+- [ ] committing ($\texttt{zk}$)
+- [ ] powers of $\tau$ ($\texttt{zk}$)
+- [ ] matrix operations on $\mathbb{F}$ ($\texttt{linalg}$)
