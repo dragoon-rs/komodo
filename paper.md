@@ -64,6 +64,15 @@ following on any input data in a distributed network or setup:
   process that is not scalable.
 - `decode`: decodes the original data using any subset of $k$ valid shards.
 
+Three cryptographic protocols can be used to prove the integrity of encoded data:
+
+- **KZG+**: based on [@kate2010constant] and its multi-polynomial extension [@boneh2020efficient]
+- **aPlonK**: based on **PlonK** [@gabizon2019plonk] and **aPlonK** [@ambrona2023aplonk]
+- **Semi-AVID**: based on **Semi-AVID-PR** from [@nazirkhanova2022information]
+
+**Komodo** is based on the Arkworks library [@arkworks] which provides
+implementations of elliptic curves, fields and polynomial algebra.
+
 For more information about the library, the reader is encouraged to have a look at [@stevan2024performance] and [@stevan2023assessing].
 
 [^1]: GitLab source code: [https://gitlab.isae-supaero.fr/dragoon/komodo](https://gitlab.isae-supaero.fr/dragoon/komodo)
