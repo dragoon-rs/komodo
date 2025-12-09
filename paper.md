@@ -64,6 +64,8 @@ following on any input data in a distributed network or setup:
   process that is not scalable.
 - `decode`: decodes the original data using any subset of $k$ valid shards.
 
+For more information about the library, the reader is encouraged to have a look at [@stevan2024performance] and [@stevan2023assessing].
+
 [^1]: GitLab source code: [https://gitlab.isae-supaero.fr/dragoon/komodo](https://gitlab.isae-supaero.fr/dragoon/komodo)
 [^2]: GitHub mirror for issues and pull requests: [https://github.com/dragoon-rs/komodo](https://github.com/dragoon-rs/komodo)
 
@@ -112,70 +114,7 @@ commitment schemes, as we did in two publications [@stevan2024performance;
 with new polynomial commitment schemes or new encoding methods, which
 performance can be evaluated in the same benchmarking conditions.
 
-# Komodo
-The following section introduces the **Komodo** library with more details about the implemented protocols, a graphical representation of the flow of data in an end-to-end communication, a simplified code example and some key performance results.
-
-**Komodo**, whose key steps have been introduced in _Summary_, use some basic mathematical objects.
-On one hand, `encode` and `decode` use elements of a finite field $\mathbb{F}$
-with a large prime order $p$. $p$ is required to be large, usually $64$ bits or
-more, for security reasons, to avoid collisions between shards. Elements in
-$\mathbb{F}$ support the usual operations on numbers: _addition_, _substraction_,
-_multiplication_ and _division_.
-On the other hand, `commit`, `prove` and `verify` use elements of the additive
-subgroup $\mathbb{G}$ of an elliptic curve $\mathbb{E}$. For consistency, there
-has to be an isomorphism between $\mathbb{G}$ and $\mathbb{F}$. Elements in
-$\mathbb{G}$ support the operations of any additive group: _addition_ and _subtraction_.
-Multiplication by an integer scalar value can be constructed as a repeated
-_addition_.
-
-This version of **Komodo** ships three cryptographic methods to prove the
-integrity of encoded data:
-
-- **KZG+**: This method is based on the well-known _zero-knowledge_ protocol
-  **KZG** [@kate2010constant] and its multi-polynomial extension
-  [@boneh2020efficient]. In **KZG**, the data is interpreted as a polynomial.
-  Then a commitment of this polynomial, common to all shards, is computed.
-  Finally, a proof, unique per shard, is computed and attached to the associated
-  shard. The multi-polynomial extension allows to scale to bigger data by still
-  computing a single proof per shard regardless of the size of the input data.
-- **aPlonK**: This method is based on the following works: **PlonK**
-  [@gabizon2019plonk] and **aPlonK** [@ambrona2023aplonk]. Through recursion and
-  tree _folding_, it achieves smaller commitment sizes as compared to **KZG+**
-  at the cost of very expensive proving times.
-- **Semi-AVID**: This last method is the simplest and the fastest. It is based
-  on the work of **Semi-AVID-PR** [@nazirkhanova2022information]. Instead of
-  computing proofs as extra cryptographic elements, **Semi-AVID** leverages the
-  _homomorphic_ property of the `commit` operation which makes sure _the linear
-  combination of commitments is equal to the commitment of the same linear
-  combination_.
-
-A beta version of **Komodo** has been used in a previous evaluation paper
-[@stevan2024performance] and is still available for reference at
-[https://gitlab.isae-supaero.fr/dragoon/pcs-fec-id](https://gitlab.isae-supaero.fr/dragoon/pcs-fec-id).
-
-**Komodo** is based on the Arkworks library [@arkworks] which provides
-implementations of elliptic curves, fields and polynomial algebra used in all
-the proving protocols.
-
-A first method that has been considered was _Merkle trees_ [@merkle1987digital].
-They cut the data in leaves of a binary tree where the value inside a node is
-computed as the hash of the concatenation of its two children. This process
-produces a root, the _Merkle root_, and any leaf can be proven as being part of
-the tree by giving a _Merkle path_ in the tree, which is simply a path of
-intermediate hashes that allow to recompute the _Merkle root_ from the leaf.
-This method, once applied to our use case and despite its simplicity, was only
-proving that one shard was part of the _Merkle tree_ and not that it had been
-generated with a $(k,n)$ code, thus allowing reconstruction from any subset of
-$k$ shards.
-
-As described in [@stevan2024performance], the protocols are usually introduced
-interactively, i.e. the _prover_ and the _verifier_ need to be involved in an
-interactive discussion where the _verifier_ imposes challenges to the _prover_
-and the latter tries to convince the former. This is not very practical and the
-implementation uses a technic known as the _Fiat-Shamir transform_ from
-[@fiat1986prove].
-
-## Some measurements
+# Some measurements
 
 Building on the work from [@stevan2024performance], we have conducted some
 measurements of the performance of the three methods. All experiments were run
