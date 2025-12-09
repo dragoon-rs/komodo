@@ -190,9 +190,9 @@ for small and large input data.
 
 ![Performance for small files. Average over $10$ runs.\label{fig:small}](figures/99613e59eb168636525c71d3f3d7a71fa773912ff80fbc70db035d076468633f.png)
 
-\autoref{fig:small} shows that **Semi-AVID** is the best for committing, proving and verifying small files.
-
 ![Performance for large files. Average over $10$ runs for \textbf{KZG+} and \textbf{Semi-AVID}. Only $1$ run for \textbf{aPlonK}. \label{fig:large}](figures/30f6bd95df8c5bd92d9d45585c5050a2e41be2814fd31b0f54f268d9bbbe3d3f.png)
+
+\autoref{fig:small} shows that **Semi-AVID** is the best for committing, proving and verifying small files.
 
 \autoref{fig:large} shows that **aPlonK** is slightly better for verifying large files but still suffers from performance orders of magnitude worst than **Semi-AVID** for committing and proving.
 
