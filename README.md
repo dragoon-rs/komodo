@@ -6,14 +6,47 @@
 [![source](https://gitlab.isae-supaero.fr/dragoon/komodo/badges/main/pipeline.svg?key_text=GitLab%20CI)](https://gitlab.isae-supaero.fr/dragoon/komodo/-/pipelines)
 [![mirror](https://github.com/dragoon-rs/komodo/actions/workflows/ci.yml/badge.svg)](https://github.com/dragoon-rs/komodo/actions)
 
-Komodo uses a build system entirely writen in Rust.
-- [`cargo-script`](https://crates.io/crates/cargo-script) to build the script
-- [`nob.rs`](https://gitlab.isae-supaero.fr/a.stevan/nob.rs) to run commands
-- [`clap`](https://crates.io/crates/clap) to provide a nice and complete build API
+**Komodo** is a library that allows to encode data with erasure-code
+techniques such as Reed-Solomon encoding, prove the resulting shards with
+cryptographic protocols, verify their integrity on the other end of any
+distributed network and decode the original data from a subset of said shards.
+The library is implemented in the _Rust_ programming language has a mirror on GitHub [^1].
+**Komodo** should be of interest for people willing to explore the field of
+cryptographically-proven shards of data in distributed systems or data
+availability sampling settings.
 
-First, [install `cargo-script`](https://github.com/DanielKeep/cargo-script#installation).
+**Komodo** provides a _Rust_ API to achieve the
+following on any input data in a distributed network or setup:
 
-Then, run the script with `./make.rs --help`
+- `encode`: encodes data into _shards_ with a $(k, n)$ code. This adds
+  redundancy to the data, making the network more resilient to failure,
+  fragmentation, partitioning, loss or corruption.
+- `commit` and `prove`: generate cryptographic commitments and proofs for all
+  $n$ encoded shards with one of three available cryptographic protocols (see
+  below for more information). This step consists in attaching extra information
+  to them and sharing augmented _blocks_ of data onto the network. This extra
+  information should guarantee with a very high probability that a given shard
+  has been generated indeed through an expected encoding process, namely a
+  polynomial evaluation or vector inner-product encoding such as Reed-Solomon.
+- `verify`: verifies any shard individually for its validity. This allows to
+  discriminate invalid or corrupted shards without any decoding attempt. Without
+  this shard-level verification step, it is impossible to know if a shard is
+  valid until the decoding step. Then, when decoding fails, it is not
+  possible to know which shards were invalid, leading to a _try-and-error_
+  process that is not scalable.
+- `decode`: decodes the original data using any subset of $k$ valid shards.
+
+[^1]: GitHub mirror for issues and pull requests: [https://github.com/dragoon-rs/komodo](https://github.com/dragoon-rs/komodo)
+
+> [!tip]
+> Komodo uses a build system entirely writen in Rust.
+> - [`cargo-script`](https://crates.io/crates/cargo-script) to build the script
+> - [`nob.rs`](https://gitlab.isae-supaero.fr/a.stevan/nob.rs) to run commands
+> - [`clap`](https://crates.io/crates/clap) to provide a nice and complete build API
+>
+> First, [install `cargo-script`](https://github.com/DanielKeep/cargo-script#installation).
+>
+> Then, run the script with `./make.rs --help`
 
 ## the library
 ```shell
