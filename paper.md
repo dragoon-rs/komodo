@@ -37,7 +37,8 @@ techniques such as Reed-Solomon encoding, prove the resulting shards with
 cryptographic protocols, verify their integrity on the other end of any
 distributed network and decode the original data from a subset of said shards.
 The library is implemented in the _Rust_ programming language and
-available on the ISAE-SUPAERO GitLab instance [^1] with a mirror on GitHub [^2].
+available on the ISAE-SUPAERO GitLab instance [^1] with a mirror on GitHub [^2],
+both released under the MIT license.
 **Komodo** should be of interest for people willing to explore the field of
 cryptographically-proven shards of data in distributed systems or data
 availability sampling settings.
@@ -189,52 +190,23 @@ for small and large input data.
 
 ![Performance for small files. Average over $10$ runs.\label{fig:small}](figures/99613e59eb168636525c71d3f3d7a71fa773912ff80fbc70db035d076468633f.png)
 
-**Semi-AVID** is the best for committing, proving and verifying small files,
-as can be seen in \autoref{fig:small}.
+\autoref{fig:small} shows that **Semi-AVID** is the best for committing, proving and verifying small files.
 
 ![Performance for large files. Average over $10$ runs for \textbf{KZG+} and \textbf{Semi-AVID}. Only $1$ run for \textbf{aPlonK}. \label{fig:large}](figures/30f6bd95df8c5bd92d9d45585c5050a2e41be2814fd31b0f54f268d9bbbe3d3f.png)
 
-**aPlonK** is slightly better for verifying large files, as can be seen in
-\autoref{fig:large}, but still suffers from performance orders of magnitude
-worst than **Semi-AVID** for committing and proving.
+\autoref{fig:large} shows that **aPlonK** is slightly better for verifying large files but still suffers from performance orders of magnitude worst than **Semi-AVID** for committing and proving.
 
 **KZG+** is neither good nor too bad.
 
-# Availability
+# Additional information
 
-This section details requirements for **Komodo** to work properly and
-information about where the source code is hosted.
-
-## Programming language
-
-**Komodo** is fully written in _Rust_.
-
-## Dependencies
-
-All dependencies are taken care of by _Cargo_ and `Cargo.toml`.
-
-## Software location
-
-**Code repository**: GitLab
-
-- Name: **Komodo**
-- Persistent identifier: [https://gitlab.isae-supaero.fr/dragoon/komodo](https://gitlab.isae-supaero.fr/dragoon/komodo)
-- Licence: MIT
-- Date published: 05/11/2024
-
-**Mirror**: GitHub
-
-- Name: **Komodo**
-- Persistent identifier: [https://github.com/dragoon-rs/komodo](https://github.com/dragoon-rs/komodo)
-- Licence: MIT
-- Date published: 05/11/2024
+**Komodo** is fully written in _Rust_ and thus all dependencies are taken care of by _Cargo_ and `Cargo.toml`.
 
 ## Contact
 
-Contact us at `firstname.lastname@isae-supaero.fr` or at one of
-
-- bug reports and feature requests [https://gitlab.isae-supaero.fr/dragoon/komodo/-/issues](https://gitlab.isae-supaero.fr/dragoon/komodo/-/issues)
-- contributions [https://gitlab.isae-supaero.fr/dragoon/komodo/-/merge_requests](https://gitlab.isae-supaero.fr/dragoon/komodo/-/merge_requests)
+- by email: `firstname.lastname@isae-supaero.fr`
+- ticket tracker: [https://github.com/dragoon-rs/komodo/issues](https://github.com/dragoon-rs/komodo/issues)
+- contributions: [https://github.com/dragoon-rs/komodo/pulls](https://github.com/dragoon-rs/komodo/pulls)
 
 # Acknowledgements
 
