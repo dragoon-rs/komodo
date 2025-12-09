@@ -86,7 +86,7 @@ ensuring data robustness and trustworthiness.
 
 In blockchain systems, Komodo can be used as the key enabling mechanism for
 checking data availability, similar to how 2D Reed-Solomon codes and Danksharding
-[@danksharding2024] are used within Ethereum 2.0, or similar mechanisms in the
+[@ethereum2024danksharding] are used within Ethereum 2.0, or similar mechanisms in the
 Celestia or Avail blockchains, among many others.
 
 A few libraries provide similar functionalities, with a few gaps filled by
@@ -109,7 +109,7 @@ elliptic curves.
 `Komodo` also adds a unified high-level API, allowing to benchmark and compare
 different combinations of prime fields, elliptic curves and polynomial
 commitment schemes, as we did in two publications [@stevan2024performance;
-@stevan2025performance]. Finally, a modular design allows to extend `Komodo`
+@stevan2023assessing]. Finally, a modular design allows to extend `Komodo`
 with new polynomial commitment schemes or new encoding methods, which
 performance can be evaluated in the same benchmarking conditions.
 
@@ -140,7 +140,7 @@ integrity of encoded data:
   shard. The multi-polynomial extension allows to scale to bigger data by still
   computing a single proof per shard regardless of the size of the input data.
 - **aPlonK**: This method is based on the following works: **PlonK**
-  [@gabizon2019plonk] and **aPlonK** [@ambrona2022aplonk]. Through recursion and
+  [@gabizon2019plonk] and **aPlonK** [@ambrona2023aplonk]. Through recursion and
   tree _folding_, it achieves smaller commitment sizes as compared to **KZG+**
   at the cost of very expensive proving times.
 - **Semi-AVID**: This last method is the simplest and the fastest. It is based
