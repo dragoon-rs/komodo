@@ -35,7 +35,7 @@ bibliography: paper.bib
 We present **Komodo**, a library that allows to encode data with erasure-code
 techniques such as Reed-Solomon encoding, prove the resulting shards with
 cryptographic protocols, verify their integrity on the other end of any
-distributed network and decode the original data from a subset of said shards.
+distributed network and decode the original data from a subset of said shards [@stevan2024performance] and [@stevan2023assessing].
 The library is implemented in the _Rust_ programming language and
 available on the ISAE-SUPAERO GitLab instance [^1] with a mirror on GitHub [^2],
 both released under the MIT license.
@@ -73,8 +73,6 @@ following on any input data in a distributed network or setup:
 **Komodo** is based on the Arkworks library [@arkworks] which provides
 implementations of elliptic curves, fields and polynomial algebra.
 
-For more information about **Komodo**, the reader is encouraged to have a look at [@stevan2024performance] and [@stevan2023assessing].
-
 [^1]: GitLab source code: [https://gitlab.isae-supaero.fr/dragoon/komodo](https://gitlab.isae-supaero.fr/dragoon/komodo)
 [^2]: GitHub mirror for issues and pull requests: [https://github.com/dragoon-rs/komodo](https://github.com/dragoon-rs/komodo)
 
@@ -105,16 +103,15 @@ A few libraries provide similar functionalities, with a few gaps filled by
 The `arkworks` ecosystem [@arkworks] is probably the closest library, providing
 many of the necessary building blocks involved in Data Availability Sampling:
 prime fields, possibly paired with elliptic curves like BLS12-381 or BN254 among
-many others; linear algebra operations like polynomial operations and matrix
-operations; and polynomial commitment. On top of those features, **Komodo** adds
+many others; linear algebra operations like polynomial operations and polynomial commitment.
+On top of those features, **Komodo** adds
 Reed-Solomon encoding, tightly integrated with proof generation.
 
 The Rust implementation of Reed-Solomon erasure coding [@rust-rse] provides
 mechanisms to encode and decode data into raw shards, using elements of finite
 fields $\mathbb{F}_{2^8}$ or $\mathbb{F}_{2^{16}}$, containing respectively
 $2^8$ and $2^{16}$ elements. **Komodo** adds the proving mechanisms, and makes it
-possible to use elements from `arkworks`' prime fields, possibly paired with
-elliptic curves.
+possible to use elements from `arkworks`' prime fields.
 
 **Komodo** also adds a unified high-level API, allowing to benchmark and compare
 different combinations of prime fields, elliptic curves and polynomial
