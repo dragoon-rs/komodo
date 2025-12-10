@@ -64,16 +64,16 @@ following on any input data in a distributed network or setup:
   process that is not scalable.
 - `decode`: decodes the original data using any subset of $k$ valid shards.
 
-Three cryptographic protocols can be used to prove the integrity of encoded data:
+**Komodo** provides the three following cryptographic protocols:
 
 - **KZG+**: based on [@kate2010constant] and its multi-polynomial extension [@boneh2020efficient]
 - **aPlonK**: based on **PlonK** [@gabizon2019plonk] and **aPlonK** [@ambrona2023aplonk]
-- **Semi-AVID**: based on **Semi-AVID-PR** from [@nazirkhanova2022information]
+- **Semi-AVID**: based on **Semi-AVID-PR** [@nazirkhanova2022information]
 
 **Komodo** is based on the Arkworks library [@arkworks] which provides
 implementations of elliptic curves, fields and polynomial algebra.
 
-For more information about the library, the reader is encouraged to have a look at [@stevan2024performance] and [@stevan2023assessing].
+For more information about **Komodo**, the reader is encouraged to have a look at [@stevan2024performance] and [@stevan2023assessing].
 
 [^1]: GitLab source code: [https://gitlab.isae-supaero.fr/dragoon/komodo](https://gitlab.isae-supaero.fr/dragoon/komodo)
 [^2]: GitHub mirror for issues and pull requests: [https://github.com/dragoon-rs/komodo](https://github.com/dragoon-rs/komodo)
@@ -85,7 +85,7 @@ dispersal; Data availability;
 
 # Statement of need
 
-Komodo provides mechanisms that satisfy various distributed systems' needs such
+**Komodo** provides mechanisms that satisfy various distributed systems' needs such
 as verifiable information dispersal or data availability. Such systems range
 from private drone swarms to public blockchains.
 
@@ -94,32 +94,32 @@ shards, prove their integrity, and distribute them across the network. Other
 nodes can then verify the shards' validity before storing or retrieving them,
 ensuring data robustness and trustworthiness.
 
-In blockchain systems, Komodo can be used as the key enabling mechanism for
+In blockchain systems, **Komodo** can be used as the key enabling mechanism for
 checking data availability, similar to how 2D Reed-Solomon codes and Danksharding
 [@ethereum2024danksharding] are used within Ethereum 2.0, or similar mechanisms in the
 Celestia or Avail blockchains, among many others.
 
 A few libraries provide similar functionalities, with a few gaps filled by
-`Komodo`.
+**Komodo**.
 
 The `arkworks` ecosystem [@arkworks] is probably the closest library, providing
 many of the necessary building blocks involved in Data Availability Sampling:
 prime fields, possibly paired with elliptic curves like BLS12-381 or BN254 among
 many others; linear algebra operations like polynomial operations and matrix
-operations; and polynomial commitment. On top of those features, `Komodo` adds
+operations; and polynomial commitment. On top of those features, **Komodo** adds
 Reed-Solomon encoding, tightly integrated with proof generation.
 
 The Rust implementation of Reed-Solomon erasure coding [@rust-rse] provides
 mechanisms to encode and decode data into raw shards, using elements of finite
 fields $\mathbb{F}_{2^8}$ or $\mathbb{F}_{2^{16}}$, containing respectively
-$2^8$ and $2^{16}$ elements. `Komodo` adds the proving mechanisms, and makes it
+$2^8$ and $2^{16}$ elements. **Komodo** adds the proving mechanisms, and makes it
 possible to use elements from `arkworks`' prime fields, possibly paired with
 elliptic curves.
 
-`Komodo` also adds a unified high-level API, allowing to benchmark and compare
+**Komodo** also adds a unified high-level API, allowing to benchmark and compare
 different combinations of prime fields, elliptic curves and polynomial
 commitment schemes, as we did in two publications [@stevan2024performance;
-@stevan2023assessing]. Finally, a modular design allows to extend `Komodo`
+@stevan2023assessing]. Finally, a modular design allows to extend **Komodo**
 with new polynomial commitment schemes or new encoding methods, which
 performance can be evaluated in the same benchmarking conditions.
 
