@@ -9,8 +9,10 @@
 **Komodo** is a library that allows to encode data with erasure-code
 techniques such as Reed-Solomon encoding, prove the resulting shards with
 cryptographic protocols, verify their integrity on the other end of any
-distributed network and decode the original data from a subset of said shards.
-The library is implemented in the _Rust_ programming language has a mirror on GitHub [^1].
+distributed network and decode the original data from a subset of said shards [@stevan2024performance] and [@stevan2023assessing].
+The library is implemented in the _Rust_ programming language and
+available on the ISAE-SUPAERO GitLab instance [^1] with a mirror on GitHub [^2],
+both released under the MIT license.
 **Komodo** should be of interest for people willing to explore the field of
 cryptographically-proven shards of data in distributed systems or data
 availability sampling settings.
@@ -36,7 +38,25 @@ following on any input data in a distributed network or setup:
   process that is not scalable.
 - `decode`: decodes the original data using any subset of $k$ valid shards.
 
-[^1]: GitHub mirror for issues and pull requests: [https://github.com/dragoon-rs/komodo](https://github.com/dragoon-rs/komodo)
+**Komodo** provides the three following cryptographic protocols:
+
+- **KZG+**: based on [@kate2010constant] and its multi-polynomial extension [@boneh2020efficient]
+- **aPlonK**: based on **PlonK** [@gabizon2019plonk] and **aPlonK** [@ambrona2023aplonk]
+- **Semi-AVID**: based on **Semi-AVID-PR** [@nazirkhanova2022information]
+
+**Komodo** is based on the Arkworks library [@arkworks] which provides
+implementations of elliptic curves, fields and polynomial algebra.
+
+[^1]: GitLab source code: [https://gitlab.isae-supaero.fr/dragoon/komodo](https://gitlab.isae-supaero.fr/dragoon/komodo)
+[^2]: GitHub mirror for issues and pull requests: [https://github.com/dragoon-rs/komodo](https://github.com/dragoon-rs/komodo)
+
+[@stevan2024performance]: https://doi.org/10.5220/0012377900003648
+[@stevan2023assessing]: https://link.springer.com/chapter/10.1007/978-3-031-89518-0_13
+[@kate2010constant]: https://doi.org/10.1007/978-3-642-17373-8_11
+[@boneh2020efficient]: https://eprint.iacr.org/2020/081
+[@gabizon2019plonk]: https://eprint.iacr.org/2019/953
+[@ambrona2023aplonk]: https://doi.org/10.1007/978-3-031-41326-1_11
+[@nazirkhanova2022information]: https://doi.org/10.1145/3558535.3559778
 
 > [!tip]
 > Komodo uses a build system entirely writen in Rust.
