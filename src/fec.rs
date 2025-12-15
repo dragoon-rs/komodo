@@ -226,6 +226,10 @@ pub fn decode<F: PrimeField>(shards: Vec<Shard<F>>) -> Result<Vec<u8>, KomodoErr
         return Err(KomodoError::TooFewShards(0, 0));
     }
 
+    for s in &shards {
+        debug_assert_eq!(s.k, s.linear_combination.len() as u32);
+    }
+
     let k = shards[0].k;
     let np = shards.len();
 

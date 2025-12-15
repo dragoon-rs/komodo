@@ -17,9 +17,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{end_timer, ops::Div, rand::RngCore, start_timer};
 
 #[cfg(any(feature = "kzg", feature = "aplonk"))]
-use ark_ec::pairing::Pairing;
-#[cfg(any(feature = "kzg", feature = "aplonk"))]
-use ark_poly_commit::kzg10;
+use {ark_ec::pairing::Pairing, ark_poly_commit::kzg10};
 
 use crate::error::KomodoError;
 

@@ -62,7 +62,7 @@
 //! let bytes = include_bytes!("../assets/dragoon_133x133.png").to_vec();
 //! # }
 //! ```
-//! - then, $\text{Semi-AVID}$ requires a trusted setup to prove and verify. This example shows a trusted
+//! - then, $\text{Semi-AVID}$ requires a trusted setup to commit and verify. This example shows a trusted
 //! setup big enough to support data as big as $10 \times 1024$ elements of $\mathbb{F}_p$, to
 //! allow users to reuse it with multiple files of varying lengths.
 //! ```
@@ -76,12 +76,12 @@
 //! let powers = komodo::zk::setup::<F, G>(10 * 1_024, &mut rng).unwrap();
 //! # }
 //! ```
-//! - we can now build an encoding matrix, encode the data, prove the shards and build [`Block`]s
+//! - we can now build an encoding matrix, encode the data, commit it, proving the shards implicitely, and build [`Block`]s
 //! ```
 //! # use ark_bls12_381::{Fr as F, G1Projective as G};
 //! # use ark_poly::univariate::DensePolynomial as DP;
 //! #
-//! # use komodo::semi_avid::{build, prove, verify};
+//! # use komodo::semi_avid::{build, commit, verify};
 //! #
 //! # fn main() {
 //! # let mut rng = ark_std::test_rng();
@@ -93,8 +93,8 @@
 //! #
 //! let encoding_mat = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
 //! let shards = komodo::fec::encode(&bytes, encoding_mat).unwrap();
-//! let proof = prove::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
-//! let blocks = build::<F, G, DP<F>>(&shards, &proof);
+//! let commitment = commit::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
+//! let blocks = build::<F, G, DP<F>>(&shards, &commitment);
 //! # }
 //! ```
 //! - finally, each [`Block`] can be verified individually, using the same trusted setup
@@ -102,7 +102,7 @@
 //! # use ark_bls12_381::{Fr as F, G1Projective as G};
 //! # use ark_poly::univariate::DensePolynomial as DP;
 //! #
-//! # use komodo::semi_avid::{build, prove, verify};
+//! # use komodo::semi_avid::{build, commit, verify};
 //! #
 //! # fn main() {
 //! # let mut rng = ark_std::test_rng();
@@ -114,8 +114,8 @@
 //! #
 //! # let encoding_mat = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
 //! # let shards = komodo::fec::encode(&bytes, encoding_mat).unwrap();
-//! # let proof = prove::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
-//! # let blocks = build::<F, G, DP<F>>(&shards, &proof);
+//! # let commitment = commit::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
+//! # let blocks = build::<F, G, DP<F>>(&shards, &commitment);
 //! #
 //! for block in &blocks {
 //!     assert!(verify::<F, G, DP<F>>(block, &powers).unwrap());
@@ -127,7 +127,7 @@
 //! # use ark_bls12_381::{Fr as F, G1Projective as G};
 //! # use ark_poly::univariate::DensePolynomial as DP;
 //! #
-//! # use komodo::semi_avid::{build, prove};
+//! # use komodo::semi_avid::{build, commit};
 //! #
 //! # fn main() {
 //! # let mut rng = ark_std::test_rng();
@@ -139,8 +139,8 @@
 //! #
 //! # let encoding_mat = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
 //! # let shards = komodo::fec::encode(&bytes, encoding_mat).unwrap();
-//! # let proof = prove::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
-//! # let blocks = build::<F, G, DP<F>>(&shards, &proof);
+//! # let commitment = commit::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
+//! # let blocks = build::<F, G, DP<F>>(&shards, &commitment);
 //! #
 //! let shards = blocks[0..k].iter().cloned().map(|b| b.shard).collect();
 //! assert_eq!(bytes, komodo::fec::decode(shards).unwrap());
@@ -181,7 +181,7 @@ use crate::{
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Block<F: PrimeField, G: CurveGroup<ScalarField = F>> {
     pub shard: fec::Shard<F>,
-    proof: Vec<Commitment<F, G>>,
+    commitment: Vec<Commitment<F, G>>,
 }
 
 /// Block serialization and deserialization.
@@ -283,7 +283,7 @@ impl<F: PrimeField, G: CurveGroup<ScalarField = F>> std::fmt::Display for Block<
         write!(f, "}}")?;
         write!(f, ",")?;
         write!(f, "commits: [")?;
-        for commit in &self.proof {
+        for commit in &self.commitment {
             write!(f, r#""{}","#, commit.0)?;
         }
         write!(f, "]")?;
@@ -310,12 +310,12 @@ pub fn recode<F: PrimeField, G: CurveGroup<ScalarField = F>>(
     rng: &mut impl RngCore,
 ) -> Result<Option<Block<F, G>>, KomodoError> {
     for (i, (b1, b2)) in blocks.iter().zip(blocks.iter().skip(1)).enumerate() {
-        if b1.proof != b2.proof {
+        if b1.commitment != b2.commitment {
             return Err(KomodoError::IncompatibleBlocks {
-                key: "proof".to_string(),
+                key: "commitment".to_string(),
                 index: i,
-                left: format!("{:?}", b1.proof),
-                right: format!("{:?}", b2.proof),
+                left: format!("{:?}", b1.commitment),
+                right: format!("{:?}", b2.commitment),
             });
         }
     }
@@ -329,12 +329,12 @@ pub fn recode<F: PrimeField, G: CurveGroup<ScalarField = F>>(
 
     Ok(Some(Block {
         shard,
-        proof: blocks[0].proof.clone(),
+        commitment: blocks[0].commitment.clone(),
     }))
 }
 
-/// Computes the Semi-AVID proof for some data.
-pub fn prove<F, G, P>(
+/// Computes the Semi-AVID commitment for some data.
+pub fn commit<F, G, P>(
     bytes: &[u8],
     powers: &Powers<F, G>,
     k: usize,
@@ -345,7 +345,7 @@ where
     P: DenseUVPolynomial<F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
-    info!("encoding and proving {} bytes", bytes.len());
+    info!("encoding and committing {} bytes", bytes.len());
 
     debug!("splitting bytes into polynomials");
     let elements = algebra::split_data_into_field_elements(bytes, k);
@@ -375,14 +375,14 @@ where
         .collect::<Vec<P>>();
 
     debug!("committing the polynomials");
-    let commits = zk::batch_commit(powers, &polynomials_to_commit)?;
+    let commitments = zk::batch_commit(powers, &polynomials_to_commit)?;
 
-    Ok(commits)
+    Ok(commitments)
 }
 
-/// Attaches a Semi-AVID proof to a collection of encoded shards.
+/// Attaches a Semi-AVID commitment to a collection of encoded shards.
 #[inline(always)]
-pub fn build<F, G, P>(shards: &[Shard<F>], proof: &[Commitment<F, G>]) -> Vec<Block<F, G>>
+pub fn build<F, G, P>(shards: &[Shard<F>], commitment: &[Commitment<F, G>]) -> Vec<Block<F, G>>
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>,
@@ -393,7 +393,7 @@ where
         .iter()
         .map(|s| Block {
             shard: s.clone(),
-            proof: proof.to_vec(),
+            commitment: commitment.to_vec(),
         })
         .collect::<Vec<_>>()
 }
@@ -418,7 +418,7 @@ where
         .linear_combination
         .iter()
         .enumerate()
-        .map(|(i, w)| block.proof[i].0.into() * w)
+        .map(|(i, w)| block.commitment[i].0.into() * w)
         .sum();
     Ok(commit.0.into() == rhs)
 }
@@ -441,7 +441,7 @@ mod tests {
         zk::{setup, Commitment, Powers},
     };
 
-    use super::{build, prove, recode, verify, Block};
+    use super::{build, commit, recode, verify, Block};
 
     fn bytes() -> Vec<u8> {
         include_bytes!("../assets/dragoon_133x133.png").to_vec()
@@ -449,7 +449,7 @@ mod tests {
 
     macro_rules! full {
         ($b:ident, $p:ident, $m:ident) => {
-            build::<F, G, P>(&encode($b, $m)?, &prove($b, &$p, $m.height)?)
+            build::<F, G, P>(&encode($b, $m)?, &commit($b, &$p, $m.height)?)
         };
     }
 
@@ -474,18 +474,18 @@ mod tests {
         Ok(())
     }
 
-    /// attack a block by alterring one part of its proof
+    /// attack a block by alterring one part of its commitment
     fn attack<F, G>(block: Block<F, G>, c: usize, base: u128, pow: u64) -> Block<F, G>
     where
         F: PrimeField,
         G: CurveGroup<ScalarField = F>,
     {
         let mut block = block;
-        // modify a field in the struct b to corrupt the block proof without corrupting the data serialization
+        // modify a field in the struct b to corrupt the block commitment without corrupting the data serialization
         let a = F::from_le_bytes_mod_order(&base.to_le_bytes());
-        let mut commits: Vec<G> = block.proof.iter().map(|c| c.0.into()).collect();
+        let mut commits: Vec<G> = block.commitment.iter().map(|c| c.0.into()).collect();
         commits[c] = commits[c].mul(a.pow([pow]));
-        block.proof = commits.iter().map(|&c| Commitment(c.into())).collect();
+        block.commitment = commits.iter().map(|&c| Commitment(c.into())).collect();
 
         block
     }
@@ -773,11 +773,11 @@ mod tests {
         let powers = setup::<Fr, G1Projective>(bytes.len(), &mut rng).unwrap();
         let encoding_mat = Matrix::random(k, n, &mut rng);
         let shards = encode(&bytes, &encoding_mat).unwrap();
-        let proof =
-            prove::<Fr, G1Projective, DensePolynomial<Fr>>(&bytes, &powers, encoding_mat.height)
+        let commitment =
+            commit::<Fr, G1Projective, DensePolynomial<Fr>>(&bytes, &powers, encoding_mat.height)
                 .unwrap();
 
-        let blocks = build::<Fr, G1Projective, DensePolynomial<Fr>>(&shards, &proof);
+        let blocks = build::<Fr, G1Projective, DensePolynomial<Fr>>(&shards, &commitment);
 
         // Test serialization and deserialization of a vector of blocks
         let bytes = bincode::serialize(&blocks).unwrap();
@@ -813,6 +813,6 @@ mod tests {
         let powers: Powers<Fr, G1Projective> = setup(300, &mut rng).unwrap();
 
         let data = std::fs::read("assets/bin_with_holes").unwrap();
-        prove::<Fr, G1Projective, DensePolynomial<Fr>>(&data, &powers, 5).unwrap();
+        commit::<Fr, G1Projective, DensePolynomial<Fr>>(&data, &powers, 5).unwrap();
     }
 }

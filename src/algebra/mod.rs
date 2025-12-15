@@ -1,15 +1,14 @@
 //! Manipulate elements from finite field $\mathbb{F}_p$.
-#[cfg(any(feature = "kzg", feature = "aplonk"))]
-use ark_ec::pairing::Pairing;
 #[cfg(feature = "aplonk")]
 use ark_ec::pairing::PairingOutput;
 use ark_ff::{BigInteger, PrimeField};
 #[cfg(any(feature = "kzg", feature = "aplonk"))]
-use ark_poly::DenseUVPolynomial;
-#[cfg(any(feature = "kzg", feature = "aplonk"))]
-use ark_std::One;
-#[cfg(any(feature = "kzg", feature = "aplonk"))]
-use std::ops::{Div, Mul};
+use {
+    ark_ec::pairing::Pairing,
+    ark_poly::DenseUVPolynomial,
+    ark_std::One,
+    std::ops::{Div, Mul},
+};
 
 pub mod linalg;
 

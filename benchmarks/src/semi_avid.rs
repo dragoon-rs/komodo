@@ -29,14 +29,14 @@ where
     let shards = fec::encode(&bytes, &encoding_mat).unwrap();
 
     let plnk::TimeWithValue {
-        t: t_prove_k,
-        v: proofs,
-    } = plnk::timeit(|| semi_avid::prove(&bytes, &powers, encoding_mat.height).unwrap());
+        t: t_commit_k,
+        v: commitment,
+    } = plnk::timeit(|| semi_avid::commit(&bytes, &powers, encoding_mat.height).unwrap());
 
     let plnk::TimeWithValue {
         t: t_build_n,
         v: blocks,
-    } = plnk::timeit(|| semi_avid::build(&shards, &proofs));
+    } = plnk::timeit(|| semi_avid::build(&shards, &commitment));
 
     let plnk::TimeWithValue { t: t_verify_n, .. } = plnk::timeit(|| {
         for block in &blocks {
@@ -45,7 +45,7 @@ where
     });
 
     vec![
-        name_some_pair!(t_prove_k),
+        name_some_pair!(t_commit_k),
         name_some_pair!(t_build_n),
         name_some_pair!(t_verify_n),
     ]
