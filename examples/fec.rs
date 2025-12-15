@@ -56,7 +56,7 @@ struct Args {
 
 fn encode_fft<F: PrimeField>(bytes: &[u8], k: usize, n: usize) -> Vec<Shard<F>> {
     let evaluations = fri::evaluate::<F>(bytes, k, n);
-    fri::encode::<F>(bytes, evaluations, k)
+    fri::encode::<F>(bytes, &evaluations, k)
 }
 
 fn run<F: PrimeField>(bytes: &[u8], k: usize, n: usize, seed: u64, coding: Coding) {
@@ -67,7 +67,7 @@ fn run<F: PrimeField>(bytes: &[u8], k: usize, n: usize, seed: u64, coding: Codin
             let matrix = linalg::Matrix::random(k, n, &mut rng);
             let mut shards = timeit_and_print!("encoding", fec::encode, bytes, &matrix).unwrap();
             random_loss(&mut shards, k, &mut rng);
-            let recovered = timeit_and_print!("decoding", fec::decode::<F>, shards).unwrap();
+            let recovered = timeit_and_print!("decoding", fec::decode::<F>, &shards).unwrap();
             assert_eq!(bytes, recovered);
         }
         Coding::Fft => {
@@ -77,12 +77,12 @@ fn run<F: PrimeField>(bytes: &[u8], k: usize, n: usize, seed: u64, coding: Codin
 
             let evaluations = fri::evaluate::<F>(bytes, k, n);
             let mut blocks =
-                fri::prove::<2, F, Sha3_512, DensePolynomial<F>>(evaluations, shards, 2, 2, 1)
+                fri::prove::<2, F, Sha3_512, DensePolynomial<F>>(&evaluations, &shards, 2, 2, 1)
                     .unwrap();
 
             random_loss(&mut blocks, k, &mut rng);
 
-            let recovered = timeit_and_print!("decoding", fri::decode::<F, Sha3_512>, blocks, n);
+            let recovered = timeit_and_print!("decoding", fri::decode::<F, Sha3_512>, &blocks, n);
             assert_eq!(
                 bytes, recovered,
                 "decoded data does not match original data"

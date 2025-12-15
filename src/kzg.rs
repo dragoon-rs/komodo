@@ -76,11 +76,11 @@ pub struct Block<E: Pairing> {
 
 /// Proves $n$ encoded shards by computing one proof for each of them and attaching the commitments.
 pub fn prove<E, P>(
-    commits: Vec<kzg10::Commitment<E>>,
-    polynomials: Vec<P>,
-    shards: Vec<Shard<E::ScalarField>>,
-    points: Vec<E::ScalarField>,
-    powers: kzg10::Powers<E>,
+    commits: &[kzg10::Commitment<E>],
+    polynomials: &[P],
+    shards: &[Shard<E::ScalarField>],
+    points: &[E::ScalarField],
+    powers: &kzg10::Powers<E>,
 ) -> Result<Vec<Block<E>>, KomodoError>
 where
     E: Pairing,
@@ -102,7 +102,7 @@ where
     let mut proofs = Vec::new();
     for (s, pt) in shards.iter().zip(points.iter()) {
         let mut eval_bytes = vec![];
-        for p in &polynomials {
+        for p in polynomials {
             let elt = p.evaluate(pt);
             if let Err(error) = elt.serialize_with_mode(&mut eval_bytes, Compress::Yes) {
                 return Err(KomodoError::Other(format!("Serialization: {}", error)));
@@ -117,17 +117,17 @@ where
         let r = E::ScalarField::from_le_bytes_mod_order(&hash);
 
         let r_vec = algebra::powers_of::<E>(r, polynomials.len());
-        let poly_q = algebra::scalar_product_polynomial::<E, P>(&r_vec, &polynomials);
+        let poly_q = algebra::scalar_product_polynomial::<E, P>(&r_vec, polynomials);
 
         match kzg10::KZG10::<E, P>::open(
-            &powers,
+            powers,
             &poly_q,
             *pt,
             &kzg10::Randomness::<E::ScalarField, P>::empty(),
         ) {
             Ok(proof) => proofs.push(Block {
                 shard: s.clone(),
-                commit: commits.clone(),
+                commit: commits.to_vec(),
                 proof,
             }),
             Err(error) => return Err(KomodoError::Other(format!("kzg open error: {}", error))),
@@ -280,7 +280,7 @@ mod tests {
         let rng = &mut test_rng();
 
         let params = KZG10::<E, P>::setup(degree, false, rng)?;
-        let (powers, verifier_key) = trim(params, degree);
+        let (powers, verifier_key) = trim(&params, degree);
 
         let elements = algebra::split_data_into_field_elements::<E::ScalarField>(bytes, k);
         let mut polynomials = Vec::new();
@@ -290,21 +290,16 @@ mod tests {
 
         let (commits, _) = super::commit(&powers, &polynomials).unwrap();
 
-        let encoding_points = &(0..n)
+        let encoding_points = (0..n)
             .map(|i| E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes()))
             .collect::<Vec<_>>();
-        let encoding_mat = Matrix::vandermonde_unchecked(encoding_points, k);
+        let encoding_mat = Matrix::vandermonde_unchecked(&encoding_points, k);
         let shards = encode::<E::ScalarField>(bytes, &encoding_mat)
             .unwrap_or_else(|_| panic!("could not encode"));
 
-        let blocks = super::prove::<E, P>(
-            commits,
-            polynomials,
-            shards,
-            encoding_points.clone(),
-            powers,
-        )
-        .expect("KZG+ proof failed");
+        let blocks =
+            super::prove::<E, P>(&commits, &polynomials, &shards, &encoding_points, &powers)
+                .expect("KZG+ proof failed");
 
         Ok((blocks, verifier_key))
     }

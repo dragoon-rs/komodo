@@ -86,14 +86,19 @@ where
 {
     let evaluations = timeit_and_print!("evaluating", komodo::fri::evaluate::<F>, &bytes, k, n);
 
-    let evals = evaluations.clone();
-    let shards = timeit_and_print!("encoding", komodo::fri::encode::<F>, &bytes, evals, k);
+    let shards = timeit_and_print!(
+        "encoding",
+        komodo::fri::encode::<F>,
+        &bytes,
+        &evaluations,
+        k
+    );
 
     let blocks = timeit_and_print!(
         "proving",
         komodo::fri::prove::<N, F, H, P>,
-        evaluations,
-        shards,
+        &evaluations,
+        &shards,
         bf,
         rpo,
         q
@@ -111,19 +116,14 @@ where
         .iter()
         .cloned()
         .map(|b| {
-            let (res, time) = timeit!(komodo::fri::verify::<N, F, H, P>, b, n, q);
+            let (res, time) = timeit!(komodo::fri::verify::<N, F, H, P>, &b, n, q);
             res.unwrap();
             time
         })
         .sum();
     println!("{}", time.as_nanos());
 
-    let decoded = timeit_and_print!(
-        "decoding",
-        komodo::fri::decode::<F, H>,
-        blocks[0..k].to_vec(),
-        n
-    );
+    let decoded = timeit_and_print!("decoding", komodo::fri::decode::<F, H>, &blocks[0..k], n);
 
     assert_eq!(hex::encode(bytes), hex::encode(decoded));
 

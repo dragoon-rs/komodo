@@ -178,15 +178,14 @@ pub fn encode<F: PrimeField>(
     data: &[u8],
     encoding_mat: &Matrix<F>,
 ) -> Result<Vec<Shard<F>>, KomodoError> {
-    let hash = Sha256::hash(data).to_vec();
+    let hash = Sha256::hash(data);
 
     let k = encoding_mat.height;
 
     let source_shards = Matrix::from_vec_vec(
-        algebra::split_data_into_field_elements(data, k)
+        &algebra::split_data_into_field_elements(data, k)
             .chunks(k)
-            .map(|c| c.to_vec())
-            .collect(),
+            .collect::<Vec<_>>(),
     )?;
 
     Ok(source_shards
@@ -198,7 +197,7 @@ pub fn encode<F: PrimeField>(
         .map(|(j, s)| Shard {
             k: k as u32,
             linear_combination: encoding_mat.get_col(j).unwrap(),
-            hash: hash.clone(),
+            hash: hash.to_vec(),
             data: s.to_vec(),
             size: data.len(),
         })
@@ -221,12 +220,12 @@ pub fn encode<F: PrimeField>(
 /// > - if there are linear dependencies between shards
 ///
 /// This is the inverse of [`encode`].
-pub fn decode<F: PrimeField>(shards: Vec<Shard<F>>) -> Result<Vec<u8>, KomodoError> {
+pub fn decode<F: PrimeField>(shards: &[Shard<F>]) -> Result<Vec<u8>, KomodoError> {
     if shards.is_empty() {
         return Err(KomodoError::TooFewShards(0, 0));
     }
 
-    for s in &shards {
+    for s in shards {
         debug_assert_eq!(s.k, s.linear_combination.len() as u32);
     }
 
@@ -238,19 +237,19 @@ pub fn decode<F: PrimeField>(shards: Vec<Shard<F>>) -> Result<Vec<u8>, KomodoErr
     }
 
     let encoding_mat = Matrix::from_vec_vec(
-        shards
+        &shards
             .iter()
-            .map(|b| b.linear_combination.clone())
-            .collect(),
+            .map(|b| &*b.linear_combination)
+            .collect::<Vec<_>>(),
     )?
     .truncate(Some(np - k as usize), None);
 
     let shard_mat = Matrix::from_vec_vec(
-        shards
+        &shards
             .iter()
             .take(k as usize)
-            .map(|b| b.data.clone())
-            .collect(),
+            .map(|b| &*b.data)
+            .collect::<Vec<_>>(),
     )?;
 
     let source_shards = encoding_mat.invert()?.mul(&shard_mat)?.transpose().elements;
@@ -356,7 +355,7 @@ mod tests {
                 .join(", ");
             let pretty_is = format!("[{pretty_is}]");
 
-            let actual = decode::<F>(c.iter().map(|(_, s)| s).cloned().collect());
+            let actual = decode::<F>(&c.iter().map(|(_, s)| s).cloned().collect::<Vec<_>>());
 
             if contains_one_of(&is, &should_not_be_decodable) {
                 assert!(
@@ -537,7 +536,8 @@ mod tests {
                 .collect();
         }
 
-        let actual = decode::<F>(shards).unwrap_or_else(|_| panic!("could not decode {test_case}"));
+        let actual =
+            decode::<F>(&shards).unwrap_or_else(|_| panic!("could not decode {test_case}"));
         assert_eq!(data, actual, "bad decoded data with {test_case}",);
     }
 

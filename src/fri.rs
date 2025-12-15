@@ -42,7 +42,7 @@ pub fn evaluate<F: PrimeField>(bytes: &[u8], k: usize, n: usize) -> Vec<Vec<F>> 
 }
 
 #[inline]
-fn transpose<F: Copy>(v: Vec<Vec<F>>) -> Vec<Vec<F>> {
+fn transpose<F: Copy>(v: &[Vec<F>]) -> Vec<Vec<F>> {
     let mut cols: Vec<_> = Vec::<Vec<F>>::with_capacity(v[0].len());
     for i in 0..v[0].len() {
         cols.push((0..v.len()).map(|j| v[j][i]).collect());
@@ -50,12 +50,8 @@ fn transpose<F: Copy>(v: Vec<Vec<F>>) -> Vec<Vec<F>> {
     cols
 }
 
-pub fn encode<F: PrimeField>(
-    bytes: &[u8],
-    evaluations: Vec<Vec<F>>,
-    k: usize,
-) -> Vec<fec::Shard<F>> {
-    let hash = Sha256::hash(bytes).to_vec();
+pub fn encode<F: PrimeField>(bytes: &[u8], evaluations: &[Vec<F>], k: usize) -> Vec<fec::Shard<F>> {
+    let hash = Sha256::hash(bytes);
 
     let n = evaluations[0].len();
 
@@ -65,7 +61,7 @@ pub fn encode<F: PrimeField>(
         .map(|i| fec::Shard {
             k: k as u32,
             linear_combination: vec![],
-            hash: hash.clone(),
+            hash: hash.to_vec(),
             data: t[i].clone(),
             size: bytes.len(),
         })
@@ -73,8 +69,8 @@ pub fn encode<F: PrimeField>(
 }
 
 pub fn prove<const N: usize, F: PrimeField, H: Hasher, P>(
-    evaluations: Vec<Vec<F>>,
-    shards: Vec<fec::Shard<F>>,
+    evaluations: &[Vec<F>],
+    shards: &[fec::Shard<F>],
     blowup_factor: usize,
     remainder_plus_one: usize,
     nb_queries: usize,
@@ -85,7 +81,7 @@ where
     <H as rs_merkle::Hasher>::Hash: AsRef<[u8]>,
 {
     let builder = FridaBuilder::<F, H>::new::<N, _>(
-        &evaluations,
+        evaluations,
         FriChallenger::<H>::default(),
         blowup_factor,
         remainder_plus_one,
@@ -107,7 +103,7 @@ where
 }
 
 pub fn verify<const N: usize, F: PrimeField, H: Hasher, P>(
-    block: Block<F, H>,
+    block: &Block<F, H>,
     domain_size: usize,
     nb_queries: usize,
 ) -> Result<(), KomodoError>
@@ -136,10 +132,15 @@ where
     Ok(())
 }
 
-pub fn decode<F: PrimeField, H: Hasher>(blocks: Vec<Block<F, H>>, n: usize) -> Vec<u8> {
+pub fn decode<F: PrimeField, H: Hasher>(blocks: &[Block<F, H>], n: usize) -> Vec<u8> {
     let w = F::get_root_of_unity(n as u64).unwrap();
 
-    let t_shards = transpose(blocks.iter().map(|b| b.shard.data.clone()).collect());
+    let t_shards = transpose(
+        &blocks
+            .iter()
+            .map(|b| b.shard.data.clone())
+            .collect::<Vec<_>>(),
+    );
     let positions = blocks
         .iter()
         .map(|b| w.pow([b.position as u64]))
@@ -193,15 +194,15 @@ mod tests {
         let evaluations = evaluate::<F>(bytes, k, n);
 
         let evals = evaluations.clone();
-        let shards = encode::<F>(bytes, evals, k);
+        let shards = encode::<F>(bytes, &evals, k);
 
-        let blocks = prove::<N, F, H, P>(evaluations, shards, bf, rpo, q).unwrap();
+        let blocks = prove::<N, F, H, P>(&evaluations, &shards, bf, rpo, q).unwrap();
 
-        for b in blocks.clone() {
+        for b in &blocks {
             verify::<N, F, H, P>(b, n, q).unwrap();
         }
 
-        assert_eq!(decode::<F, H>(blocks[0..k].to_vec(), n), bytes);
+        assert_eq!(decode::<F, H>(&blocks[0..k], n), bytes);
 
         Ok(())
     }

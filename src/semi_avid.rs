@@ -142,8 +142,8 @@
 //! # let commitment = commit::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
 //! # let blocks = build::<F, G, DP<F>>(&shards, &commitment);
 //! #
-//! let shards = blocks[0..k].iter().cloned().map(|b| b.shard).collect();
-//! assert_eq!(bytes, komodo::fec::decode(shards).unwrap());
+//! let shards = blocks[0..k].iter().cloned().map(|b| b.shard).collect::<Vec<_>>();
+//! assert_eq!(bytes, komodo::fec::decode(&shards).unwrap());
 //! # }
 //! ```
 //!
@@ -494,7 +494,7 @@ mod tests {
     fn verify_with_errors_template<F, G, P>(
         bytes: &[u8],
         encoding_mat: &Matrix<F>,
-        attacks: Vec<(usize, usize, u128, u64)>,
+        attacks: &[(usize, usize, u128, u64)],
     ) -> Result<(), KomodoError>
     where
         F: PrimeField,
@@ -512,7 +512,7 @@ mod tests {
             assert!(verify(block, &powers)?);
         }
 
-        for (b, c, base, pow) in attacks {
+        for &(b, c, base, pow) in attacks {
             assert!(!verify(&attack(blocks[b].clone(), c, base, pow), &powers)?);
         }
 
@@ -523,7 +523,7 @@ mod tests {
     fn verify_recoding_template<F, G, P>(
         bytes: &[u8],
         encoding_mat: &Matrix<F>,
-        recodings: Vec<Vec<usize>>,
+        recodings: &[Vec<usize>],
     ) -> Result<(), KomodoError>
     where
         F: PrimeField,
@@ -537,7 +537,7 @@ mod tests {
 
         let blocks = full!(bytes, powers, encoding_mat);
 
-        let min_nb_blocks = recodings.clone().into_iter().flatten().max().unwrap() + 1;
+        let min_nb_blocks = recodings.iter().flatten().max().unwrap() + 1;
         assert!(
             blocks.len() >= min_nb_blocks,
             "not enough blocks, expected {}, found {}",
@@ -579,7 +579,7 @@ mod tests {
 
         let shards: Vec<Shard<F>> = blocks.iter().map(|b| b.shard.clone()).collect();
 
-        assert_eq!(bytes, decode(shards).unwrap());
+        assert_eq!(bytes, decode(&shards).unwrap());
 
         Ok(())
     }
@@ -588,7 +588,7 @@ mod tests {
     fn end_to_end_with_recoding_template<F, G, P>(
         bytes: &[u8],
         encoding_mat: &Matrix<F>,
-        recodings: Vec<(Vec<Vec<usize>>, bool)>,
+        recodings: &[(Vec<Vec<usize>>, bool)],
     ) -> Result<(), KomodoError>
     where
         F: PrimeField,
@@ -639,17 +639,17 @@ mod tests {
                         .shard
                     }
                 })
-                .collect();
-            if pass {
+                .collect::<Vec<_>>();
+            if *pass {
                 assert_eq!(
                     bytes,
-                    decode(recoded_shards).unwrap(),
+                    decode(&recoded_shards).unwrap(),
                     "should decode with {:?}",
                     rs
                 );
             } else {
                 assert!(
-                    decode(recoded_shards).is_err(),
+                    decode(&recoded_shards).is_err(),
                     "should not decode with {:?}",
                     rs
                 );
@@ -710,7 +710,7 @@ mod tests {
             verify_with_errors_template::<Fr, G1Projective, DensePolynomial<Fr>>(
                 b,
                 m,
-                vec![(0, 0, 123u128, 4321u64)],
+                &[(0, 0, 123u128, 4321u64)],
             )
         });
     }
@@ -721,7 +721,7 @@ mod tests {
             verify_recoding_template::<Fr, G1Projective, DensePolynomial<Fr>>(
                 b,
                 m,
-                vec![vec![2, 3], vec![3, 5]],
+                &[vec![2, 3], vec![3, 5]],
             )
         });
     }
@@ -741,7 +741,7 @@ mod tests {
             end_to_end_with_recoding_template::<Fr, G1Projective, DensePolynomial<Fr>>(
                 b,
                 m,
-                vec![
+                &[
                     (vec![vec![0, 1], vec![2], vec![3]], true),
                     (vec![vec![0, 1], vec![0], vec![1]], false),
                     (vec![vec![0, 1], vec![2, 3], vec![1, 4]], true),

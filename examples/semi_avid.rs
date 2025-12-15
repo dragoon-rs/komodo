@@ -88,7 +88,7 @@ where
         blocks[2].shard.clone(),
         blocks[3].shard.clone(),
     ];
-    assert_eq!(bytes, decode(shards).unwrap());
+    assert_eq!(bytes, decode(&shards).unwrap());
 
     // fail to decode the data with the following blocks
     // - $b_0$
@@ -106,7 +106,7 @@ where
         blocks[1].shard.clone(),
         b_0_1.shard,
     ];
-    assert!(decode(shards).is_err());
+    assert!(decode(&shards).is_err());
 
     // successfully decode the data with the following blocks
     // - $b_0 + b_1$
@@ -118,7 +118,7 @@ where
         .unwrap()
         .unwrap();
     let shards = vec![b_0_1.shard, b_2_3.shard, b_1_4.shard];
-    assert_eq!(bytes, decode(shards).unwrap());
+    assert_eq!(bytes, decode(&shards).unwrap());
 
     // successfully decode the data with the following blocks
     // - $b_0 + b_1 + b_2$
@@ -132,8 +132,8 @@ where
     // > time. because the finite field used is so large, we end up with linearly independent shards
     let fully_recoded_shards = (0..3)
         .map(|_| recode(&blocks[0..=2], &mut rng).unwrap().unwrap().shard)
-        .collect();
-    assert_eq!(bytes, decode(fully_recoded_shards).unwrap());
+        .collect::<Vec<_>>();
+    assert_eq!(bytes, decode(&fully_recoded_shards).unwrap());
 
     eprintln!("all good");
 

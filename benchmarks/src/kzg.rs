@@ -25,7 +25,7 @@ where
 
     let degree = fec_params.k - 1;
     let params = KZG10::<E, P>::setup(degree, false, &mut rng).expect("setup failed");
-    let (powers, verifier_key) = trim(params, degree);
+    let (powers, verifier_key) = trim(&params, degree);
 
     let elements = algebra::split_data_into_field_elements::<E::ScalarField>(&bytes, fec_params.k);
     let mut polynomials = Vec::new();
@@ -49,11 +49,11 @@ where
         v: blocks,
     } = plnk::timeit(|| {
         kzg::prove::<E, P>(
-            commitments.clone(),
-            polynomials.clone(),
-            shards.clone(),
-            encoding_points.clone(),
-            powers.clone(),
+            &commitments,
+            &polynomials,
+            &shards,
+            encoding_points,
+            &powers,
         )
         .unwrap()
     });

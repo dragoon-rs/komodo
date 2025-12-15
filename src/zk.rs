@@ -203,7 +203,7 @@ pub fn nb_elements_in_setup<F: PrimeField>(nb_bytes: usize) -> usize {
 /// > see [`ark-poly-commit::kzg10::tests::KZG10`](https://gitlab.isae-supaero.fr/a.stevan/poly-commit/-/blob/19fc0d4ad2bcff7df030c952d09649918dba7ddb/src/kzg10/mod.rs#L513-L538)
 #[cfg(any(feature = "kzg", feature = "aplonk"))]
 pub fn trim<E: Pairing>(
-    pp: kzg10::UniversalParams<E>,
+    pp: &kzg10::UniversalParams<E>,
     supported_degree: usize,
 ) -> (kzg10::Powers<'static, E>, kzg10::VerifierKey<E>) {
     let powers_of_g = pp.powers_of_g[..=supported_degree].to_vec();

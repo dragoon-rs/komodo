@@ -26,7 +26,7 @@ where
     // coefficients for each one of the $m$ polynomials
     let degree = bytes.len() / (E::ScalarField::MODULUS_BIT_SIZE as usize / 8);
     let params = KZG10::<E, P>::setup(degree, false, rng).expect("setup failed");
-    let (powers, verifier_key) = trim(params, degree);
+    let (powers, verifier_key) = trim(&params, degree);
 
     // build the $m$ polynomials from the data
     let elements = algebra::split_data_into_field_elements::<E::ScalarField>(&bytes, k);
@@ -47,14 +47,8 @@ where
         .unwrap_or_else(|_| panic!("could not encode"));
 
     // craft and attach one proof to each shard of encoded data
-    let blocks = kzg::prove::<E, P>(
-        commits,
-        polynomials,
-        shards,
-        encoding_points.clone(),
-        powers,
-    )
-    .expect("KZG+ proof failed");
+    let blocks = kzg::prove::<E, P>(&commits, &polynomials, &shards, encoding_points, &powers)
+        .expect("KZG+ proof failed");
 
     // verify that all the shards are valid
     for (i, block) in blocks.iter().enumerate() {

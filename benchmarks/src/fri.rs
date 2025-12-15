@@ -36,15 +36,15 @@ where
     let plnk::TimeWithValue {
         t: t_encode_n,
         v: shards,
-    } = plnk::timeit(|| komodo::fri::encode::<F>(&bytes, evaluations.clone(), fec_params.k));
+    } = plnk::timeit(|| komodo::fri::encode::<F>(&bytes, &evaluations, fec_params.k));
 
     let plnk::TimeWithValue {
         t: t_prove_n,
         v: blocks,
     } = plnk::timeit(|| {
         komodo::fri::prove::<N, F, H, P>(
-            evaluations.clone(),
-            shards.clone(),
+            &evaluations,
+            &shards,
             fri_params.bf,
             fri_params.rpo,
             fri_params.q,
@@ -54,16 +54,14 @@ where
 
     let plnk::TimeWithValue { t: t_verify_n, .. } = plnk::timeit(|| {
         for b in &blocks {
-            komodo::fri::verify::<N, F, H, P>(b.clone(), fec_params.n, fri_params.q).unwrap();
+            komodo::fri::verify::<N, F, H, P>(b, fec_params.n, fri_params.q).unwrap();
         }
     });
 
     let plnk::TimeWithValue {
         t: t_decode_k,
         v: decoded,
-    } = plnk::timeit(|| {
-        komodo::fri::decode::<F, H>(blocks[0..fec_params.k].to_vec(), fec_params.n)
-    });
+    } = plnk::timeit(|| komodo::fri::decode::<F, H>(&blocks[0..fec_params.k], fec_params.n));
 
     assert_eq!(hex::encode(bytes), hex::encode(decoded));
 

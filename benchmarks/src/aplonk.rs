@@ -42,17 +42,17 @@ where
 
     let degree = fec_params.k - 1;
     let params = setup::<E, P>(degree, polynomials.len()).unwrap();
-    let (_, vk_psi) = trim(params.kzg.clone(), degree);
+    let (_, vk_psi) = trim(&params.kzg, degree);
 
     let plnk::TimeWithValue {
         t: t_commit_m,
         v: commitment,
-    } = plnk::timeit(|| commit(polynomials.clone(), params.clone()).unwrap());
+    } = plnk::timeit(|| commit(&polynomials, &params).unwrap());
 
-    let encoding_points = &(0..fec_params.n)
+    let encoding_points = (0..fec_params.n)
         .map(|i| E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes()))
         .collect::<Vec<_>>();
-    let encoding_mat = Matrix::vandermonde_unchecked(encoding_points, fec_params.k);
+    let encoding_mat = Matrix::vandermonde_unchecked(&encoding_points, fec_params.k);
     let shards = encode::<E::ScalarField>(&bytes, &encoding_mat).unwrap();
 
     let plnk::TimeWithValue {
@@ -61,10 +61,10 @@ where
     } = plnk::timeit(|| {
         prove::<E, P>(
             commitment.clone(),
-            polynomials.clone(),
-            shards.clone(),
-            encoding_points.clone(),
-            params.clone(),
+            &polynomials,
+            &shards,
+            &encoding_points,
+            &params,
         )
         .unwrap()
     });

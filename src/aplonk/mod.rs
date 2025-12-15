@@ -100,8 +100,8 @@ where
 ///
 /// [`commit`] actually computes $\mu$ and $\text{com}_f$.
 pub fn commit<E, P>(
-    polynomials: Vec<P>,
-    setup: SetupParams<E>,
+    polynomials: &[P],
+    setup: &SetupParams<E>,
 ) -> Result<(Vec<E::G1>, PairingOutput<E>), KomodoError>
 where
     E: Pairing,
@@ -118,7 +118,7 @@ where
         )));
     }
 
-    let (powers, _) = trim(setup.kzg, supported_degree);
+    let (powers, _) = trim(&setup.kzg, supported_degree);
 
     if powers.powers_of_g.len() <= supported_degree {
         return Err(KomodoError::Other(format!(
@@ -129,7 +129,7 @@ where
     }
 
     // commit.1.
-    let mu = match ark_commit(&powers, &polynomials) {
+    let mu = match ark_commit(&powers, polynomials) {
         Ok((mu, _)) => mu,
         Err(error) => return Err(KomodoError::Other(format!("commit error: {}", error))),
     };
@@ -161,10 +161,10 @@ where
 /// - $\pi_{\text{aPlonK}} = \sum [\tau^i\]_2 H_i$
 pub fn prove<E, P>(
     commit: (Vec<E::G1>, PairingOutput<E>),
-    polynomials: Vec<P>,
-    shards: Vec<Shard<E::ScalarField>>,
-    points: Vec<E::ScalarField>,
-    params: SetupParams<E>,
+    polynomials: &[P],
+    shards: &[Shard<E::ScalarField>],
+    points: &[E::ScalarField],
+    params: &SetupParams<E>,
 ) -> Result<Vec<Block<E>>, KomodoError>
 where
     E: Pairing,
@@ -182,7 +182,7 @@ where
     let (mu, com_f) = commit;
 
     let supported_degree = polynomials.iter().map(|p| p.degree()).max().unwrap_or(0);
-    let (powers, _) = trim(params.kzg, supported_degree);
+    let (powers, _) = trim(&params.kzg, supported_degree);
 
     // open
     let mut proofs = Vec::new();
@@ -207,7 +207,7 @@ where
         // open.3.2.
         let r_vec = algebra::powers_of::<E>(r, polynomials.len());
         // open.3.3
-        let f = algebra::scalar_product_polynomial::<E, P>(&r_vec, &polynomials);
+        let f = algebra::scalar_product_polynomial::<E, P>(&r_vec, polynomials);
         // open.3.4.
         let mu_hat: E::G1 = algebra::scalar_product_g1::<E>(&mu, &r_vec);
         // open.3.5.
@@ -460,7 +460,7 @@ mod tests {
             bytes.len() / (E::ScalarField::MODULUS_BIT_SIZE as usize / 8) / (degree + 1);
 
         let params = setup::<E, P>(degree, vector_length_bound)?;
-        let (_, vk_psi) = trim(params.kzg.clone(), degree);
+        let (_, vk_psi) = trim(&params.kzg, degree);
 
         let elements = algebra::split_data_into_field_elements::<E::ScalarField>(bytes, k);
         let mut polynomials = Vec::new();
@@ -468,23 +468,17 @@ mod tests {
             polynomials.push(P::from_coefficients_vec(chunk.to_vec()))
         }
 
-        let commit = commit(polynomials.clone(), params.clone()).unwrap();
+        let commit = commit(&polynomials, &params).unwrap();
 
-        let encoding_points = &(0..n)
+        let encoding_points = (0..n)
             .map(|i| E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes()))
             .collect::<Vec<_>>();
-        let encoding_mat = Matrix::vandermonde_unchecked(encoding_points, k);
+        let encoding_mat = Matrix::vandermonde_unchecked(&encoding_points, k);
         let shards = encode::<E::ScalarField>(bytes, &encoding_mat)
             .unwrap_or_else(|_| panic!("could not encode"));
 
-        let blocks = prove::<E, P>(
-            commit,
-            polynomials,
-            shards,
-            encoding_points.clone(),
-            params.clone(),
-        )
-        .unwrap();
+        let blocks =
+            prove::<E, P>(commit, &polynomials, &shards, &encoding_points, &params).unwrap();
 
         Ok((
             blocks,
