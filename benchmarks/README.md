@@ -12,107 +12,41 @@ make bench (0..18 | each { 1024 * 2 ** $in }) -k 2 -n 6 --nb-rounds 10
 
 ## run all
 ```bash
-use benchmarks/make.nu
+const BN254 = { name: "bn254", bits: 254, bytes_without_truncation: 31 }
 
-let cpu = make lscpu | to json | hash sha256
-let git = git rev-parse HEAD | str trim
-
-const RHO = 1 / 2
-let BN254_F_SIZE = 254 / 8 | math floor | $in * 8
-
-make build
-
-mkdir benchmarks/results
-
-1..6
-    | each { 2 ** $in }
-    | each {{ k: $in, n: ($in / $RHO | into int) }}
-    | each { |it|
-        make bench (0..8 | each { 1024 * 2 ** $in }) -k $it.k -n $it.n --nb-rounds 1 --protocol semi-avid
-            | insert k $it.k
-            | insert n $it.n
-    }
-    | flatten
-    | insert git $git
-    | insert cpu $cpu
-    | save --force benchmarks/results/semi-avid.ndjson
-
-1..6
-    | each { 2 ** $in }
-    | each {{ k: $in, n: ($in / $RHO | into int) }}
-    | each { |it|
-        make bench (0..8 | each { 1024 * 2 ** $in }) -k $it.k -n $it.n --nb-rounds 1 --protocol kzg
-            | insert k $it.k
-            | insert n $it.n
-    }
-    | flatten
-    | insert git $git
-    | insert cpu $cpu
-    | save --force benchmarks/results/kzg.ndjson
-
-1..6
-    | each { 2 ** $in }
-    | each {{ k: $in, n: ($in / $RHO | into int) }}
-    | each { |it|
-        make bench (0..8 | each { $BN254_F_SIZE * 2 ** $in }) -k $it.k -n $it.n --nb-rounds 1 --protocol aplonk
-            | insert k $it.k
-            | insert n $it.n
-    }
-    | flatten
-    | insert git $git
-    | insert cpu $cpu
-    | save --force benchmarks/results/aplonk.ndjson
-
-1..6
-    | each { 2 ** $in }
-    | each {{ k: $in, n: ($in / $RHO | into int) }}
-    | each { |it|
-        make bench (0..8 | each { 1024 * 2 ** $in }) -k $it.k -n $it.n --nb-rounds 1 --protocol fri --fri-ff 2 --fri-bf (1 / $RHO | into int) --fri-rpo 1 --fri-q 50
-            | insert k $it.k
-            | insert n $it.n
-    }
-    | flatten
-    | insert git $git
-    | insert cpu $cpu
-    | save --force benchmarks/results/fri.ndjson
+(make
+    (make cartesian-product ...[
+            ["semi-avid", "kzg", "aplonk", "fri"]
+            (1..10 | each { 2 ** $in })
+            (3..18 | each { 2 ** $in * $BN254.bytes_without_truncation })
+        ]
+        | each {{ p: $in.0, k: $in.1, b: $in.2 }}
+        | insert n { 2 * $in.k }
+    )
+    # --email
+    # --shutdown
+    --commit
+    --seed 1
+    # --push
+)
 ```
 
-## plot all
+## plot
 ```bash
-def get-values []: [ table -> list<float> ] {
-    update times { try { math avg } }
-        | group-by --to-table k
-        | sort-by { $in.k | into int }
-        | reverse
-        | get items
-        | each { each { try { $in.times | math log 10 } catch { -1 } } }
-        | flatten
-        | wrap _
-        | update _ { if $in == -1 { "NaN" } else { $in }}
-        | get _
-}
-
-def plot-steps [
-    data: table,
-    steps: list<string>,
-    --name: string,
-    --width (-W): int,
-    --height (-H): int,
-] {
-    for step in $steps {
-        $data
-            | where step == $step
-            | get-values
-            | uv run benchmarks/heat_map.py ...$in -W $width -H $height --save $"($name)-($step).png"
-    }
-}
-
-plot-steps (open benchmarks/results/semi-avid.ndjson) --name semi-avid -W 9 -H 6 ["t_prove_k", "t_build_n", "t_verify_n"]
-plot-steps (open benchmarks/results/kzg.ndjson      ) --name kzg       -W 9 -H 6 ["t_commit_m", "t_prove_n", "t_verify_n", "t_verify_batch_3"]
-plot-steps (open benchmarks/results/aplonk.ndjson   ) --name aplonk    -W 9 -H 6 ["t_commit_m", "t_prove_n", "t_verify_n"]
-plot-steps (open benchmarks/results/fri.ndjson      ) --name fri       -W 9 -H 6 ["t_evaluate_kn", "t_encode_n", "t_prove_n", "t_verify_n", "t_decode_k"]
+nu benchmarks/plot.nu ...[
+    --build "release"
+    --cpu   "ee672bb315ea00fe5815f0e20db6aa88017c1ba8355794f411c10a6057377e57"
+    --curve "bn254"
+    --seed  1
+    --nb
+    --regular
+    --normalized
+    --clean
+    --plot
+    --compare
+    --stitch
+]
 ```
-
 
 > [!important]
 >
@@ -137,13 +71,13 @@ plot-steps (open benchmarks/results/fri.ndjson      ) --name fri       -W 9 -H 6
 > $\mathbb{F}$ _without bit truncation_ and the size $\delta$ of the input data
 > $\Delta$ is
 >
-> $$\delta = km\delta = \delta \times 2^\bullet$$
+> $$\delta = km\phi = \phi \times 2^\bullet$$
 >
-> In the end, the size of $\Delta$ is a _power of 2 multiple_ of $\delta$ and
+> In the end, the size of $\Delta$ is a _power of 2 multiple_ of $\phi$ and
 > below are values of $\phi$ with the corresponding elliptic curve and number of
 > bits in the prime order $p$ of $\mathbb{F}$
 >
-> | curve              | $p$ | $\phi$ |
-> | ------------------ | --- | ------ |
-> | $\text{BLS12-381}$ | 381 | 376    |
-> | $\text{BN254}$     | 254 | 248    |
+> | curve              | $p$ (bits) | $\phi$ (bits) |
+> | ------------------ | ---------- | ------------- |
+> | $\text{BLS12-381}$ | 381        | 376           |
+> | $\text{BN254}$     | 254        | 248           |

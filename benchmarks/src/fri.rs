@@ -4,10 +4,10 @@ use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
 use ark_serialize::CanonicalSerialize;
 use ark_std::ops::Div;
-use rand::thread_rng;
+use rand::Rng;
 use rs_merkle::Hasher;
 
-use crate::{name_some_pair, FECParams};
+use crate::FECParams;
 
 pub(crate) struct FRIParams {
     pub bf: usize,
@@ -15,18 +15,51 @@ pub(crate) struct FRIParams {
     pub q: usize,
 }
 
+pub(crate) struct FRIResult {
+    t_evaluate_kn: Option<Duration>,
+    t_encode_n: Option<Duration>,
+    t_prove_n: Option<Duration>,
+    t_verify_n: Option<Duration>,
+    t_decode_k: Option<Duration>,
+}
+
+impl From<FRIResult> for Vec<(&'static str, Option<u128>)> {
+    fn from(value: FRIResult) -> Self {
+        vec![
+            ("t_evaluate_kn", value.t_evaluate_kn.map(|v| v.as_nanos())),
+            ("t_encode_n", value.t_encode_n.map(|v| v.as_nanos())),
+            ("t_prove_n", value.t_prove_n.map(|v| v.as_nanos())),
+            ("t_verify_n", value.t_verify_n.map(|v| v.as_nanos())),
+            ("t_decode_k", value.t_decode_k.map(|v| v.as_nanos())),
+        ]
+    }
+}
+
+impl FRIResult {
+    /// Sets all fields to [`None`].
+    fn empty() -> Self {
+        FRIResult {
+            t_evaluate_kn: None,
+            t_encode_n: None,
+            t_prove_n: None,
+            t_verify_n: None,
+            t_decode_k: None,
+        }
+    }
+}
+
 pub(crate) fn bench<const N: usize, F: PrimeField, H: Hasher, P>(
     nb_bytes: usize,
     fec_params: FECParams,
     fri_params: FRIParams,
-) -> Vec<(&'static str, Option<Duration>)>
+    rng: &mut impl Rng,
+) -> FRIResult
 where
     P: DenseUVPolynomial<F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     <H as rs_merkle::Hasher>::Hash: AsRef<[u8]> + CanonicalSerialize,
 {
-    let mut rng = thread_rng();
-    let bytes = crate::random::random_bytes(nb_bytes, &mut rng);
+    let bytes = crate::random::random_bytes(nb_bytes, rng);
 
     let plnk::TimeWithValue {
         t: t_evaluate_kn,
@@ -49,27 +82,39 @@ where
             fri_params.rpo,
             fri_params.q,
         )
-        .unwrap()
+        .expect("komodo::fri::prove")
     });
 
-    let plnk::TimeWithValue { t: t_verify_n, .. } = plnk::timeit(|| {
+    let plnk::TimeWithValue {
+        t: t_verify_n,
+        v: ok,
+    } = plnk::timeit(|| {
+        let mut ok = true;
         for b in &blocks {
-            komodo::fri::verify::<N, F, H, P>(b, fec_params.n, fri_params.q).unwrap();
+            if komodo::fri::verify::<N, F, H, P>(b, fec_params.n, fri_params.q).is_err() {
+                ok = false;
+            }
         }
+        ok
     });
+    if !ok {
+        return FRIResult::empty();
+    }
 
     let plnk::TimeWithValue {
         t: t_decode_k,
         v: decoded,
     } = plnk::timeit(|| komodo::fri::decode::<F, H>(&blocks[0..fec_params.k], fec_params.n));
 
-    assert_eq!(hex::encode(bytes), hex::encode(decoded));
+    if hex::encode(bytes) != hex::encode(decoded) {
+        return FRIResult::empty();
+    }
 
-    vec![
-        name_some_pair!(t_evaluate_kn),
-        name_some_pair!(t_encode_n),
-        name_some_pair!(t_prove_n),
-        name_some_pair!(t_verify_n),
-        name_some_pair!(t_decode_k),
-    ]
+    FRIResult {
+        t_evaluate_kn: Some(t_evaluate_kn),
+        t_encode_n: Some(t_encode_n),
+        t_prove_n: Some(t_prove_n),
+        t_verify_n: Some(t_verify_n),
+        t_decode_k: Some(t_decode_k),
+    }
 }

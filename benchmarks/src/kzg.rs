@@ -6,26 +6,56 @@ use ark_poly::DenseUVPolynomial;
 use ark_poly_commit::kzg10::KZG10;
 use ark_std::ops::Div;
 
-use komodo::{algebra, algebra::linalg::Matrix, fec::encode, kzg, zk::trim};
-use rand::thread_rng;
+use komodo::{algebra, algebra::linalg::Matrix, fec, kzg, zk};
+use rand::Rng;
 
-use crate::{name_some_pair, FECParams};
+use crate::FECParams;
 
-pub(crate) fn bench<E, P>(
-    nb_bytes: usize,
-    fec_params: FECParams,
-) -> Vec<(&'static str, Option<Duration>)>
+pub(crate) struct KZGResult {
+    t_commit_m: Option<Duration>,
+    t_prove_n: Option<Duration>,
+    t_verify_n: Option<Duration>,
+    t_verify_batch_3: Option<Duration>,
+}
+
+impl From<KZGResult> for Vec<(&'static str, Option<u128>)> {
+    fn from(value: KZGResult) -> Self {
+        vec![
+            ("t_commit_m", value.t_commit_m.map(|v| v.as_nanos())),
+            ("t_prove_n", value.t_prove_n.map(|v| v.as_nanos())),
+            ("t_verify_n", value.t_verify_n.map(|v| v.as_nanos())),
+            (
+                "t_verify_batch_3",
+                value.t_verify_batch_3.map(|v| v.as_nanos()),
+            ),
+        ]
+    }
+}
+
+impl KZGResult {
+    /// Sets all fields to [`None`].
+    fn empty() -> Self {
+        KZGResult {
+            t_commit_m: None,
+            t_prove_n: None,
+            t_verify_n: None,
+            t_verify_batch_3: None,
+        }
+    }
+}
+
+pub(crate) fn bench<E, P>(nb_bytes: usize, fec_params: FECParams, rng: &mut impl Rng) -> KZGResult
 where
     E: Pairing,
     P: DenseUVPolynomial<E::ScalarField>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
-    let mut rng = thread_rng();
-    let bytes = crate::random::random_bytes(nb_bytes, &mut rng);
+    let bytes = crate::random::random_bytes(nb_bytes, rng);
 
     let degree = fec_params.k - 1;
-    let params = KZG10::<E, P>::setup(degree, false, &mut rng).expect("setup failed");
-    let (powers, verifier_key) = trim(&params, degree);
+    let params = KZG10::<E, P>::setup(degree, false, rng)
+        .expect("ark_poly_commit::kzg10::KZG10::<E, P>::setup");
+    let (powers, verifier_key) = zk::trim(&params, degree);
 
     let elements = algebra::split_data_into_field_elements::<E::ScalarField>(&bytes, fec_params.k);
     let mut polynomials = Vec::new();
@@ -36,13 +66,13 @@ where
     let plnk::TimeWithValue {
         t: t_commit_m,
         v: (commitments, _),
-    } = plnk::timeit(|| kzg::commit(&powers, &polynomials).unwrap());
+    } = plnk::timeit(|| kzg::commit(&powers, &polynomials).expect("komodo::kzg::commit"));
 
     let encoding_points = &(0..fec_params.n)
         .map(|i| E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes()))
         .collect::<Vec<_>>();
     let encoding_mat = Matrix::vandermonde_unchecked(encoding_points, fec_params.k);
-    let shards = encode::<E::ScalarField>(&bytes, &encoding_mat).unwrap();
+    let shards = fec::encode::<E::ScalarField>(&bytes, &encoding_mat).expect("komodo::fec::encode");
 
     let plnk::TimeWithValue {
         t: t_prove_n,
@@ -55,39 +85,54 @@ where
             encoding_points,
             &powers,
         )
-        .unwrap()
-    });
-
-    let plnk::TimeWithValue { t: t_verify_n, .. } = plnk::timeit(|| {
-        for (i, block) in blocks.iter().enumerate() {
-            assert!(kzg::verify::<E, P>(
-                block,
-                E::ScalarField::from_le_bytes_mod_order(&[i as u8]),
-                &verifier_key,
-            ),);
-        }
+        .expect("komodo::kzg::prove")
     });
 
     let plnk::TimeWithValue {
-        t: t_verify_batch_3,
-        ..
+        t: t_verify_n,
+        v: ok,
     } = plnk::timeit(|| {
-        assert!(kzg::batch_verify(
+        let mut ok = true;
+        for block in &blocks {
+            let alpha = block.shard.linear_combination[1]; // Vandermonde coefficient
+            if !kzg::verify::<E, P>(block, alpha, &verifier_key) {
+                ok = false;
+            }
+        }
+        ok
+    });
+    if !ok {
+        return KZGResult::empty();
+    }
+
+    let plnk::TimeWithValue {
+        t: t_verify_batch_3,
+        v: ok,
+    } = plnk::timeit(|| {
+        let mut ok = true;
+        if !kzg::batch_verify(
             &blocks[1..3],
             &[
                 E::ScalarField::from_le_bytes_mod_order(&[1]),
                 E::ScalarField::from_le_bytes_mod_order(&[2]),
                 E::ScalarField::from_le_bytes_mod_order(&[3]),
             ],
-            &verifier_key
+            &verifier_key,
         )
-        .unwrap(),)
+        .expect("komodo::kzg::batch_verify(1, 2, 3)")
+        {
+            ok = false;
+        }
+        ok
     });
+    if !ok {
+        return KZGResult::empty();
+    }
 
-    vec![
-        name_some_pair!(t_commit_m),
-        name_some_pair!(t_prove_n),
-        name_some_pair!(t_verify_n),
-        name_some_pair!(t_verify_batch_3),
-    ]
+    KZGResult {
+        t_commit_m: Some(t_commit_m),
+        t_prove_n: Some(t_prove_n),
+        t_verify_n: Some(t_verify_n),
+        t_verify_batch_3: Some(t_verify_batch_3),
+    }
 }

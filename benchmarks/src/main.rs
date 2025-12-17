@@ -4,8 +4,11 @@ use ark_poly::univariate::DensePolynomial;
 use clap::{command, Parser};
 use dragoonfri::algorithms::Sha3_256;
 use dragoonfri::dynamic_folding_factor;
+use rand::{RngCore, SeedableRng};
 
 mod aplonk;
+#[allow(clippy::identity_op, clippy::precedence, clippy::erasing_op)]
+mod conversions;
 mod fri;
 mod kzg;
 mod macros;
@@ -20,6 +23,22 @@ use crate::semi_avid::bench as semi_avid_bench;
 pub(crate) struct FECParams {
     pub k: usize,
     pub n: usize,
+}
+
+fn dump_kv_pairs<T: Into<Vec<(&'static str, Option<u128>)>>>(t: T) {
+    println!(
+        "{{{}}}",
+        t.into()
+            .iter()
+            .map(|(k, v)| {
+                match v {
+                    Some(v) => format!("{}:{}", k, v),
+                    None => format!("{}:null", k),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(",")
+    );
 }
 
 macro_rules! ark_gen {
@@ -44,6 +63,11 @@ enum Protocol {
     Fri,
 }
 
+#[derive(clap::ValueEnum, Clone, Hash, PartialEq, Eq, Debug)]
+enum Curve {
+    Bn254,
+}
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -55,7 +79,13 @@ struct Cli {
     n: usize,
 
     #[arg(long)]
+    seed: Option<u64>,
+
+    #[arg(long)]
     protocol: Protocol,
+
+    #[arg(long)]
+    curve: Curve,
 
     #[arg(long)]
     fri_ff: Option<usize>,
@@ -75,12 +105,33 @@ fn main() {
         n: args.n,
     };
 
-    #[rustfmt::skip]
-    let res = match args.protocol {
-        Protocol::SemiAVID => ark_gen!(semi_avid_bench: ark_bn254, F=Fr, G=G1Projective        )(args.nb_bytes, fec_params),
-        Protocol::Kzg      => ark_gen!(kzg_bench      : ark_bn254,                      E=Bn254)(args.nb_bytes, fec_params),
-        Protocol::Aplonk   => ark_gen!(aplonk_bench   : ark_bn254,                      E=Bn254)(args.nb_bytes, fec_params),
-        Protocol::Fri      => {
+    let mut rng: Box<dyn RngCore> = match args.seed {
+        Some(seed) => Box::new(rand::rngs::StdRng::seed_from_u64(seed)),
+        None => Box::new(rand::thread_rng()),
+    };
+
+    let kv_pairs: Vec<(&'static str, Option<u128>)> = match args.protocol {
+        Protocol::SemiAVID => match args.curve {
+            Curve::Bn254 => ark_gen!(semi_avid_bench: ark_bn254, F=Fr, G=G1Projective)(
+                args.nb_bytes,
+                fec_params,
+                &mut rng,
+            ),
+        }
+        .into(),
+        Protocol::Kzg => match args.curve {
+            Curve::Bn254 => {
+                ark_gen!(kzg_bench: ark_bn254, E=Bn254)(args.nb_bytes, fec_params, &mut rng)
+            }
+        }
+        .into(),
+        Protocol::Aplonk => match args.curve {
+            Curve::Bn254 => {
+                ark_gen!(aplonk_bench: ark_bn254, E=Bn254)(args.nb_bytes, fec_params, &mut rng)
+            }
+        }
+        .into(),
+        Protocol::Fri => {
             let ff = args.fri_ff.unwrap();
             let fec_params = FECParams {
                 k: args.k,
@@ -91,20 +142,17 @@ fn main() {
                 rpo: args.fri_rpo.unwrap(),
                 q: args.fri_q.unwrap(),
             };
-            ark_gen!(fri_bench: ark_bn254, N=ff, F=Fr, H=Sha3_256)(args.nb_bytes, fec_params, fri_params)
+            match args.curve {
+                Curve::Bn254 => ark_gen!(fri_bench: ark_bn254, N=ff, F=Fr, H=Sha3_256)(
+                    args.nb_bytes,
+                    fec_params,
+                    fri_params,
+                    &mut rng,
+                ),
+            }
+            .into()
         }
     };
 
-    println!(
-        "{{{}}}",
-        res.iter()
-            .map(|(label, duration)| {
-                match duration {
-                    Some(d) => format!("{}:{}", label, d.as_nanos()),
-                    None => format!("{}:null", label),
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(",")
-    );
+    dump_kv_pairs(kv_pairs);
 }
