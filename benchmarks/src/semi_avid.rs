@@ -13,7 +13,6 @@ use crate::FECParams;
 
 pub(crate) struct SemiAVIDResult {
     t_commit_k: Option<Duration>,
-    t_build_n: Option<Duration>,
     t_verify_n: Option<Duration>,
 }
 
@@ -21,7 +20,6 @@ impl From<SemiAVIDResult> for Vec<(&'static str, Option<u128>)> {
     fn from(value: SemiAVIDResult) -> Self {
         vec![
             ("t_commit_k", value.t_commit_k.map(|v| v.as_nanos())),
-            ("t_build_n", value.t_build_n.map(|v| v.as_nanos())),
             ("t_verify_n", value.t_verify_n.map(|v| v.as_nanos())),
         ]
     }
@@ -32,7 +30,6 @@ impl SemiAVIDResult {
     fn empty() -> Self {
         SemiAVIDResult {
             t_commit_k: None,
-            t_build_n: None,
             t_verify_n: None,
         }
     }
@@ -64,17 +61,12 @@ where
     });
 
     let plnk::TimeWithValue {
-        t: t_build_n,
-        v: blocks,
-    } = plnk::timeit(|| semi_avid::build(&shards, &commitment));
-
-    let plnk::TimeWithValue {
         t: t_verify_n,
         v: ok,
     } = plnk::timeit(|| {
         let mut ok = true;
-        for (i, block) in blocks.iter().enumerate() {
-            if !semi_avid::verify(block, &powers)
+        for (i, shard) in shards.iter().enumerate() {
+            if !semi_avid::verify(shard, &commitment, &powers)
                 .unwrap_or_else(|_| panic!("komodo::semi_avid::verify({})", i))
             {
                 ok = false;
@@ -88,7 +80,6 @@ where
 
     SemiAVIDResult {
         t_commit_k: Some(t_commit_k),
-        t_build_n: Some(t_build_n),
         t_verify_n: Some(t_verify_n),
     }
 }

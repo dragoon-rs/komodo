@@ -47,7 +47,6 @@ bincode = "1.3.3"
 kzg = ["dep:ark-poly-commit"]
 aplonk = ["dep:ark-poly-commit"]
 fri = ["dep:dragoonfri"]
-fs = []
 
 [package.metadata.docs.rs]
 features = ["kzg", "aplonk"]

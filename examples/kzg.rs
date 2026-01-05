@@ -36,7 +36,7 @@ where
     }
 
     // commit the polynomials
-    let (commits, _) = kzg::commit(&powers, &polynomials).unwrap();
+    let commitment = kzg::commit(&powers, &polynomials).unwrap();
 
     // encode the data with a Vandermonde encoding
     let encoding_points = &(0..n)
@@ -46,15 +46,17 @@ where
     let shards = encode::<E::ScalarField>(&bytes, &encoding_mat)
         .unwrap_or_else(|_| panic!("could not encode"));
 
-    // craft and attach one proof to each shard of encoded data
-    let blocks = kzg::prove::<E, P>(&commits, &polynomials, &shards, encoding_points, &powers)
+    // prove to each shard of encoded data
+    let proofs = kzg::prove::<E, P>(&polynomials, &shards, encoding_points, &powers)
         .expect("KZG+ proof failed");
 
     // verify that all the shards are valid
-    for (i, block) in blocks.iter().enumerate() {
+    for (i, (shard, proof)) in shards.iter().zip(proofs.iter()).enumerate() {
         assert!(
             kzg::verify::<E, P>(
-                block,
+                shard,
+                &commitment,
+                proof,
                 E::ScalarField::from_le_bytes_mod_order(&[i as u8]),
                 &verifier_key,
             ),
@@ -66,7 +68,12 @@ where
     // verify a batch of shards at once
     assert!(
         kzg::batch_verify(
-            &blocks[1..3],
+            &[
+                (shards[0].clone(), proofs[0].clone()),
+                (shards[1].clone(), proofs[1].clone()),
+                (shards[2].clone(), proofs[2].clone()),
+            ],
+            &commitment,
             &[
                 E::ScalarField::from_le_bytes_mod_order(&[1]),
                 E::ScalarField::from_le_bytes_mod_order(&[2]),

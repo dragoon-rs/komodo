@@ -18,6 +18,8 @@ pub(crate) struct FRIParams {
 pub(crate) struct FRIResult {
     t_evaluate_kn: Option<Duration>,
     t_encode_n: Option<Duration>,
+    t_build: Option<Duration>,
+    t_commit: Option<Duration>,
     t_prove_n: Option<Duration>,
     t_verify_n: Option<Duration>,
     t_decode_k: Option<Duration>,
@@ -28,6 +30,8 @@ impl From<FRIResult> for Vec<(&'static str, Option<u128>)> {
         vec![
             ("t_evaluate_kn", value.t_evaluate_kn.map(|v| v.as_nanos())),
             ("t_encode_n", value.t_encode_n.map(|v| v.as_nanos())),
+            ("t_build", value.t_build.map(|v| v.as_nanos())),
+            ("t_commit", value.t_commit.map(|v| v.as_nanos())),
             ("t_prove_n", value.t_prove_n.map(|v| v.as_nanos())),
             ("t_verify_n", value.t_verify_n.map(|v| v.as_nanos())),
             ("t_decode_k", value.t_decode_k.map(|v| v.as_nanos())),
@@ -41,6 +45,8 @@ impl FRIResult {
         FRIResult {
             t_evaluate_kn: None,
             t_encode_n: None,
+            t_build: None,
+            t_commit: None,
             t_prove_n: None,
             t_verify_n: None,
             t_decode_k: None,
@@ -72,17 +78,28 @@ where
     } = plnk::timeit(|| komodo::fri::encode::<F>(&bytes, &evaluations, fec_params.k));
 
     let plnk::TimeWithValue {
-        t: t_prove_n,
-        v: blocks,
+        t: t_build,
+        v: builder,
     } = plnk::timeit(|| {
-        komodo::fri::prove::<N, F, H, P>(
+        dragoonfri::frida::FridaBuilder::<F, H>::new::<N, _>(
             &evaluations,
-            &shards,
+            dragoonfri::rng::FriChallenger::<H>::default(),
             fri_params.bf,
             fri_params.rpo,
             fri_params.q,
         )
-        .expect("komodo::fri::prove")
+    });
+
+    let plnk::TimeWithValue {
+        t: t_commit,
+        v: commitment,
+    } = plnk::timeit(|| komodo::fri::commit(builder.clone()));
+
+    let plnk::TimeWithValue {
+        t: t_prove_n,
+        v: proofs,
+    } = plnk::timeit(|| {
+        komodo::fri::prove::<F, H>(builder.clone(), &(0..fec_params.n).collect::<Vec<_>>())
     });
 
     let plnk::TimeWithValue {
@@ -90,8 +107,16 @@ where
         v: ok,
     } = plnk::timeit(|| {
         let mut ok = true;
-        for b in &blocks {
-            if komodo::fri::verify::<N, F, H, P>(b, fec_params.n, fri_params.q).is_err() {
+        for (shard, proof) in shards.iter().zip(proofs.iter()) {
+            if komodo::fri::verify::<N, F, H, P>(
+                shard,
+                &commitment,
+                proof,
+                fec_params.n,
+                fri_params.q,
+            )
+            .is_err()
+            {
                 ok = false;
             }
         }
@@ -104,7 +129,12 @@ where
     let plnk::TimeWithValue {
         t: t_decode_k,
         v: decoded,
-    } = plnk::timeit(|| komodo::fri::decode::<F, H>(&blocks[0..fec_params.k], fec_params.n));
+    } = plnk::timeit(|| {
+        komodo::fri::decode::<F>(
+            &shards.clone().into_iter().enumerate().collect::<Vec<_>>(),
+            fec_params.n,
+        )
+    });
 
     if hex::encode(bytes) != hex::encode(decoded) {
         return FRIResult::empty();
@@ -113,6 +143,8 @@ where
     FRIResult {
         t_evaluate_kn: Some(t_evaluate_kn),
         t_encode_n: Some(t_encode_n),
+        t_build: Some(t_build),
+        t_commit: Some(t_commit),
         t_prove_n: Some(t_prove_n),
         t_verify_n: Some(t_verify_n),
         t_decode_k: Some(t_decode_k),

@@ -9,8 +9,8 @@ use ark_std::{ops::Div, test_rng};
 use komodo::{
     algebra::linalg::Matrix,
     error::KomodoError,
-    fec::{decode, encode},
-    semi_avid::{build, commit, recode, verify, Block},
+    fec::{self, decode, encode, recode_random},
+    semi_avid::{commit, verify},
     zk::setup,
 };
 
@@ -28,28 +28,29 @@ where
     let bytes = include_bytes!("../assets/dragoon_133x133.png").to_vec();
     eprintln!("loaded {} bytes of data", bytes.len());
 
-    // Semi-AVID needs a _trusted setup_ to prove and verify blocks of encoded data
+    // Semi-AVID needs a _trusted setup_ to commit and verify shards of encoded data
     eprint!("creating trusted setup... ");
     let powers = setup::<F, G>(bytes.len(), &mut rng)?;
     eprintln!("done");
 
-    // encode and prove the data with a _random_ encoding
-    eprint!("building blocks... ");
+    // encode the data with a _random_ encoding
+    eprint!("building shards... ");
     let encoding_mat = &Matrix::random(k, n, &mut rng);
     let shards = encode(&bytes, encoding_mat)?;
+    eprintln!("done");
+    eprint!("committing data... ");
     let commitment = commit(&bytes, &powers, encoding_mat.height)?;
-    let blocks = build::<F, G, P>(&shards, &commitment);
     eprintln!("done");
 
-    // verify that all the blocks are valid
-    eprint!("verifying blocks... ");
-    for block in &blocks {
-        assert!(verify(block, &powers)?);
+    // verify that all the shards are valid
+    eprint!("verifying shards... ");
+    for shard in &shards {
+        assert!(verify(shard, &commitment, &powers)?);
     }
 
-    // corrupt the first block...
-    let mut serialized = vec![0; blocks[0].serialized_size(Compress::No)];
-    blocks[0]
+    // corrupt the first shard...
+    let mut serialized = vec![0; shards[0].serialized_size(Compress::No)];
+    shards[0]
         .serialize_with_mode(&mut serialized[..], Compress::No)
         .unwrap();
     // -> attack the `data` field of the [`komodo::fec::Shard`] structure
@@ -60,70 +61,62 @@ where
     let data_start_index =
         U32_SIZE + VEC_LEN_SIZE + k * field_element_size + VEC_LEN_SIZE + HASH_SIZE + VEC_LEN_SIZE;
     serialized[data_start_index] = 0x00;
-    let block: Block<F, G> =
-        Block::deserialize_with_mode(&serialized[..], Compress::No, Validate::No).unwrap();
+    let shard: fec::Shard<F> =
+        fec::Shard::deserialize_with_mode(&serialized[..], Compress::No, Validate::No).unwrap();
     // ... and make sure it is not valid anymore
-    assert!(!verify(&block, &powers)?);
+    assert!(!verify(&shard, &commitment, &powers)?);
 
     eprintln!("all good");
 
     // some recoding examples:
-    // - let's denote the original blocks by $(b_i)_{0 \leq i \lt n}$
-    // - if block $b$ is the result of recoding blocks $b_i$ and $b_j$, then we write
-    // $b = b_i + b_j$
+    // - let's denote the original shards by $(s_i)_{0 \leq i \lt n}$
+    // - if shard $s$ is the result of recoding shards $s_i$ and $s_j$, then we write
+    // $s = s_i + s_j$
     eprint!("some recoding scenarii... ");
 
-    // successfully decode the data with the following blocks
-    // - $b_0 + b_1$
-    // - $b_2$
-    // - $b_3$
+    // successfully decode the data with the following shards
+    // - $s_0 + s_1$
+    // - $s_2$
+    // - $s_3$
     //
     // > **Note**
     // >
-    // > it works because $b_0$, $b_1$, $b_2$ and $b_3$ are all linearly independent and thus $b_0
-    // + b_1$, $b_2$ and $b_3$ are as well
-    let b_0_1 = recode(&blocks[0..=1], &mut rng).unwrap().unwrap();
-    let shards = vec![
-        b_0_1.shard,
-        blocks[2].shard.clone(),
-        blocks[3].shard.clone(),
-    ];
+    // > it works because $s_0$, $s_1$, $s_2$ and $s_3$ are all linearly independent and thus $s_0
+    // + s_1$, $s_2$ and $s_3$ are as well
+    let s_0_1 = recode_random(&shards[0..=1], &mut rng).unwrap().unwrap();
+    let shards = vec![s_0_1, shards[2].clone(), shards[3].clone()];
     assert_eq!(bytes, decode(&shards).unwrap());
 
-    // fail to decode the data with the following blocks
-    // - $b_0$
-    // - $b_1$
-    // - $b_0 + b_1$
+    // fail to decode the data with the following shards
+    // - $s_0$
+    // - $s_1$
+    // - $s_0 + s_1$
     //
     // > **Note**
     // >
-    // > it fails because $b_0 + b_1$ is lineary dependent on $b_0$ and $b_1$
-    let b_0_1 = recode(&[blocks[0].clone(), blocks[1].clone()], &mut rng)
+    // > it fails because $s_0 + s_1$ is lineary dependent on $s_0$ and $s_1$
+    let s_0_1 = recode_random(&[shards[0].clone(), shards[1].clone()], &mut rng)
         .unwrap()
         .unwrap();
-    let shards = vec![
-        blocks[0].shard.clone(),
-        blocks[1].shard.clone(),
-        b_0_1.shard,
-    ];
+    let shards = vec![shards[0].clone(), shards[1].clone(), s_0_1];
     assert!(decode(&shards).is_err());
 
-    // successfully decode the data with the following blocks
-    // - $b_0 + b_1$
-    // - $b_2 + b_3$
-    // - $b_1 + b_4$
-    let b_0_1 = recode(&blocks[0..=1], &mut rng).unwrap().unwrap();
-    let b_2_3 = recode(&blocks[2..=3], &mut rng).unwrap().unwrap();
-    let b_1_4 = recode(&[blocks[1].clone(), blocks[4].clone()], &mut rng)
+    // successfully decode the data with the following shards
+    // - $s_0 + s_1$
+    // - $s_2 + s_3$
+    // - $s_1 + s_4$
+    let s_0_1 = recode_random(&shards[0..=1], &mut rng).unwrap().unwrap();
+    let s_2_3 = recode_random(&shards[2..=3], &mut rng).unwrap().unwrap();
+    let s_1_4 = recode_random(&[shards[1].clone(), shards[4].clone()], &mut rng)
         .unwrap()
         .unwrap();
-    let shards = vec![b_0_1.shard, b_2_3.shard, b_1_4.shard];
+    let shards = vec![s_0_1, s_2_3, s_1_4];
     assert_eq!(bytes, decode(&shards).unwrap());
 
-    // successfully decode the data with the following blocks
-    // - $b_0 + b_1 + b_2$
-    // - $b_0 + b_1 + b_2$
-    // - $b_0 + b_1 + b_2$
+    // successfully decode the data with the following shards
+    // - $s_0 + s_1 + s_2$
+    // - $s_0 + s_1 + s_2$
+    // - $s_0 + s_1 + s_2$
     //
     // > **Note**
     // >
@@ -131,7 +124,7 @@ where
     // > the linear combinations that generate the recoded shards are random and different each
     // > time. because the finite field used is so large, we end up with linearly independent shards
     let fully_recoded_shards = (0..3)
-        .map(|_| recode(&blocks[0..=2], &mut rng).unwrap().unwrap().shard)
+        .map(|_| recode_random(&shards[0..=2], &mut rng).unwrap().unwrap())
         .collect::<Vec<_>>();
     assert_eq!(bytes, decode(&fully_recoded_shards).unwrap());
 

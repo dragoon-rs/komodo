@@ -3,7 +3,6 @@ use ark_poly::DenseUVPolynomial;
 use ark_std::ops::Div;
 use rs_merkle::algorithms::Sha256;
 use rs_merkle::Hasher;
-use std::rc::Rc;
 use tracing::{debug, info};
 
 use crate::{algebra, error::KomodoError, fec};
@@ -14,16 +13,13 @@ use dragoonfri::{
     utils::{to_evaluations, HasherExt, MerkleProof},
 };
 
-/// representation of a block of proven data.
-///
-/// this is a wrapper around a [`fec::Shard`] with some additional cryptographic
-/// information that allows to prove the integrity of said shard.
 #[derive(Clone, PartialEq)]
-pub struct Block<F: PrimeField, H: Hasher> {
-    pub shard: fec::Shard<F>,
-    pub proof: MerkleProof<H>,
-    pub commit: Rc<FridaCommitment<F, H>>,
-    position: usize,
+pub struct Commitment<F: PrimeField, H: Hasher>(pub FridaCommitment<F, H>);
+
+#[derive(Clone, PartialEq)]
+pub struct Proof<H: Hasher> {
+    pub path: MerkleProof<H>,
+    pub position: usize,
 }
 
 pub fn evaluate<F: PrimeField>(bytes: &[u8], k: usize, n: usize) -> Vec<Vec<F>> {
@@ -68,42 +64,27 @@ pub fn encode<F: PrimeField>(bytes: &[u8], evaluations: &[Vec<F>], k: usize) -> 
         .collect::<Vec<_>>()
 }
 
-pub fn prove<const N: usize, F: PrimeField, H: Hasher, P>(
-    evaluations: &[Vec<F>],
-    shards: &[fec::Shard<F>],
-    blowup_factor: usize,
-    remainder_plus_one: usize,
-    nb_queries: usize,
-) -> Result<Vec<Block<F, H>>, KomodoError>
-where
-    P: DenseUVPolynomial<F>,
-    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
-    <H as rs_merkle::Hasher>::Hash: AsRef<[u8]>,
-{
-    let builder = FridaBuilder::<F, H>::new::<N, _>(
-        evaluations,
-        FriChallenger::<H>::default(),
-        blowup_factor,
-        remainder_plus_one,
-        nb_queries,
-    );
+pub fn commit<F: PrimeField, H: Hasher>(builder: FridaBuilder<F, H>) -> Commitment<F, H> {
+    Commitment(FridaCommitment::from(builder))
+}
 
-    let commit = Rc::new(FridaCommitment::from(builder.clone()));
-
-    Ok(shards
+pub fn prove<F: PrimeField, H: Hasher>(
+    builder: FridaBuilder<F, H>,
+    positions: &[usize],
+) -> Vec<Proof<H>> {
+    positions
         .iter()
-        .enumerate()
-        .map(|(i, s)| Block {
-            shard: s.clone(),
-            proof: builder.prove_shards(&[i]),
-            commit: commit.clone(),
-            position: i,
+        .map(|i| Proof {
+            path: builder.prove_shards(&[*i]),
+            position: *i,
         })
-        .collect())
+        .collect()
 }
 
 pub fn verify<const N: usize, F: PrimeField, H: Hasher, P>(
-    block: &Block<F, H>,
+    shard: &fec::Shard<F>,
+    commitment: &Commitment<F, H>,
+    proof: &Proof<H>,
     domain_size: usize,
     nb_queries: usize,
 ) -> Result<(), KomodoError>
@@ -112,38 +93,38 @@ where
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     <H as rs_merkle::Hasher>::Hash: AsRef<[u8]>,
 {
-    block
-        .commit
+    commitment
+        .0
         .verify::<N, _>(
             FriChallenger::<H>::default(),
             nb_queries,
-            block.shard.k as usize,
+            shard.k as usize,
             domain_size,
         )
         .unwrap();
 
-    assert!(block.proof.verify(
-        block.commit.tree_root(),
-        &[block.position],
-        &[H::hash_item(&block.shard.data)],
+    assert!(proof.path.verify(
+        commitment.0.tree_root(),
+        &[proof.position],
+        &[H::hash_item(&shard.data)],
         domain_size,
     ));
 
     Ok(())
 }
 
-pub fn decode<F: PrimeField, H: Hasher>(blocks: &[Block<F, H>], n: usize) -> Vec<u8> {
+pub fn decode<F: PrimeField>(blocks: &[(usize, fec::Shard<F>)], n: usize) -> Vec<u8> {
     let w = F::get_root_of_unity(n as u64).unwrap();
 
     let t_shards = transpose(
         &blocks
             .iter()
-            .map(|b| b.shard.data.clone())
+            .map(|(_, s)| s.data.clone())
             .collect::<Vec<_>>(),
     );
     let positions = blocks
         .iter()
-        .map(|b| w.pow([b.position as u64]))
+        .map(|(p, _)| w.pow([*p as u64]))
         .collect::<Vec<_>>();
     let source_shards = interpolate_polynomials(&t_shards, &positions)
         .into_iter()
@@ -151,7 +132,7 @@ pub fn decode<F: PrimeField, H: Hasher>(blocks: &[Block<F, H>], n: usize) -> Vec
         .collect::<Vec<_>>();
 
     let mut bytes = algebra::merge_elements_into_bytes(&source_shards);
-    bytes.resize(blocks[0].shard.size, 0);
+    bytes.resize(blocks[0].1.size, 0);
     bytes
 }
 
@@ -167,12 +148,14 @@ mod tests {
     use dragoonfri::{
         algorithms::{Blake3, Sha3_256, Sha3_512},
         dynamic_folding_factor,
+        frida::FridaBuilder,
+        rng::FriChallenger,
     };
     use dragoonfri_test_utils::Fq as F_128;
 
     use crate::error::KomodoError;
 
-    use super::{decode, encode, evaluate, prove, verify};
+    use super::{commit, decode, encode, evaluate, prove, verify};
 
     fn bytes() -> Vec<u8> {
         include_bytes!("../assets/dragoon_133x133.png").to_vec()
@@ -196,13 +179,25 @@ mod tests {
         let evals = evaluations.clone();
         let shards = encode::<F>(bytes, &evals, k);
 
-        let blocks = prove::<N, F, H, P>(&evaluations, &shards, bf, rpo, q).unwrap();
+        let builder = FridaBuilder::<F, H>::new::<N, _>(
+            &evaluations,
+            FriChallenger::<H>::default(),
+            bf,
+            rpo,
+            q,
+        );
 
-        for b in &blocks {
-            verify::<N, F, H, P>(b, n, q).unwrap();
+        let commitment = commit(builder.clone());
+        let proofs = prove::<F, H>(builder, &(0..n).collect::<Vec<_>>());
+
+        for (shard, proof) in shards.iter().zip(proofs.iter()) {
+            verify::<N, F, H, P>(shard, &commitment, proof, n, q).unwrap();
         }
 
-        assert_eq!(decode::<F, H>(&blocks[0..k], n), bytes);
+        assert_eq!(
+            decode::<F>(&shards.into_iter().enumerate().collect::<Vec<_>>(), n),
+            bytes
+        );
 
         Ok(())
     }

@@ -37,19 +37,20 @@
 //! ```ignore
 //! let shards = fec::encode(bytes, encoding_mat);
 //! ```
-//! 3. attach a _cryptographic proof_ to all the shards and get a proven _block_
+//! 3. generate a _cryptographic proof_ for all the shards and commit the data
 //! ```ignore
-//! let blocks = prove(bytes, k);
+//! let commitment = commit(bytes);
+//! let proofs = prove(bytes, k);
 //! ```
-//! 4. verify each _block_ individually
+//! 4. verify each "_block_" individually
 //! ```ignore
-//! for block in blocks {
-//!     assert!(verify(block));
+//! for (shard, proof) in shards.zip(proofs) {
+//!     assert!(verify(shard, commitment, proof));
 //! }
 //! ```
-//! 5. decode the original data with any subset of _k_ blocks
+//! 5. decode the original data with any subset of _k_ shards
 //! ```ignore
-//! assert_eq!(bytes, fec::decode(blocks[0..k]));
+//! assert_eq!(bytes, fec::decode(shards[0..k]));
 //! ```
 pub mod algebra;
 #[cfg(feature = "aplonk")]
@@ -61,8 +62,6 @@ pub mod error;
 pub mod fec;
 #[cfg(feature = "fri")]
 pub mod fri;
-#[cfg(feature = "fs")]
-pub mod fs;
 #[cfg(feature = "kzg")]
 pub mod kzg;
 pub mod semi_avid;

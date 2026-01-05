@@ -4,7 +4,10 @@ use ark_poly::DenseUVPolynomial;
 use rand::Rng;
 use std::{ops::Div, time::Duration};
 
-use komodo::{algebra, algebra::linalg::Matrix, aplonk, fec, zk};
+use komodo::{
+    algebra::{self, linalg::Matrix},
+    aplonk, fec, zk,
+};
 
 use crate::FECParams;
 
@@ -61,6 +64,13 @@ where
     let params = aplonk::setup::<E, P>(degree, polynomials.len()).expect("komodo::aplonk::setup");
     let (_, vk_psi) = zk::trim(&params.kzg.clone(), degree);
 
+    let vk = aplonk::VerifierKey {
+        vk_psi,
+        tau_1: params.ipa.tau_1,
+        g_1: params.kzg.powers_of_g[0].into_group(),
+        g_2: params.kzg.h.into_group(),
+    };
+
     let plnk::TimeWithValue {
         t: t_commit_m,
         v: commitment,
@@ -74,16 +84,10 @@ where
 
     let plnk::TimeWithValue {
         t: t_prove_n,
-        v: blocks,
+        v: proofs,
     } = plnk::timeit(|| {
-        aplonk::prove::<E, P>(
-            commitment.clone(),
-            &polynomials,
-            &shards,
-            &encoding_points,
-            &params,
-        )
-        .expect("komodo::aplonk::prove")
+        aplonk::prove::<E, P>(&commitment, &polynomials, &encoding_points, &params)
+            .expect("komodo::aplonk::prove")
     });
 
     let plnk::TimeWithValue {
@@ -91,17 +95,10 @@ where
         v: ok,
     } = plnk::timeit(|| {
         let mut ok = true;
-        for block in &blocks {
-            let alpha = block.shard.linear_combination[1]; // Vandermonde coefficient
-            if !aplonk::verify::<E, P>(
-                block,
-                alpha,
-                &vk_psi,
-                params.ipa.tau_1,
-                params.kzg.powers_of_g[0].into_group(),
-                params.kzg.h.into_group(),
-            )
-            .unwrap_or_else(|_| panic!("komodo::aplonk::verify({})", alpha))
+        for (shard, proof) in shards.iter().zip(proofs.iter()) {
+            let alpha = shard.linear_combination[1]; // Vandermonde coefficient
+            if !aplonk::verify::<E, P>(shard, &commitment, proof, alpha, &vk)
+                .unwrap_or_else(|_| panic!("komodo::aplonk::verify({})", alpha))
             {
                 ok = false;
             }

@@ -30,21 +30,33 @@ mod polynomial;
 mod transcript;
 
 #[derive(Debug, Clone, Default, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
-/// Representation of an _aPlonK_ block.
-pub struct Block<E: Pairing> {
-    pub shard: Shard<E::ScalarField>,
+pub struct Commitment<E: Pairing> {
+    /// $\mu \in \mathbb{G}_1$
+    pub mu: Vec<E::G1>,
     /// $\text{com}_f \in \mathbb{G}_T$
-    com_f: PairingOutput<E>,
+    pub com_f: PairingOutput<E>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
+pub struct Proof<E: Pairing> {
     /// $\hat{v} \in \mathbb{F}_p$
-    v_hat: E::ScalarField,
+    pub v_hat: E::ScalarField,
     /// $\hat{\mu} \in \mathbb{G}_1$
-    mu_hat: E::G1,
+    pub mu_hat: E::G1,
     /// $\pi_\text{KZG} \in \mathbb{G}_1$
-    kzg_proof: kzg10::Proof<E>,
+    pub kzg_proof: kzg10::Proof<E>,
     /// $\pi_\text{IPA}$
     ipa_proof: ipa::Proof<E>,
     /// $\pi_{\text{aPlonK}} \in \mathbb{G}_2$
-    aplonk_proof: E::G2,
+    pub aplonk_proof: E::G2,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
+pub struct VerifierKey<E: Pairing> {
+    pub vk_psi: kzg10::VerifierKey<E>,
+    pub tau_1: E::G1,
+    pub g_1: E::G1,
+    pub g_2: E::G2,
 }
 
 /// Representation of _aPlonK_'s parameters.
@@ -99,10 +111,7 @@ where
 /// Commits the polynomials.
 ///
 /// [`commit`] actually computes $\mu$ and $\text{com}_f$.
-pub fn commit<E, P>(
-    polynomials: &[P],
-    setup: &SetupParams<E>,
-) -> Result<(Vec<E::G1>, PairingOutput<E>), KomodoError>
+pub fn commit<E, P>(polynomials: &[P], setup: &SetupParams<E>) -> Result<Commitment<E>, KomodoError>
 where
     E: Pairing,
     P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
@@ -142,7 +151,7 @@ where
         .map(|(i, c)| E::pairing(c, setup.ipa.ck_tau[i]))
         .sum();
 
-    Ok((mu, com_f))
+    Ok(Commitment { mu, com_f })
 }
 
 /// Proves the whole data $\Delta$.
@@ -160,33 +169,24 @@ where
 /// - $H = \text{witness}(G, \rho)$
 /// - $\pi_{\text{aPlonK}} = \sum [\tau^i\]_2 H_i$
 pub fn prove<E, P>(
-    commit: (Vec<E::G1>, PairingOutput<E>),
+    commitment: &Commitment<E>,
     polynomials: &[P],
-    shards: &[Shard<E::ScalarField>],
     points: &[E::ScalarField],
     params: &SetupParams<E>,
-) -> Result<Vec<Block<E>>, KomodoError>
+) -> Result<Vec<Proof<E>>, KomodoError>
 where
     E: Pairing,
     P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
-    assert_eq!(
-        shards.len(),
-        points.len(),
-        "should have same number of shards and evaluation points, found {} and {} respectively",
-        shards.len(),
-        points.len()
-    );
-
-    let (mu, com_f) = commit;
+    let Commitment { mu, com_f } = commitment;
 
     let supported_degree = polynomials.iter().map(|p| p.degree()).max().unwrap_or(0);
     let (powers, _) = trim(&params.kzg, supported_degree);
 
     // open
     let mut proofs = Vec::new();
-    for (s, pt) in shards.iter().zip(points.iter()) {
+    for pt in points.iter() {
         let v_hat_elements = polynomials
             .iter()
             .map(|p| p.evaluate(pt))
@@ -209,7 +209,7 @@ where
         // open.3.3
         let f = algebra::scalar_product_polynomial::<E, P>(&r_vec, polynomials);
         // open.3.4.
-        let mu_hat: E::G1 = algebra::scalar_product_g1::<E>(&mu, &r_vec);
+        let mu_hat: E::G1 = algebra::scalar_product_g1::<E>(mu, &r_vec);
         // open.3.5.
         let v_hat: E::ScalarField = algebra::scalar_product::<E>(&v_hat_elements, &r_vec);
 
@@ -229,7 +229,7 @@ where
 
         // open.6.
         let (ipa_proof, u) =
-            ipa::prove(polynomials.len(), &params.ipa.ck_tau, com_f, r, mu_hat, &mu)?;
+            ipa::prove(polynomials.len(), &params.ipa.ck_tau, *com_f, r, mu_hat, mu)?;
         let mut u_inv = Vec::new();
         for u_i in &u {
             if let Some(inverse) = u_i.inverse() {
@@ -272,9 +272,7 @@ where
             .sum();
 
         // open.9.
-        proofs.push(Block {
-            shard: s.clone(),
-            com_f,
+        proofs.push(Proof {
             v_hat,
             mu_hat,
             kzg_proof,
@@ -286,7 +284,7 @@ where
     Ok(proofs)
 }
 
-/// Verifies that a block is valid.
+/// Verifies that a shard is valid.
 ///
 /// For a given shard $s_\alpha$:
 /// - $r = \text{hash}(\text{com}_f, \alpha)$
@@ -300,12 +298,11 @@ where
 /// - $\text{ok}_{\text{aPlonK}} = E(\[\tau\]_1 - \[\rho\]_1, \pi\_{\text{aPlonK}}) = E(\[1\]_1, \pi\_{\text{IPA}}.\text{ck}\_{\tau,0})$
 /// - assert $\text{ok}_{\text{KZG}}$, $\text{ok}\_{\text{IPA}}$ and $\text{ok}\_{\text{aPlonK}}$ are true
 pub fn verify<E, P>(
-    block: &Block<E>,
+    shard: &Shard<E::ScalarField>,
+    commitment: &Commitment<E>,
+    proof: &Proof<E>,
     pt: E::ScalarField,
-    vk_psi: &kzg10::VerifierKey<E>,
-    tau_1: E::G1,
-    g_1: E::G1,
-    g_2: E::G2,
+    vk: &VerifierKey<E>,
 ) -> Result<bool, KomodoError>
 where
     E: Pairing,
@@ -314,7 +311,10 @@ where
 {
     // check.1.
     let mut bytes = vec![];
-    if let Err(error) = block.com_f.serialize_with_mode(&mut bytes, Compress::Yes) {
+    if let Err(error) = commitment
+        .com_f
+        .serialize_with_mode(&mut bytes, Compress::Yes)
+    {
         return Err(KomodoError::Other(format!("SerializationError: {}", error)));
     }
     if let Err(error) = pt.serialize_with_mode(&mut bytes, Compress::Yes) {
@@ -325,34 +325,33 @@ where
     let r = E::ScalarField::from_le_bytes_mod_order(&hash);
 
     // check.2.
-    let p1 = block.mu_hat - vk_psi.g.mul(block.v_hat);
-    let inner = vk_psi.beta_h.into_group() - vk_psi.h.mul(&pt);
-    if E::pairing(p1, vk_psi.h) != E::pairing(block.kzg_proof.w, inner) {
+    let p1 = proof.mu_hat - vk.vk_psi.g.mul(proof.v_hat);
+    let inner = vk.vk_psi.beta_h.into_group() - vk.vk_psi.h.mul(&pt);
+    if E::pairing(p1, vk.vk_psi.h) != E::pairing(proof.kzg_proof.w, inner) {
         return Ok(false);
     }
 
     // TODO: missing part of the aplonk algorithm
     // check.3.
 
-    let nb_polynomials = block.shard.size
-        / (block.shard.k as usize)
-        / (E::ScalarField::MODULUS_BIT_SIZE as usize / 8);
+    let nb_polynomials =
+        shard.size / (shard.k as usize) / (E::ScalarField::MODULUS_BIT_SIZE as usize / 8);
 
     // check.4.
     if !ipa::verify(
         nb_polynomials,
         None, // we call *IPA.Verify'* here
-        block.com_f,
+        commitment.com_f,
         r,
-        block.mu_hat,
-        &block.ipa_proof,
+        proof.mu_hat,
+        &proof.ipa_proof,
     )? {
         return Ok(false);
     }
 
     // check.5.1.
     let mut bytes = vec![];
-    if let Err(error) = block
+    if let Err(error) = proof
         .ipa_proof
         .serialize_with_mode(&mut bytes, Compress::Yes)
     {
@@ -362,17 +361,17 @@ where
     let rho = E::ScalarField::from_le_bytes_mod_order(&hash);
 
     let kappa = f64::log2(nb_polynomials as f64) as usize;
-    let mut ts = match transcript::initialize(block.com_f, r, block.mu_hat) {
+    let mut ts = match transcript::initialize(commitment.com_f, r, proof.mu_hat) {
         Ok(transcript) => transcript,
         Err(error) => return Err(KomodoError::Other(format!("SerializationError: {}", error))),
     };
     let mut u = algebra::vector::zero::<E::ScalarField>(kappa);
     for j in (0..kappa).rev() {
         u[j] = match transcript::hash(
-            block.ipa_proof.l_g[j],
-            block.ipa_proof.r_g[j],
-            block.ipa_proof.l_r[j],
-            block.ipa_proof.r_r[j],
+            proof.ipa_proof.l_g[j],
+            proof.ipa_proof.r_g[j],
+            proof.ipa_proof.l_r[j],
+            proof.ipa_proof.r_r[j],
             &ts,
         ) {
             Ok(hash) => hash,
@@ -401,10 +400,10 @@ where
     let v_rho = g.evaluate(&rho);
 
     // check.6.
-    let lhs = E::pairing(tau_1 - g_1.mul(rho), block.aplonk_proof);
+    let lhs = E::pairing(vk.tau_1 - vk.g_1.mul(rho), proof.aplonk_proof);
     let rhs = E::pairing(
-        g_1.mul(E::ScalarField::one()),
-        block.ipa_proof.ck_tau_0 - g_2.mul(v_rho),
+        vk.g_1.mul(E::ScalarField::one()),
+        proof.ipa_proof.ck_tau_0 - vk.g_2.mul(v_rho),
     );
     let b_tau = lhs == rhs;
 
@@ -418,16 +417,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{commit, prove, setup, Block};
     use crate::{
-        algebra, algebra::linalg::Matrix, conversions::u32_to_u8_vec, fec::encode, zk::trim,
+        algebra::{self, linalg::Matrix},
+        conversions::u32_to_u8_vec,
+        fec::{self, encode},
+        zk::trim,
     };
 
     use ark_bls12_381::Bls12_381;
     use ark_ec::{pairing::Pairing, AffineRepr};
     use ark_ff::{Field, PrimeField};
     use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
-    use ark_poly_commit::kzg10;
     use std::ops::{Div, MulAssign};
 
     type UniPoly381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;
@@ -444,9 +444,9 @@ mod tests {
         n: usize,
     ) -> Result<
         (
-            Vec<Block<E>>,
-            (kzg10::VerifierKey<E>, E::G1),
-            (E::G1, E::G2),
+            super::Commitment<E>,
+            Vec<(fec::Shard<E::ScalarField>, super::Proof<E>)>,
+            super::VerifierKey<E>,
         ),
         ark_poly_commit::Error,
     >
@@ -459,7 +459,7 @@ mod tests {
         let vector_length_bound =
             bytes.len() / (E::ScalarField::MODULUS_BIT_SIZE as usize / 8) / (degree + 1);
 
-        let params = setup::<E, P>(degree, vector_length_bound)?;
+        let params = super::setup::<E, P>(degree, vector_length_bound)?;
         let (_, vk_psi) = trim(&params.kzg, degree);
 
         let elements = algebra::split_data_into_field_elements::<E::ScalarField>(bytes, k);
@@ -468,7 +468,7 @@ mod tests {
             polynomials.push(P::from_coefficients_vec(chunk.to_vec()))
         }
 
-        let commit = commit(&polynomials, &params).unwrap();
+        let commitment = super::commit(&polynomials, &params).unwrap();
 
         let encoding_points = (0..n)
             .map(|i| E::ScalarField::from_le_bytes_mod_order(&i.to_le_bytes()))
@@ -477,16 +477,18 @@ mod tests {
         let shards = encode::<E::ScalarField>(bytes, &encoding_mat)
             .unwrap_or_else(|_| panic!("could not encode"));
 
-        let blocks =
-            prove::<E, P>(commit, &polynomials, &shards, &encoding_points, &params).unwrap();
+        let proofs =
+            super::prove::<E, P>(&commitment, &polynomials, &encoding_points, &params).unwrap();
 
         Ok((
-            blocks,
-            (vk_psi, params.ipa.tau_1),
-            (
-                params.kzg.powers_of_g[0].into_group(),
-                params.kzg.h.into_group(),
-            ),
+            commitment,
+            shards.into_iter().zip(proofs).collect::<Vec<_>>(),
+            super::VerifierKey {
+                vk_psi,
+                tau_1: params.ipa.tau_1,
+                g_1: params.kzg.powers_of_g[0].into_group(),
+                g_2: params.kzg.h.into_group(),
+            },
         ))
     }
 
@@ -496,17 +498,16 @@ mod tests {
         P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
-        let (blocks, (vk_psi, tau_1), (g_1, g_2)) =
+        let (commitment, blocks, vk) =
             test_setup::<E, P>(bytes, k, n).expect("proof failed for bls12-381");
 
-        for (i, block) in blocks.iter().enumerate() {
+        for (i, (shard, proof)) in blocks.iter().enumerate() {
             assert!(super::verify::<E, P>(
-                block,
+                shard,
+                &commitment,
+                proof,
                 E::ScalarField::from_le_bytes_mod_order(&u32_to_u8_vec(i as u32)),
-                &vk_psi,
-                tau_1,
-                g_1,
-                g_2
+                &vk,
             )
             .unwrap());
         }
@@ -524,23 +525,22 @@ mod tests {
         P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
-        let (blocks, (vk_psi, tau_1), (g_1, g_2)) =
+        let (commitment, blocks, vk) =
             test_setup::<E, P>(bytes, k, n).expect("proof failed for bls12-381");
 
-        for (i, block) in blocks.iter().enumerate() {
-            let mut b = block.clone();
+        for (i, (shard, proof)) in blocks.iter().enumerate() {
+            let mut p = proof.clone();
             // modify a field in the struct b to corrupt the block proof without corrupting the data serialization
             let a = E::ScalarField::from_le_bytes_mod_order(&[123]);
-            b.ipa_proof.l_r[0].mul_assign(a.pow([4321_u64]));
+            p.ipa_proof.l_r[0].mul_assign(a.pow([4321_u64]));
 
             assert!(
                 !super::verify::<E, P>(
-                    &b,
+                    shard,
+                    &commitment,
+                    &p,
                     E::ScalarField::from_le_bytes_mod_order(&u32_to_u8_vec(i as u32)),
-                    &vk_psi,
-                    tau_1,
-                    g_1,
-                    g_2
+                    &vk,
                 )
                 .unwrap(),
                 "aPlonK should fail for bls12-381, k = {} and a corrupted block",

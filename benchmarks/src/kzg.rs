@@ -65,7 +65,7 @@ where
 
     let plnk::TimeWithValue {
         t: t_commit_m,
-        v: (commitments, _),
+        v: commitment,
     } = plnk::timeit(|| kzg::commit(&powers, &polynomials).expect("komodo::kzg::commit"));
 
     let encoding_points = &(0..fec_params.n)
@@ -76,16 +76,10 @@ where
 
     let plnk::TimeWithValue {
         t: t_prove_n,
-        v: blocks,
+        v: proofs,
     } = plnk::timeit(|| {
-        kzg::prove::<E, P>(
-            &commitments,
-            &polynomials,
-            &shards,
-            encoding_points,
-            &powers,
-        )
-        .expect("komodo::kzg::prove")
+        kzg::prove::<E, P>(&polynomials, &shards, encoding_points, &powers)
+            .expect("komodo::kzg::prove")
     });
 
     let plnk::TimeWithValue {
@@ -93,9 +87,9 @@ where
         v: ok,
     } = plnk::timeit(|| {
         let mut ok = true;
-        for block in &blocks {
-            let alpha = block.shard.linear_combination[1]; // Vandermonde coefficient
-            if !kzg::verify::<E, P>(block, alpha, &verifier_key) {
+        for (s, p) in shards.iter().zip(proofs.iter()) {
+            let alpha = s.linear_combination[1]; // Vandermonde coefficient
+            if !kzg::verify::<E, P>(s, &commitment, p, alpha, &verifier_key) {
                 ok = false;
             }
         }
@@ -111,7 +105,12 @@ where
     } = plnk::timeit(|| {
         let mut ok = true;
         if !kzg::batch_verify(
-            &blocks[1..3],
+            &[
+                (shards[0].clone(), proofs[0].clone()),
+                (shards[1].clone(), proofs[1].clone()),
+                (shards[2].clone(), proofs[2].clone()),
+            ],
+            &commitment,
             &[
                 E::ScalarField::from_le_bytes_mod_order(&[1]),
                 E::ScalarField::from_le_bytes_mod_order(&[2]),

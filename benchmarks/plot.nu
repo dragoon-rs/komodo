@@ -87,7 +87,6 @@ def main [
                 [
                     [p           , __k               ];
                     ["semi-avid" , "t_commit_k"      ],
-                    ["semi-avid" , "t_build_n"       ],
                     ["semi-avid" , "t_verify_n"      ],
                     ["kzg"       , "t_commit_m"      ],
                     ["kzg"       , "t_prove_n"       ],
@@ -110,7 +109,6 @@ def main [
             | each { |it|
                 match $it.__k {
                     "t_commit_k"       => { $it | update __k "t_commit_1" | update v { |it| try { $it.v / $it.k } } },
-                    "t_build_n"        => { $it | update __k "t_build_1"  | update v { |it| try { $it.v / $it.n } } },
                     "t_verify_n"       => { $it | update __k "t_verify_1" | update v { |it| try { $it.v / $it.n } } },
                     "t_prove_n"        => { $it | update __k "t_prove_1"  | update v { |it| try { $it.v / $it.n } } },
                     "t_commit_m"       => { $it | update __k "t_commit_1" | update v { |it| try { $it.v / $it.m } } },
@@ -132,7 +130,6 @@ def main [
                 [
                     [p           , __k               ];
                     ["semi-avid" , "t_commit_1"      ],
-                    ["semi-avid" , "t_build_1"       ],
                     ["semi-avid" , "t_verify_1"      ],
                     ["kzg"       , "t_commit_1"      ],
                     ["kzg"       , "t_prove_1"       ],
@@ -152,9 +149,9 @@ def main [
 
     if $stitch and ($nb or $regular or $normalized) {
         ffmpeg grid --output semi-avid.png ([
-            (if $nb         { [semi-avid-t_build_n.nb.png , semi-avid-t_commit_k.nb.png , semi-avid-t_verify_n.nb.png] }),
-            (if $regular    { [semi-avid-t_build_n.png    , semi-avid-t_commit_k.png    , semi-avid-t_verify_n.png   ] }),
-            (if $normalized { [semi-avid-t_build_1.png    , semi-avid-t_commit_1.png    , semi-avid-t_verify_1.png   ] }),
+            (if $nb         { [semi-avid-t_commit_k.nb.png , semi-avid-t_verify_n.nb.png] }),
+            (if $regular    { [semi-avid-t_commit_k.png    , semi-avid-t_verify_n.png   ] }),
+            (if $normalized { [semi-avid-t_commit_1.png    , semi-avid-t_verify_1.png   ] }),
         ] | compact)
 
         ffmpeg grid --output kzg.png ([
@@ -196,7 +193,6 @@ def main [
             | insert step {
                 match [$in.p, $in.__k] {
                     ["semi-avid", "t_commit_k"] => "commit",
-                    ["semi-avid", "t_build_n" ] => "prove",
                     ["semi-avid", "t_verify_n"] => "verify",
                     ["kzg"      , "t_commit_m"] => "commit",
                     ["kzg"      , "t_prove_n" ] => "prove",

@@ -5,9 +5,8 @@ use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
 use std::ops::Div;
 
 use komodo::{
-    algebra,
-    algebra::linalg::Matrix,
-    aplonk::{commit, prove, setup, verify},
+    algebra::{self, linalg::Matrix},
+    aplonk::{commit, prove, setup, verify, VerifierKey},
     error::KomodoError,
     fec::encode,
     zk::trim,
@@ -34,6 +33,12 @@ where
         bytes.len() / (E::ScalarField::MODULUS_BIT_SIZE as usize / 8) / (degree + 1);
     let params = setup::<E, P>(degree, vector_length_bound).expect("setup failed");
     let (_, vk_psi) = trim(&params.kzg, degree);
+    let vk = VerifierKey {
+        vk_psi,
+        tau_1: params.ipa.tau_1,
+        g_1: params.kzg.powers_of_g[0].into_group(),
+        g_2: params.kzg.h.into_group(),
+    };
 
     // build the $m$ polynomials from the data
     let elements = algebra::split_data_into_field_elements::<E::ScalarField>(&bytes, k);
@@ -43,7 +48,7 @@ where
     }
 
     // commit the polynomials
-    let commit = commit(&polynomials, &params).unwrap();
+    let commitment = commit(&polynomials, &params).unwrap();
 
     // encode the data with a Vandermonde encoding
     let encoding_points = (0..n)
@@ -54,17 +59,16 @@ where
         .unwrap_or_else(|_| panic!("could not encode"));
 
     // craft and attach one proof to each shard of encoded data
-    let blocks = prove::<E, P>(commit, &polynomials, &shards, &encoding_points, &params).unwrap();
+    let proofs = prove::<E, P>(&commitment, &polynomials, &encoding_points, &params).unwrap();
 
     // verify that all the shards are valid
-    for (i, block) in blocks.iter().enumerate() {
+    for (i, (shard, proof)) in shards.iter().zip(proofs.iter()).enumerate() {
         assert!(verify::<E, P>(
-            block,
+            shard,
+            &commitment,
+            proof,
             E::ScalarField::from_le_bytes_mod_order(&[i as u8]),
-            &vk_psi,
-            params.ipa.tau_1,
-            params.kzg.powers_of_g[0].into_group(),
-            params.kzg.h.into_group(),
+            &vk,
         )
         .unwrap());
     }

@@ -76,12 +76,13 @@
 //! let powers = komodo::zk::setup::<F, G>(10 * 1_024, &mut rng).unwrap();
 //! # }
 //! ```
-//! - we can now build an encoding matrix, encode the data, commit it, proving the shards implicitely, and build [`Block`]s
+//! - we can now build an encoding matrix, encode the data and commit it, proving the shards implicitely
 //! ```
 //! # use ark_bls12_381::{Fr as F, G1Projective as G};
 //! # use ark_poly::univariate::DensePolynomial as DP;
 //! #
-//! # use komodo::semi_avid::{build, commit, verify};
+//! # use komodo::semi_avid::{commit, verify};
+//! # use komodo::algebra::linalg::Matrix;
 //! #
 //! # fn main() {
 //! # let mut rng = ark_std::test_rng();
@@ -91,18 +92,18 @@
 //! #
 //! # let powers = komodo::zk::setup::<F, G>(10 * 1_024, &mut rng).unwrap();
 //! #
-//! let encoding_mat = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
-//! let shards = komodo::fec::encode(&bytes, encoding_mat).unwrap();
+//! let encoding_mat: Matrix<F> = komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
+//! let shards = komodo::fec::encode(&bytes, &encoding_mat).unwrap();
 //! let commitment = commit::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
-//! let blocks = build::<F, G, DP<F>>(&shards, &commitment);
 //! # }
 //! ```
-//! - finally, each [`Block`] can be verified individually, using the same trusted setup
+//! - finally, each [`Shard`] can be verified individually, using the same trusted setup
 //! ```
 //! # use ark_bls12_381::{Fr as F, G1Projective as G};
 //! # use ark_poly::univariate::DensePolynomial as DP;
 //! #
-//! # use komodo::semi_avid::{build, commit, verify};
+//! # use komodo::semi_avid::{commit, verify};
+//! # use komodo::algebra::linalg::Matrix;
 //! #
 //! # fn main() {
 //! # let mut rng = ark_std::test_rng();
@@ -112,13 +113,12 @@
 //! #
 //! # let powers = komodo::zk::setup::<F, G>(10 * 1_024, &mut rng).unwrap();
 //! #
-//! # let encoding_mat = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
-//! # let shards = komodo::fec::encode(&bytes, encoding_mat).unwrap();
+//! # let encoding_mat: Matrix<F> = komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
+//! # let shards = komodo::fec::encode(&bytes, &encoding_mat).unwrap();
 //! # let commitment = commit::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
-//! # let blocks = build::<F, G, DP<F>>(&shards, &commitment);
 //! #
-//! for block in &blocks {
-//!     assert!(verify::<F, G, DP<F>>(block, &powers).unwrap());
+//! for shard in &shards {
+//!     assert!(verify::<F, G, DP<F>>(shard, &commitment, &powers).unwrap());
 //! }
 //! # }
 //! ```
@@ -127,7 +127,8 @@
 //! # use ark_bls12_381::{Fr as F, G1Projective as G};
 //! # use ark_poly::univariate::DensePolynomial as DP;
 //! #
-//! # use komodo::semi_avid::{build, commit};
+//! # use komodo::semi_avid::commit;
+//! # use komodo::algebra::linalg::Matrix;
 //! #
 //! # fn main() {
 //! # let mut rng = ark_std::test_rng();
@@ -137,12 +138,10 @@
 //! #
 //! # let powers = komodo::zk::setup::<F, G>(10 * 1_024, &mut rng).unwrap();
 //! #
-//! # let encoding_mat = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
-//! # let shards = komodo::fec::encode(&bytes, encoding_mat).unwrap();
+//! # let encoding_mat: Matrix<F> = komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
+//! # let shards = komodo::fec::encode(&bytes, &encoding_mat).unwrap();
 //! # let commitment = commit::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
-//! # let blocks = build::<F, G, DP<F>>(&shards, &commitment);
 //! #
-//! let shards = blocks[0..k].iter().cloned().map(|b| b.shard).collect::<Vec<_>>();
 //! assert_eq!(bytes, komodo::fec::decode(&shards).unwrap());
 //! # }
 //! ```
@@ -156,181 +155,30 @@
 //! However, this operation will introduce linear dependencies between recoded shards and their
 //! _parents_, which might decrease the diversity of shards and harm the decoding process.
 
+use std::ops::Index;
+
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::ops::Div;
-use ark_std::rand::RngCore;
-use serde::de::Visitor;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt;
 use tracing::{debug, info};
 
 use crate::{
     algebra,
     error::KomodoError,
-    fec::{self, Shard},
-    zk::{self, Commitment, Powers},
+    fec::Shard,
+    zk::{self, Powers},
 };
 
-/// Representation of a block of proven data.
-///
-/// This is a wrapper around a [`fec::Shard`] with some additional cryptographic
-/// information that allows to prove the integrity of said shard.
 #[derive(Debug, Default, Clone, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
-pub struct Block<F: PrimeField, G: CurveGroup<ScalarField = F>> {
-    pub shard: fec::Shard<F>,
-    commitment: Vec<Commitment<F, G>>,
-}
+pub struct Commitment<F: PrimeField, G: CurveGroup<ScalarField = F>>(pub Vec<zk::Commitment<F, G>>);
 
-/// Block serialization and deserialization.
-/// In order to serialize and deserialize a block, we need to use the [`ark_serialize`] crate.
-/// [`Block`] cannot directly implement [`Serialize`] and [`Deserialize`] because of its fields.
-/// Instead, we implement [`Serialize`] and [`Deserialize`] for [`Block`] using the [`ark_serialize`] methods.
-///
-/// The first step is to use [`CanonicalSerialize::serialize_with_mode`] to serialize the block with compression.
-/// Once we get the bytes, we can serialize them using serde and [`Serializer::serialize_bytes`].
-///
-/// For the deserialization, we first need to deserialize the bytes using serde and [`Deserializer::deserialize_bytes`].
-/// To do that with deserialize_bytes, we need to implement a custom visitor, [`ByteVisitor`], that will
-/// convert the bytes into a [`Vec<u8>`].
-/// Then, we can use [`CanonicalDeserialize::deserialize_with_mode`] to deserialize the block from the [`Vec<u8>`]
-///
-/// By doing that, we are fully compatible with serde, but the Block will always be serialized the same way.
-struct ByteVisitor;
-
-impl Visitor<'_> for ByteVisitor {
-    type Value = Vec<u8>;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a byte array")
+impl<F: PrimeField, G: CurveGroup<ScalarField = F>> Index<usize> for Commitment<F, G> {
+    type Output = G::Affine;
+    fn index(&self, i: usize) -> &Self::Output {
+        &self.0[i].0
     }
-
-    fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        Ok(v.to_vec())
-    }
-}
-
-impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> Deserialize<'de> for Block<F, G> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let bytes = deserializer.deserialize_bytes(ByteVisitor)?;
-        let block = Self::deserialize_with_mode(
-            bytes.as_slice(),
-            ark_serialize::Compress::Yes,
-            ark_serialize::Validate::Yes,
-        );
-        block.map_err(serde::de::Error::custom)
-    }
-}
-
-impl<F: PrimeField, G: CurveGroup<ScalarField = F>> Serialize for Block<F, G> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut bytes = Vec::new();
-
-        self.serialize_with_mode(&mut bytes, ark_serialize::Compress::Yes)
-            .map_err(serde::ser::Error::custom)?;
-
-        serializer.serialize_bytes(&bytes)
-    }
-}
-
-impl<F: PrimeField, G: CurveGroup<ScalarField = F>> std::fmt::Display for Block<F, G> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{{")?;
-        write!(f, "shard: {{")?;
-        write!(f, "k: {},", self.shard.k)?;
-        write!(f, "comb: [")?;
-        for x in &self.shard.linear_combination {
-            if x.is_zero() {
-                write!(f, "0,")?;
-            } else {
-                write!(f, r#""{}","#, x)?;
-            }
-        }
-        write!(f, "]")?;
-        write!(f, ",")?;
-        write!(f, "bytes: [")?;
-        for x in &self.shard.data {
-            if x.is_zero() {
-                write!(f, "0,")?;
-            } else {
-                write!(f, r#""{}","#, x)?;
-            }
-        }
-        write!(f, "]")?;
-        write!(f, ",")?;
-        write!(
-            f,
-            "hash: {:?},",
-            self.shard
-                .hash
-                .iter()
-                .map(|x| format!("{:x}", x))
-                .collect::<Vec<_>>()
-                .join("")
-        )?;
-        write!(f, "size: {},", self.shard.size)?;
-        write!(f, "}}")?;
-        write!(f, ",")?;
-        write!(f, "commits: [")?;
-        for commit in &self.commitment {
-            write!(f, r#""{}","#, commit.0)?;
-        }
-        write!(f, "]")?;
-        write!(f, "}}")?;
-
-        Ok(())
-    }
-}
-
-/// Computes a recoded block from an arbitrary set of blocks.
-///
-/// Coefficients will be drawn at random, one for each block.
-///
-/// > **Note**
-/// >
-/// > If the blocks appear to come from different data, e.g. if the commits are
-/// > different, an error will be returned.
-///
-/// > **Note**
-/// >
-/// > This is a wrapper around [`fec::recode_random`].
-pub fn recode<F: PrimeField, G: CurveGroup<ScalarField = F>>(
-    blocks: &[Block<F, G>],
-    rng: &mut impl RngCore,
-) -> Result<Option<Block<F, G>>, KomodoError> {
-    for (i, (b1, b2)) in blocks.iter().zip(blocks.iter().skip(1)).enumerate() {
-        if b1.commitment != b2.commitment {
-            return Err(KomodoError::IncompatibleBlocks {
-                key: "commitment".to_string(),
-                index: i,
-                left: format!("{:?}", b1.commitment),
-                right: format!("{:?}", b2.commitment),
-            });
-        }
-    }
-    let shard = match fec::recode_random(
-        &blocks.iter().map(|b| b.shard.clone()).collect::<Vec<_>>(),
-        rng,
-    )? {
-        Some(s) => s,
-        None => return Ok(None),
-    };
-
-    Ok(Some(Block {
-        shard,
-        commitment: blocks[0].commitment.clone(),
-    }))
 }
 
 /// Computes the Semi-AVID commitment for some data.
@@ -338,7 +186,7 @@ pub fn commit<F, G, P>(
     bytes: &[u8],
     powers: &Powers<F, G>,
     k: usize,
-) -> Result<Vec<Commitment<F, G>>, KomodoError>
+) -> Result<Commitment<F, G>, KomodoError>
 where
     F: PrimeField,
     G: CurveGroup<ScalarField = F>,
@@ -377,30 +225,13 @@ where
     debug!("committing the polynomials");
     let commitments = zk::batch_commit(powers, &polynomials_to_commit)?;
 
-    Ok(commitments)
+    Ok(Commitment(commitments))
 }
 
-/// Attaches a Semi-AVID commitment to a collection of encoded shards.
-#[inline(always)]
-pub fn build<F, G, P>(shards: &[Shard<F>], commitment: &[Commitment<F, G>]) -> Vec<Block<F, G>>
-where
-    F: PrimeField,
-    G: CurveGroup<ScalarField = F>,
-    P: DenseUVPolynomial<F>,
-    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
-{
-    shards
-        .iter()
-        .map(|s| Block {
-            shard: s.clone(),
-            commitment: commitment.to_vec(),
-        })
-        .collect::<Vec<_>>()
-}
-
-/// Verifies that a single block of encoded and proven data is valid.
+/// Verifies that a single shard is valid.
 pub fn verify<F, G, P>(
-    block: &Block<F, G>,
+    shard: &Shard<F>,
+    commitment: &Commitment<F, G>,
     verifier_key: &Powers<F, G>,
 ) -> Result<bool, KomodoError>
 where
@@ -409,16 +240,14 @@ where
     P: DenseUVPolynomial<F>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
-    let elements = block.shard.data.clone();
-    let polynomial = P::from_coefficients_vec(elements);
+    let polynomial = P::from_coefficients_vec(shard.data.clone());
     let commit = zk::commit(verifier_key, &polynomial)?;
 
-    let rhs = block
-        .shard
+    let rhs = shard
         .linear_combination
         .iter()
         .enumerate()
-        .map(|(i, w)| block.commitment[i].0.into() * w)
+        .map(|(i, w)| commitment[i].into() * w)
         .sum();
     Ok(commit.0.into() == rhs)
 }
@@ -432,28 +261,21 @@ mod tests {
     use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
     use ark_std::{ops::Div, test_rng};
     use rand::{rngs::StdRng, SeedableRng};
-    use serde::{Deserialize, Serialize};
 
     use crate::{
         algebra::linalg::Matrix,
         error::KomodoError,
-        fec::{decode, encode, Shard},
-        zk::{setup, Commitment, Powers},
+        fec::{encode, recode_random},
+        zk::{self, setup, Powers},
     };
 
-    use super::{build, commit, recode, verify, Block};
+    use super::{commit, verify, Commitment};
 
     fn bytes() -> Vec<u8> {
         include_bytes!("../assets/dragoon_133x133.png").to_vec()
     }
 
-    macro_rules! full {
-        ($b:ident, $p:ident, $m:ident) => {
-            build::<F, G, P>(&encode($b, $m)?, &commit($b, &$p, $m.height)?)
-        };
-    }
-
-    /// verify all `n` blocks
+    /// verify all `n` shards
     fn verify_template<F, G, P>(bytes: &[u8], encoding_mat: &Matrix<F>) -> Result<(), KomodoError>
     where
         F: PrimeField,
@@ -465,32 +287,36 @@ mod tests {
 
         let powers = setup::<F, G>(bytes.len(), rng)?;
 
-        let blocks = full!(bytes, powers, encoding_mat);
+        let shards = encode(bytes, encoding_mat)?;
+        let commitment = commit(bytes, &powers, encoding_mat.height)?;
 
-        for block in &blocks {
-            assert!(verify(block, &powers)?);
+        for shard in &shards {
+            assert!(verify(shard, &commitment, &powers)?);
         }
 
         Ok(())
     }
 
-    /// attack a block by alterring one part of its commitment
-    fn attack<F, G>(block: Block<F, G>, c: usize, base: u128, pow: u64) -> Block<F, G>
+    /// attack a part of the commitment
+    fn attack<F, G>(
+        commitment: &Commitment<F, G>,
+        c: usize,
+        base: u128,
+        pow: u64,
+    ) -> Commitment<F, G>
     where
         F: PrimeField,
         G: CurveGroup<ScalarField = F>,
     {
-        let mut block = block;
-        // modify a field in the struct b to corrupt the block commitment without corrupting the data serialization
+        // modify a field in the struct b to corrupt the commitment without corrupting the data serialization
         let a = F::from_le_bytes_mod_order(&base.to_le_bytes());
-        let mut commits: Vec<G> = block.commitment.iter().map(|c| c.0.into()).collect();
+        let mut commits: Vec<G> = commitment.0.iter().map(|c| c.0.into()).collect();
         commits[c] = commits[c].mul(a.pow([pow]));
-        block.commitment = commits.iter().map(|&c| Commitment(c.into())).collect();
 
-        block
+        Commitment(commits.iter().map(|&c| zk::Commitment(c.into())).collect())
     }
 
-    /// verify all `n` blocks and then make sure an attacked block does not verify
+    /// verify all `n` shards and then make sure an attacked shard does not verify
     fn verify_with_errors_template<F, G, P>(
         bytes: &[u8],
         encoding_mat: &Matrix<F>,
@@ -504,22 +330,27 @@ mod tests {
     {
         let rng = &mut test_rng();
 
-        let powers = setup(bytes.len(), rng)?;
+        let powers = setup::<F, G>(bytes.len(), rng)?;
 
-        let blocks = full!(bytes, powers, encoding_mat);
+        let shards = encode(bytes, encoding_mat)?;
+        let commitment = commit(bytes, &powers, encoding_mat.height)?;
 
-        for block in &blocks {
-            assert!(verify(block, &powers)?);
+        for shard in &shards {
+            assert!(verify(shard, &commitment, &powers)?);
         }
 
         for &(b, c, base, pow) in attacks {
-            assert!(!verify(&attack(blocks[b].clone(), c, base, pow), &powers)?);
+            assert!(!verify(
+                &shards[b],
+                &attack(&commitment, c, base, pow),
+                &powers
+            )?);
         }
 
         Ok(())
     }
 
-    /// make sure recoded blocks still verify correctly
+    /// make sure recoded shards still verify correctly
     fn verify_recoding_template<F, G, P>(
         bytes: &[u8],
         encoding_mat: &Matrix<F>,
@@ -535,125 +366,31 @@ mod tests {
 
         let powers = setup::<F, G>(bytes.len(), rng)?;
 
-        let blocks = full!(bytes, powers, encoding_mat);
+        let shards = encode(bytes, encoding_mat)?;
+        let commitment = commit(bytes, &powers, encoding_mat.height)?;
 
-        let min_nb_blocks = recodings.iter().flatten().max().unwrap() + 1;
+        let min_nb_shards = recodings.iter().flatten().max().unwrap() + 1;
         assert!(
-            blocks.len() >= min_nb_blocks,
-            "not enough blocks, expected {}, found {}",
-            min_nb_blocks,
-            blocks.len()
+            shards.len() >= min_nb_shards,
+            "not enough shards, expected {}, found {}",
+            min_nb_shards,
+            shards.len()
         );
 
-        for bs in recodings {
+        for shard_indices in recodings {
             assert!(verify(
-                &recode(
-                    &bs.iter().map(|&i| blocks[i].clone()).collect::<Vec<_>>(),
+                &recode_random(
+                    &shard_indices
+                        .iter()
+                        .map(|&i| shards[i].clone())
+                        .collect::<Vec<_>>(),
                     rng
                 )
                 .unwrap()
                 .unwrap(),
+                &commitment,
                 &powers
             )?);
-        }
-
-        Ok(())
-    }
-
-    /// encode and decode with all `n` shards
-    fn end_to_end_template<F, G, P>(
-        bytes: &[u8],
-        encoding_mat: &Matrix<F>,
-    ) -> Result<(), KomodoError>
-    where
-        F: PrimeField,
-        G: CurveGroup<ScalarField = F>,
-        P: DenseUVPolynomial<F>,
-        for<'a, 'b> &'a P: Div<&'b P, Output = P>,
-    {
-        let rng = &mut test_rng();
-
-        let powers = setup::<F, G>(bytes.len(), rng)?;
-
-        let blocks = full!(bytes, powers, encoding_mat);
-
-        let shards: Vec<Shard<F>> = blocks.iter().map(|b| b.shard.clone()).collect();
-
-        assert_eq!(bytes, decode(&shards).unwrap());
-
-        Ok(())
-    }
-
-    /// encode and try to decode with recoded shards
-    fn end_to_end_with_recoding_template<F, G, P>(
-        bytes: &[u8],
-        encoding_mat: &Matrix<F>,
-        recodings: &[(Vec<Vec<usize>>, bool)],
-    ) -> Result<(), KomodoError>
-    where
-        F: PrimeField,
-        G: CurveGroup<ScalarField = F>,
-        P: DenseUVPolynomial<F>,
-        for<'a, 'b> &'a P: Div<&'b P, Output = P>,
-    {
-        let rng = &mut test_rng();
-
-        let max_k = recodings.iter().map(|(rs, _)| rs.len()).min().unwrap();
-        assert!(
-            encoding_mat.height <= max_k,
-            "too many source shards, expected at most {}, found {}",
-            max_k,
-            encoding_mat.height
-        );
-
-        let powers = setup::<F, G>(bytes.len(), rng)?;
-
-        let blocks = full!(bytes, powers, encoding_mat);
-
-        let min_n = recodings
-            .iter()
-            .flat_map(|(rs, _)| rs.iter().flatten())
-            .max()
-            .unwrap()
-            + 1;
-        assert!(
-            blocks.len() >= min_n,
-            "not enough blocks, expected {}, found {}",
-            min_n,
-            blocks.len()
-        );
-
-        for (rs, pass) in recodings {
-            let recoded_shards = rs
-                .iter()
-                .map(|bs| {
-                    if bs.len() == 1 {
-                        blocks[bs[0]].clone().shard
-                    } else {
-                        recode(
-                            &bs.iter().map(|&i| blocks[i].clone()).collect::<Vec<_>>(),
-                            rng,
-                        )
-                        .unwrap()
-                        .unwrap()
-                        .shard
-                    }
-                })
-                .collect::<Vec<_>>();
-            if *pass {
-                assert_eq!(
-                    bytes,
-                    decode(&recoded_shards).unwrap(),
-                    "should decode with {:?}",
-                    rs
-                );
-            } else {
-                assert!(
-                    decode(&recoded_shards).is_err(),
-                    "should not decode with {:?}",
-                    rs
-                );
-            }
         }
 
         Ok(())
@@ -724,87 +461,6 @@ mod tests {
                 &[vec![2, 3], vec![3, 5]],
             )
         });
-    }
-
-    #[test]
-    fn end_to_end() {
-        run_template::<Fr, DensePolynomial<Fr>, _>(
-            3,
-            6,
-            end_to_end_template::<Fr, G1Projective, DensePolynomial<Fr>>,
-        );
-    }
-
-    #[test]
-    fn end_to_end_with_recoding() {
-        run_template::<Fr, DensePolynomial<Fr>, _>(3, 6, |b, m| {
-            end_to_end_with_recoding_template::<Fr, G1Projective, DensePolynomial<Fr>>(
-                b,
-                m,
-                &[
-                    (vec![vec![0, 1], vec![2], vec![3]], true),
-                    (vec![vec![0, 1], vec![0], vec![1]], false),
-                    (vec![vec![0, 1], vec![2, 3], vec![1, 4]], true),
-                    (vec![vec![0, 1, 2], vec![0, 1, 2], vec![0, 1, 2]], true),
-                ],
-            )
-        });
-    }
-
-    #[test]
-    fn test_serde() {
-        #[derive(Debug, Serialize, Deserialize)]
-        enum EncapsulatedBLock {
-            EBlock {
-                block_id: String,
-                block: Block<Fr, G1Projective>,
-            },
-            EBlockNotFound {
-                block_id: String,
-            },
-        }
-
-        let mut rng = ark_std::test_rng();
-
-        let (k, n) = (3, 6_usize);
-
-        let bytes = bytes();
-
-        let powers = setup::<Fr, G1Projective>(bytes.len(), &mut rng).unwrap();
-        let encoding_mat = Matrix::random(k, n, &mut rng);
-        let shards = encode(&bytes, &encoding_mat).unwrap();
-        let commitment =
-            commit::<Fr, G1Projective, DensePolynomial<Fr>>(&bytes, &powers, encoding_mat.height)
-                .unwrap();
-
-        let blocks = build::<Fr, G1Projective, DensePolynomial<Fr>>(&shards, &commitment);
-
-        // Test serialization and deserialization of a vector of blocks
-        let bytes = bincode::serialize(&blocks).unwrap();
-        let deser_blocks: Vec<Block<Fr, G1Projective>> = bincode::deserialize(&bytes).unwrap();
-        for (block, deser_block) in blocks.iter().zip(deser_blocks.iter()) {
-            assert_eq!(block, deser_block);
-        }
-
-        // Test serialization and deserialization of a single block
-        let bytes = bincode::serialize(&blocks[0]).unwrap();
-        let b = bincode::deserialize::<Block<Fr, G1Projective>>(&bytes).unwrap();
-        assert_eq!(blocks[0], b);
-
-        // Test serialization and deserialization of an enum encapsulating a block
-        let eblock = EncapsulatedBLock::EBlock {
-            block_id: "1".to_string(),
-            block: blocks[0].clone(),
-        };
-        let bytes = bincode::serialize(&eblock).unwrap();
-        let deser_eblock: EncapsulatedBLock = bincode::deserialize(&bytes).unwrap();
-        match deser_eblock {
-            EncapsulatedBLock::EBlock { block_id, block } => {
-                assert_eq!(block_id, "1");
-                assert_eq!(block, blocks[0]);
-            }
-            _ => panic!("Expected EncapsulatedBLock::EBlock"),
-        };
     }
 
     #[test]
