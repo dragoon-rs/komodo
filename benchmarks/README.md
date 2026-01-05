@@ -28,23 +28,41 @@ const BN254 = { name: "bn254", bits: 254, bytes_without_truncation: 31 }
     --commit
     --seed 1
     # --push
+    --curve $BN254.name
 )
 ```
 
 ## plot
 ```bash
+let data = make load-all
+
+let seeds = seq 0 9 | each { 176606841000 + $in }
+
+print --no-newline "filtering... "
+let data = $data
+    | where ([
+        ($it.bytes mod 248 == 0),
+        ($it.build         == "release"),
+        ($it.cpu           == "ee672bb"),
+        ($it.git           == "af83d3e"),
+        ($it.curve         == "bn254"),
+        ($it.seed          in $seeds),
+    ] | all { $in })
+print "done"
+
+let tmp = mktemp --tmpdir XXXXXXX.json
+print --no-newline "saving... "
+$data | save -fp $tmp
+print "done"
 nu benchmarks/plot.nu ...[
-    --build "release"
-    --cpu   "ee672bb315ea00fe5815f0e20db6aa88017c1ba8355794f411c10a6057377e57"
-    --curve "bn254"
-    --seed  1
-    --nb
-    --regular
-    --normalized
-    --clean
-    --plot
-    --compare
-    --stitch
+    $tmp
+    # --nb
+    # --regular
+    # --normalized
+    # --clean
+    # --plot
+    # --compare
+    # --stitch
 ]
 ```
 

@@ -1,7 +1,6 @@
 use make.nu
 use ffmpeg.nu *
-use std formats [ "to ndjson", "from ndjson" ]
-use ../log.nu [ "log warning" ]
+use ../log.nu [ "log warning", "log error", "log info" ]
 
 const PROTOCOLS = {
     "semi-avid": { name: "Semi-AVID", color: {r: 255, g: 128, b: 166} },
@@ -47,11 +46,12 @@ def uniq-color [it: record, --worst]: [ nothing -> record<r: int, g: int, b: int
     $PROTOCOLS | get $best.p | get color
 }
 
+const CURVES = {
+    bn254: { bits: 254, bytes_without_truncation: 31 },
+}
+
 def main [
-    --cpu  : string,
-    --seed : int,
-    --build: string,
-    --curve: string,
+    data_filepath: path,
     --clean,
     --regular,
     --normalized,
@@ -60,30 +60,9 @@ def main [
     --plot,
     --compare,
 ] {
-    missing-flag "--cpu"   $cpu   --name ($env.CURRENT_FILE | path basename)
-    missing-flag "--seed"  $seed  --name ($env.CURRENT_FILE | path basename)
-    missing-flag "--build" $build --name ($env.CURRENT_FILE | path basename)
-    missing-flag "--curve" $curve --name ($env.CURRENT_FILE | path basename)
-
     if $clean { rm -vf *.png }
 
-    let data = ["semi-avid", "kzg", "aplonk", "fri" ]
-        | each { |it|
-            open $"benchmarks/($it).ndjson" | insert p $it
-        }
-        | flatten
-        | where ([
-            ($it.bytes mod 248 == 0),
-            ($it.build         == $build),
-            ($it.cpu           == $cpu),
-            ($it.curve         == $curve),
-            ($it.seed          == $seed),
-        ] | all { $in })
-        | insert m { $in.bytes / ($in.k * 31) }
-    if ($data | length) == 0 {
-        log error $"empty filter: bytes: mod 248 == 0, build: ($build), cpu  : ($cpu), curve: ($curve), seed : ($seed)"
-        return
-    }
+    let data = open $data_filepath | insert m { |it| $it.bytes / ($it.k * ($CURVES | get $it.curve).bytes_without_truncation) }
 
     let complete_x = 3..18 | each { 31 * 2 ** $in }
     let complete_y = 1..10 | each {      2 ** $in }
@@ -205,7 +184,7 @@ def main [
         }
 
         let data = $data
-            | reject build cpu curve seed
+            | reject build git cpu curve seed
             | make compact-results
             | update v { try { math sum } }
             | where ([

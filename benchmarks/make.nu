@@ -1,4 +1,3 @@
-use std formats [ "to ndjson", "from ndjson" ]
 use ../log.nu [ "log warning", "log info", "log debug" ]
 
 const PACKAGE = "benchmarks"
@@ -6,6 +5,8 @@ const PACKAGE = "benchmarks"
 def progress [msg: string] {
     print --no-newline ($msg | fill --width (term size).columns | $in + "\r")
 }
+
+const KOMODO_URL = "https://gitlab.isae-supaero.fr/dragoon/komodo"
 
 const CPU_FIELDS = [
     "Architecture",
@@ -72,7 +73,7 @@ export def bench [
     1..$nb_rounds
         | each {
             progress $"started at (date now | format date '%+') | protocol=($protocol),b=($size),k=($k),n=($n) | ($in)/($nb_rounds)"
-            ^$"./target/($build)/($PACKAGE)" ...[
+            ^$"./target/($build)/($PACKAGE)" run ...[
                 --nb-bytes $size
                 -k $k
                 -n $n
@@ -90,26 +91,32 @@ export def bench [
         | insert seed $seed
 }
 
-def send [header: record, body: string] {
+def send [header: record, body: string, --debug] {
     let lines = [
         ...($header | items { |k, v| $"($k): ($v)" })
         ""
         $body
     ]
-    himalaya message send  --debug ($lines | str join "\n")
+    himalaya message send ...[
+        ...(if $debug { [--debug] } else { [] }),
+        ($lines | str join "\n")
+    ]
 }
 
 export def main [
     params      : table<p: string, k: int, n: int, b: int>,
-    --email,
-    --shutdown,
+    --email     : int, # frequency at which to email
+    --dbg-mail,
+    --shutdown  : datetime,
     --commit,
     --push,
     --remote    : string,
     --from      : string,
     --to        : string,
     --seed      : int,
-    --curve     : record<name: string, bits: int> = { name: "bn254", bits: 254 },
+    --curve     : string = "bn254",
+    --git       : string, # force a Git revision
+    --no-confirm (-y),
 ] {
     # /* MAIN_ARGS_ERROR_HANDLING
     if $seed == null { error make --unspanned {
@@ -123,7 +130,23 @@ export def main [
         },
         help: $"(ansi default_dimmed)--push(ansi reset) is set, try to set (ansi default_dimmed)--remote(ansi reset) to a valid Git remote name",
     } }
-    if $email and $from == null { error make {
+    if $email == 0 { error make {
+        msg: $"(ansi red_bold)invalid_args(ansi reset)",
+        label: {
+            text: $"(ansi default_dimmed)--email(ansi reset) cannot be 0",
+            span: (metadata $email).span,
+        },
+        help: $"set (ansi default_dimmed)--email(ansi reset) to a strictly positive value",
+    } }
+    if $email < 0 { error make {
+        msg: $"(ansi red_bold)invalid_args(ansi reset)",
+        label: {
+            text: $"(ansi default_dimmed)--email(ansi reset) cannot be negative",
+            span: (metadata $email).span,
+        },
+        help: $"set (ansi default_dimmed)--email(ansi reset) to a strictly positive value",
+    } }
+    if $email != null and $from == null { error make {
         msg: $"(ansi red_bold)invalid_args(ansi reset)",
         label: {
             text: $"missing (ansi default_dimmed)--from(ansi reset)",
@@ -160,7 +183,7 @@ export def main [
             $"($header)\n($rest)"
         }),
     } }
-    if $email and $to == null { error make {
+    if $email != null and $to == null { error make {
         msg: $"(ansi red_bold)invalid_args(ansi reset)",
         label: {
             text: $"missing (ansi default_dimmed)--to(ansi reset)",
@@ -172,60 +195,201 @@ export def main [
     if $push and not $commit { log warning $"(ansi default_dimmed)--push(ansi reset) is set but (ansi default_dimmed)--commit(ansi reset) is not \(won't push\)" }
     # MAIN_ARGS_ERROR_HANDLING */
 
+    if ($params | is-empty) {
+        log warning "nothing to do"
+        return
+    }
+
+    let api = ./target/release/benchmarks list
+        | lines
+        | parse "{k}:{v}"
+        | update v { split row "," }
+        | transpose --header-row
+        | into record
+    if $curve not-in $api.curves { error make {
+        msg: $"(ansi red_bold)invalid_args(ansi reset)",
+        label: {
+            text: $"(ansi default_dimmed)--curve(ansi reset) = ($curve) is invalid",
+            span: (metadata $curve).span,
+        },
+        help: $"set (ansi default_dimmed)--curve(ansi reset) to one of: ($api.curves | str join ', ')",
+    } }
+    let invalid_protocols = $params | enumerate | where $it.item.p not-in $api.protocols
+    if not ($invalid_protocols | is-empty) { error make {
+        msg: $"(ansi red_bold)invalid_args(ansi reset)",
+        label: {
+            text: $"(ansi default_dimmed)$params.p.($invalid_protocols.0.index)(ansi reset) = ($invalid_protocols.0.item.p) is invalid",
+            span: (metadata $params).span,
+        },
+        help: $"$params.($invalid_protocols.0.index) = ($invalid_protocols.0.item) \(found ($invalid_protocols | length) others\)\navailable protocols: ($api.protocols | str join ', ')",
+    } }
+
     let cpu = lscpu | to json | hash sha256
-    let git = git rev-parse HEAD | str trim
+    let git = if $git != null {
+        try {
+            git rev-parse $git
+        } catch { error make {
+            msg: $"(ansi red_bold)invalid_args(ansi reset)",
+            label: {
+                text: $"($git) is not a valid and non-ambiguous Git revision",
+                span: (metadata $git).span,
+            },
+            help: $"set (ansi default_dimmed)--git(ansi reset) to a valid Git revision",
+        } }
+    } else {
+        git fetch $KOMODO_URL main
+        git merge-base (git rev-parse FETCH_HEAD) (git rev-parse HEAD)
+    }
 
-    build
+    let now = date now
+    let shutdown = if $shutdown == null {
+        null
+    } else if $shutdown <= $now {
+        error make {
+            msg: $"(ansi red_bold)invalid_args(ansi reset)",
+            label: {
+                text: $"($shutdown) is before now or within a minute",
+                span: (metadata $shutdown).span,
+            },
+            help: ([
+                $"now            : ($now | format date "%+")",
+                $"scheduled date : ($shutdown | format date "%+")",
+            ] | str join "\n"),
+        }
+    } else {
+        $shutdown
+    }
 
-    for p in $params {
-        let start = date now
-        (bench
-            $p.b
-            -k $p.k
-            -n $p.n
-            --nb-rounds 1
-            --protocol $p.p
-            --fri-ff 2
-            --fri-bf ($p.n / $p.k | into int)
-            --fri-rpo 1
-            --fri-q 50
-            --curve $curve.name
-            --seed $seed)
-            | rename --column { k: "__k" }
-            | insert k $p.k
-            | insert n $p.n
-            | insert bytes $p.b
-            | insert git $git
-            | insert cpu $cpu
-            | insert curve $curve.name
-            | save --append $"benchmarks/($p.p).ndjson"
-        let end = date now
+    if not $no_confirm {
+        print $"(ansi cyan)PARAMETERS(ansi reset):"
+        [
+            [k          , v];
+            ["git"      , $git],
+            ["cpu"      , $"($cpu) \((if ($"benchmarks/($cpu).json" | path exists) { '*' } else { ' ' })\)"],
+            ["seed"     , $seed],
+            ["curve"    , $curve],
+            ["shutdown" , (if $shutdown != null { $"scheduled for ($shutdown | format date '%+'), in ($shutdown - $now)" })]
+            ["email"    , (if $email    != null { $"($from) -> ($to)" })]
+            ["commit"   , (if $commit           { "*"                 })]
+            ["push"     , (if $push             { $remote             })]
+            ["params"   , ($params | length)],
+        ]
+            | into string v
+            | to md --pretty
+            | lines
+            | skip 2
+            | parse "| {k} | {v} |"
+            | str trim v
+            | each { $"    ($in.k) : ($in.v)" }
+            | str join "\n"
+            | print $in
 
-        if $commit {
-            git add "benchmarks/*.ndjson"
-            git commit --no-gpg-sign --message $"auto: p=($p.p),k=($p.k),b=($p.b)"
-            if $push { git push $remote HEAD }
+        if (["no", "yes"] | input list $"(ansi cyan)Open the params with pager(ansi reset)") == "yes" {
+            $params | to md --pretty | less -R
         }
 
-        if $email {
-            {
-                from: $from,
-                to: $to,
-                subject: $"Komodo: p=($p.p),k=($p.k)",
-                body: [
-                    $"t: (date now | format date "%+")"
-                    $"done in ($end - $start)",
-                    (if $push { $"pushed to https://gitlab.isae-supaero.fr/dragoon/komodo/-/commit/(git rev-parse HEAD)" }),
-                ]
-            } | send { From: $in.from, To: $in.to, Subject: $in.subject } ($in.body | compact | str join "\n")
+        if (["no", "yes"] | input list $"(ansi cyan)Proceed with benchmarks(ansi reset)") != "yes" {
+            log info "aborting"
+            return
         }
     }
 
-    if $shutdown {
-        if $email {
-            send { From: $from, To: $to, Subject: $"Shutting down (hostname)" } $"t: (date now | format date "%+")"
+    if $shutdown != null {
+        const NB_NS_IN_SEC = 1_000_000_000
+        let delta_min = $shutdown - $now
+            | into int
+            | $in / (60 * $NB_NS_IN_SEC)
+            | math round --precision 0
+            | into int
+
+        if $email != null {
+            send --debug=$dbg_mail { From: $from, To: $to, Subject: $"(hostname): Shutdown scheduled" } $"t: (date now | format date "%+")\nshutdown: ($now + 1min * $delta_min)"
         }
-        shutdown now
+
+        shutdown $"+($delta_min)"
+    }
+
+    build
+
+    let start = date now
+
+    for p in ($params | enumerate) {
+        let output = $"benchmarks/($p.item.p).csv"
+        let start = date now
+        (bench
+            $p.item.b
+            -k $p.item.k
+            -n $p.item.n
+            --nb-rounds 1
+            --protocol $p.item.p
+            --fri-ff 2
+            --fri-bf ($p.item.n / $p.item.k | into int)
+            --fri-rpo 1
+            --fri-q 50
+            --curve $curve
+            --seed $seed)
+            | rename --column { k: "__k" }
+            | insert k $p.item.k
+            | insert n $p.item.n
+            | insert bytes $p.item.b
+            | insert cpu ($cpu | str substring ..<7)
+            | insert git ($git | str substring ..<7)
+            | move build --first
+            | move cpu --first
+            | move git --first
+            | insert curve $curve
+            | if not ($output | path exists) { to csv } else { to csv --noheaders }
+            | save --append $output
+        let end = date now
+
+        if $commit {
+            git add $output
+            git commit --no-gpg-sign --message $"no-ci:auto: s=($seed),p=($p.item.p),k=($p.item.k),b=($p.item.b)"
+            if $push { git push $remote HEAD }
+        }
+
+        if $email != null and (($p.index + 1) mod $email == 0) {
+            {
+                from: $from,
+                to: $to,
+                subject: $"Komodo: (date now | format date "%+")",
+                body: [
+                    $"done in ($end - $start)",
+                    (if $push {
+                        let head = git rev-parse HEAD
+                        if $email == 1 {
+                            $"($KOMODO_URL)/-/commit/($head)"
+                        } else {
+                            let last = git rev-parse $"HEAD~($email)"
+                            $"($KOMODO_URL)/-/compare/($last)...($head)"
+                        }
+                    }),
+                ]
+            } | send --debug=$dbg_mail { From: $in.from, To: $in.to, Subject: $in.subject } ($in.body | compact | str join "\n")
+        }
+    }
+
+    let end = date now
+
+    if $email != null {
+        {
+            from: $from,
+            to: $to,
+            subject: $"Komodo: (date now | format date "%+") \(benchmarks done\)",
+            body: [
+                $"done in ($end - $start)",
+                (if $push {
+                    let head = git rev-parse HEAD
+                    if ($params | length) == 1 {
+                        $"($KOMODO_URL)/-/commit/($head)"
+                    } else {
+                        let start = git rev-parse $"HEAD~($params | length)"
+                        $"($KOMODO_URL)/-/compare/($start)...($head)"
+                    }
+                })
+                (if $shutdown != null { $"shutdown scheduled in ($shutdown - (date now))" })
+            ]
+        } | send --debug=$dbg_mail { From: $in.from, To: $in.to, Subject: $in.subject } ($in.body | compact | str join "\n")
     }
 }
 
@@ -352,7 +516,7 @@ export def plot [
     --cbar,
     --cmap       : string = "viridis",
 ]: [ table -> nothing ] {
-    let data = $in | update v { if $in == null { null } else { $in | math log $log_base } }
+    let data = $in | update v { try { math log $log_base } }
 
     log debug "find minmax"
     let log_minmax = $data.v
@@ -422,7 +586,9 @@ export def plot [
         log info $"plot p=($plot.p),__k=($plot.__k)"
         let filtered = $data | where p == $plot.p and __k == $plot.__k
         if ($filtered | length) == 0 {
-            log warning $"empty filter: p == ($plot.p) and __k == ($plot.__k)"
+            log warning $"empty filter"
+            log info    $"      p == ($plot.p)"
+            log info    $"    __k == ($plot.__k)"
             continue
         }
         let compacted = $filtered | reject git cpu curve build seed | compact-results
@@ -483,4 +649,19 @@ export def "cartesian-product" [...iters: list]: [ nothing -> list ] {
     }
 
     aux $iters
+}
+
+export def load-all [] {
+    log info "loading data"
+    let start = date now
+    let res = ["semi-avid", "kzg", "aplonk", "fri" ]
+        | each { |it|
+            open $"benchmarks/($it).csv" | insert p $it
+        }
+        | flatten
+    let end = date now
+    log info $"data loaded in ($end - $start)"
+    log debug $"loaded ($res | length) rows"
+
+    $res
 }
