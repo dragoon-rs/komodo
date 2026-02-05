@@ -69,8 +69,14 @@ implementations of elliptic curves, fields and polynomial algebra.
 > Then, run the script with `./make.rs --help`
 
 ## the library
-```shell
-./make.rs doc
+> [!tip]
+> entry point of the local documentation is `./target/doc/komodo/index.html`
+
+```bash
+cargo doc                # raw documentation
+cargo doc --all-features # raw documentation with optional features
+./make.rs doc            # with the KaTeX formulae
+./make.rs doc --features # with the KaTeX formulae and all the optional features
 ```
 
 ## the tests

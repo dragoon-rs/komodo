@@ -27,6 +27,8 @@ const DOCKERFILE: &str = ".env.dockerfile";
 const BASE: &str = "https://gitlab.isae-supaero.fr/dragoon/komodo";
 const MIRROR: &str = "https://github.com/dragoon-rs/komodo";
 
+const KATEX_HEADER_PATH: &str = "katex.html";
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -242,7 +244,7 @@ fn version() {
 }
 
 fn doc(open: bool, private: bool, features: bool) {
-    let mut cmd = vec!["cargo", "doc", "--no-deps"];
+    let mut cmd = vec!["cargo", "doc"];
     if open {
         cmd.push("--open")
     }
@@ -252,7 +254,16 @@ fn doc(open: bool, private: bool, features: bool) {
     if features {
         cmd.push("--all-features")
     }
-    nob::run_cmd_as_vec_and_fail!(cmd);
+
+    nob::run_cmd_as_vec_and_fail!(cmd;
+        "RUSTDOCFLAGS" => &format!(
+            "--html-in-header {}",
+            std::env::current_dir()
+                .unwrap()
+                .join(KATEX_HEADER_PATH)
+                .display(),
+        )
+    );
 }
 
 fn paper(draft: bool) {
