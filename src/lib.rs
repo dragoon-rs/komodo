@@ -29,27 +29,28 @@
 //! > [`examples/`](https://gitlab.isae-supaero.fr/dragoon/komodo/-/tree/main/examples)
 //! > directory in the repository.
 //!
-//! 1. choose an _encoding matrix_ to encode the _input data_
+//! 1. build encoded _shards_ via a given encoding
 //! ```ignore
 //! let encoding_mat = Matrix::random(k, n, rng);
-//! ```
-//! 2. encode the data and build encoded _shards_
-//! ```ignore
 //! let shards = fec::encode(bytes, encoding_mat);
 //! ```
-//! 3. attach a _cryptographic proof_ to all the shards and get a proven _block_
+//! 2. compute a _commitment_ that is shared across shards
 //! ```ignore
-//! let blocks = prove(bytes, k);
+//! let commitment = commit(bytes, k);
 //! ```
-//! 4. verify each _block_ individually
+//! 3. compute one _cryptographic proof_ per shard
 //! ```ignore
-//! for block in blocks {
-//!     assert!(verify(block));
+//! let proofs = prove(bytes, k);
+//! ```
+//! 4. verify each _shard-proof_ pair individually
+//! ```ignore
+//! for (shard, proof) in shards.zip(proofs) {
+//!     assert!(verify(shard, commitment, proof));
 //! }
 //! ```
-//! 5. decode the original data with any subset of _k_ blocks
+//! 5. decode the original data with any subset of _k_ shards
 //! ```ignore
-//! assert_eq!(bytes, fec::decode(blocks[0..k]));
+//! assert_eq!(bytes, fec::decode(shards[0..k]));
 //! ```
 pub mod algebra;
 #[cfg(feature = "aplonk")]
