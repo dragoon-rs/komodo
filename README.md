@@ -113,6 +113,16 @@ Docker image to the [_container registry_][gitlab.isae-supaero.fr:dragoon/komodo
 ./make.rs container --push
 ```
 
+## contribute to Komodo
+- open bug reports in the [issue tracker](https://github.com/dragoon-rs/komodo/issues)
+- discuss the library and feature requests in the [discussion feed](https://github.com/dragoon-rs/komodo/discussions)
+- submit changes to the [pull requests](https://github.com/dragoon-rs/komodo/pulls)
+
+Even though [this repo](https://github.com/dragoon-rs/komodo) is a mirror of the
+[original project](https://gitlab.isae-supaero.fr/dragoon/komodo), bugs and new
+features can still be discussed and pull requests can be merged upstream by the
+DRAGOON team.
+
 ## contributors
 
 Because the code for this project has been originally extracted from
