@@ -3,6 +3,7 @@
 - [Run](#run)
 
 ## Requirements
+- install [Nushell](https://nushell.sh) (there are pre-built binaries for all major releases on all major OSes [here](https://github.com/nushell/nushell/releases))
 - activate the `benchmarks` module
 ```bash
 use benchmarks
