@@ -17,6 +17,12 @@
 //! When some data $\Delta$ is $(k,n)$-encoded, shards $(s_i)_{1 \leq i \leq n}$ are generated
 //!                         $$(s_i) = \texttt{encode}(\Delta, k, n)$$
 //!
+//! A [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) could be used to prove that a given
+//! shard $s$ has been drawn from the pool of encoded shards
+//! (see [`github.com:antouhou/rs-merkle`](https://github.com/antouhou/rs-merkle)). However such
+//! tree is incapable of proving that $s$ has been generated through a correct encoding process and
+//! is not just a random shard from a set of custom shards.
+//!
 //! Komodo allows any verifier to assert that any shard $s \in (s_i)$ has been constructed from a
 //! correct encoding of the data $\Delta$ without requiring a full $k$-decoding, which is an
 //! expensive operation that does not isolate tampered shards trivially.
