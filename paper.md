@@ -132,6 +132,10 @@ experiments.
 The time to run `commit`, `prove` and `verify` has been measured for $k = 8$ and
 a code rate $\rho = \frac{1}{2}$, i.e. $n = 16$, on the BN-254 elliptic curve, and
 for small and large input data.
+The `encode` and `decode` steps are the same for all protocols and thus have
+been omitted from the analysis below. `encode` involves a matrix multiplication
+which takes around $10\mu s$ with $k = 8$. `decode` has an extra matrix inversion
+of size $k = 8$ taking around $250 \mu s$.
 
 ![Performance for small files. Average over $10$ runs.\label{fig:small}](figures/99613e59eb168636525c71d3f3d7a71fa773912ff80fbc70db035d076468633f.png)
 
