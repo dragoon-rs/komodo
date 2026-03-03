@@ -34,8 +34,9 @@ bibliography: paper.bib
 
 We present **Komodo**, a library that allows to encode data with erasure-code
 techniques such as Reed-Solomon encoding, prove the resulting shards with
-cryptographic protocols, verify their integrity on the other end of any
-distributed network and decode the original data from a subset of said shards [@stevan2024performance] and [@stevan2023assessing].
+cryptographic protocols, verify their validity on the other end of any
+distributed network and decode the original data from a subset of said shards
+[@stevan2024performance] and [@stevan2023assessing].
 The library is implemented in the _Rust_ programming language and
 available on the ISAE-SUPAERO GitLab instance [^1] with a mirror on GitHub [^2],
 both released under the MIT license.
@@ -88,7 +89,7 @@ as verifiable information dispersal or data availability. Such systems range
 from private drone swarms to public blockchains.
 
 For instance, in a distributed storage system, nodes can encode data into
-shards, prove their integrity, and distribute them across the network. Other
+shards, prove their validity, and distribute them across the network. Other
 nodes can then verify the shards' validity before storing or retrieving them,
 ensuring data robustness and trustworthiness.
 
