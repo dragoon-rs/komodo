@@ -16,7 +16,7 @@
 //! # Example
 //! Let's explain with a very simple example how things operate with Komodo. The setup is that a
 //! _prover_ wants to show a _verifier_ that a shard of encoded data $s$ has indeed been generated
-//! with a linear combination of the $k$ source shards from data $\Delta$.
+//! with a linear combination of the $k$ source shards from data $\Delta$ (see [`fec`]).
 //!
 #![doc = simple_mermaid::mermaid!("lib.mmd")]
 //!

@@ -4,9 +4,9 @@ sequenceDiagram
 
     Note over prover,verifier: generate public objects required<br/>for proving and verifying
 
-    Note left of prover: encodes the data $$\ (s_i) = \texttt{encode}(\Delta)$$
-    Note left of prover: computes commitment $$\ \mathcal{C} = \texttt{commit}(\Delta)$$
-    Note left of prover: computes proof $$\ \pi_i = \texttt{prove}(s_i)$$
+    Note left of prover: encode the data $$\ (s_i) = \texttt{encode}(\Delta, k, n)$$
+    Note left of prover: compute commitment $$\ \mathcal{C} = \texttt{commit}(\Delta)$$
+    Note left of prover: compute proof $$\ \pi_i = \texttt{prove}(s_i)$$
 
     prover->>verifier: $$\mathcal{C} \text{, } (\pi_i, s_i)$$
 
