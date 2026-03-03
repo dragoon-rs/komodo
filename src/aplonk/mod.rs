@@ -3,6 +3,11 @@
 //! > references:
 //! > - [Ambrona et al., 2022](https://link.springer.com/chapter/10.1007/978-3-031-41326-1_11)
 //!
+//! # What does aPlonK prove ?
+//! aPlonK does prove the [same property as $\text{KZG}^+$][crate::kzg#what-does-textkzg-prove-]
+//! but reduces the size of the _commitment_ at the expense of longer proving time.
+//!
+//! # Example
 #![doc = simple_mermaid::mermaid!("mod.mmd")]
 use ark_ec::{
     pairing::{Pairing, PairingOutput},

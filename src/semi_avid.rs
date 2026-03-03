@@ -3,12 +3,17 @@
 //! In their paper, [Nazirkhanova et al.](https://arxiv.org/abs/2111.12323) introduce a new proving
 //! scheme.
 //!
+//! # What does Semi-AVID prove ?
+//!
 //! In opposition to how it is commonly done in protocols such as
 //! [KZG](https://link.springer.com/chapter/10.1007/978-3-642-17373-8_11), the data is interpreted
 //! as column-oriented polynomials.
 //!
-//! Using FEC notations, there are $k$ such column-oriented polynomials, i.e. the $k$ source shards.
-//! They are all commited using a common trusted setup and these $k$ commitments are used to prove
+//! Semi-AVID proves that a given shard $s$ has indeed been generated from a known linear combination $(\alpha_i)$ from the $k$ source shards $(P_i)$
+//!
+//! $$s = \sum\limits_i \alpha_i P_i$$
+//!
+//! They $k$ source shards are all commited using a common trusted setup and these $k$ commitments are used to prove
 //! the integrity of encoded shards.
 //!
 //! In order to verify this property, i.e. that a given shard has been computed as a linear

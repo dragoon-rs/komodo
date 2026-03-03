@@ -4,12 +4,6 @@
 //! > - [Kate et al., 2010](https://link.springer.com/chapter/10.1007/978-3-642-17373-8_11)
 //! > - [Boneh et al., 2020](https://eprint.iacr.org/2020/081)
 //!
-//! # The protocol
-//! Here, we assume that the input data has been encoded with a _Reed-Solomon_ encoding, as can be
-//! done with the [`crate::fec`] module.
-//!
-//! > **Note**
-//! >
 //! > In the following, the data $\Delta$ is arranged in an $m \times k$ matrix and $i$ will denote
 //! > the number of a row and $j$ the number of a column
 //! > - $0 \leq i \leq m - 1$
@@ -19,6 +13,28 @@
 //! > $E: \mathbb{G}_1 \times \mathbb{G}_2 \mapsto \mathbb{G}_T$ is the bilinear pairing mapping
 //! > defined on _pairing-friendly_ elliptic curves $(\mathbb{G}_1, \mathbb{G}_2, \mathbb{G}_T)$
 //! > such as BLS12-381.
+//!
+//! # What does $\text{KZG}^+$ prove ?
+//! > Here, we assume that the input data has been encoded with a _Reed-Solomon_ encoding, as can be
+//! > done with the [`fec`][crate::fec] module.
+//!
+//! The rows of the $\Delta$ matrix are interpreted as polynomials $(P_i)$.
+//! A shard $s_x$ is constructed by evaluating all these polynomials on a single point $x$.
+//!
+//! $$
+//! s_x = \begin{bmatrix}
+//!           P_{0}(x)   \\\\
+//!           P_{1}(x)   \\\\
+//!           \vdots     \\\\
+//!           P_{m-1}(x) \\\\
+//!       \end{bmatrix}
+//! $$
+//!
+//! $\text{KZG}^+$ proves that $\hat{s_x} = [y_{0}, y_{1}, \dots, y_{m-1}]^T$ is the correct
+//! evaluation of $(P_i)$ on $x$
+//! $$\forall i \in 0..m, \quad y_i = P_i(x)$$
+//!
+//! # The protocol
 #![doc = simple_mermaid::mermaid!("kzg.mmd")]
 //!
 //! Conveniently, each one of the $n$ encoded shards is a linear combination of the $k$ source

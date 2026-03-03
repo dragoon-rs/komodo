@@ -13,6 +13,16 @@
 //! Other submodules define several fundamental building blocks to Komodo, but are not
 //! mandatory to explore to understand the protocols.
 //!
+//! # What does Komodo prove ?
+//! When some data $\Delta$ is $(k,n)$-encoded, shards $(s_i)_{1 \leq i \leq n}$ are generated
+//!                         $$(s_i) = \texttt{encode}(\Delta, k, n)$$
+//!
+//! Komodo allows any verifier to assert that any shard $s \in (s_i)$ has been constructed from a
+//! correct encoding of the data $\Delta$ without requiring a full $k$-decoding, which is an
+//! expensive operation that does not isolate tampered shards trivially.
+//!
+//! > see protocol submodules for a more precise definition of "_correct encoding_".
+//!
 //! # Example
 //! Let's explain with a very simple example how things operate with Komodo. The setup is that a
 //! _prover_ wants to show a _verifier_ that a shard of encoded data $s$ has indeed been generated
