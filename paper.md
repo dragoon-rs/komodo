@@ -113,7 +113,7 @@ fields $\mathbb{F}_{2^8}$ or $\mathbb{F}_{2^{16}}$, containing respectively
 $2^8$ and $2^{16}$ elements. **Komodo** adds the proving mechanisms, and makes it
 possible to use elements from `arkworks`' prime fields.
 
-**Komodo** also adds a unified high-level API, allowing to benchmark and compare
+**Komodo** also adds a unified benchmarking API, allowing to compare
 different combinations of prime fields, elliptic curves and polynomial
 commitment schemes, as we did in two publications [@stevan2024performance;
 @stevan2023assessing]. Finally, a modular design allows to extend **Komodo**
