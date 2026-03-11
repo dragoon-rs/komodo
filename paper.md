@@ -32,39 +32,24 @@ bibliography: paper.bib
 
 # Summary
 
-We present **Komodo**, a library that allows to encode data with erasure-code
-techniques such as Reed-Solomon encoding, prove the resulting shards with
-cryptographic protocols, verify their validity on the other end of any
-distributed network and decode the original data from a subset of said shards
-[@stevan2024performance] and [@stevan2023assessing].
-The library is implemented in the _Rust_ programming language and
-available on the ISAE-SUPAERO GitLab instance [^1] with a mirror on GitHub [^2],
-both released under the MIT license.
-**Komodo** should be of interest for people willing to explore the field of
-cryptographically-proven shards of data in distributed systems or data
-availability sampling settings.
+We present **Komodo**, a library that allows to (**1**) encode data with erasure-code techniques such as Reed-Solomon encoding, (**2**) prove the resulting _shards_ with cryptographic protocols, (**3**) verify their validity on the other end of any distributed network and (**4**) decode the original data from a subset of said _shards_; [@stevan2024performance] and [@stevan2023assessing].
+The library is implemented in the _Rust_ programming language and available on the ISAE-SUPAERO GitLab instance [^1] with a mirror on GitHub [^2], both released under the MIT license.
+**Komodo** should be of interest for people willing to explore the field of cryptographically-proven _shards_ of data in distributed systems or data availability sampling settings.
 
-**Komodo** provides a _Rust_ API to achieve the
-following on any input data in a distributed network or setup:
+A _shard_ of data is said to be _valid_ if it has been generated indeed through an expected encoding process, namely a polynomial evaluation or vector inner-product encoding such as Reed-Solomon.
 
-- `encode`: encodes data into _shards_ with a $(k, n)$ code. This adds
-  redundancy to the data, making the network more resilient to failure,
-  fragmentation, partitioning, loss or corruption.
-- `commit` and `prove`: generate cryptographic commitments and proofs for all
-  $n$ encoded shards with one of three available cryptographic protocols (see
-  below for more information). This step consists in attaching extra information
-  to them and sharing augmented _blocks_ of data onto the network. This extra
-  information should guarantee with a very high probability that a given shard
-  is valid, i.e. has been generated indeed through an expected encoding process,
-  namely a polynomial evaluation or vector inner-product encoding such as
-  Reed-Solomon.
-- `verify`: verifies any shard individually for its validity. This allows to
-  discriminate invalid or corrupted shards without any decoding attempt. Without
-  this shard-level verification step, it is impossible to know if a shard is
-  valid until the decoding step. Then, when decoding fails, it is not
-  possible to know which shards were invalid, leading to a _try-and-error_
-  process that is not scalable.
-- `decode`: decodes the original data using any subset of $k$ valid shards.
+**Komodo** implements a protocol API to achieve the following on any input data in a distributed network:
+
+- `encode`: encodes data into _shards_ with a $(k,n)$-code.
+  This adds redundancy to the data, making the network more resilient to failure, fragmentation, partitioning, loss or corruption.
+- `commit`: commit the input data into a _commitment_ common to all _shards_.
+- `prove`: generate one proof for all $n$ _shards_ with one of three available cryptographic protocols (see below for more information).
+  This extra information guarantees a given _shard_ is valid, except with negligible probability.
+- `verify`: verifies a _shard_ individually for its validity using the data _commitment_ and the _shard_ proof.
+  This allows to discriminate invalid or corrupted _shards_ without any decoding attempt.
+  Without this shard-level verification step, it is impossible to know if a _shard_ is valid until the decoding step.
+  Then, when decoding fails, it is not possible to know which _shards_ were invalid, leading to a _try-and-error_ process that is not scalable.
+- `decode`: decodes the original data using any subset of $k$ independent and valid _shards_.
 
 **Komodo** provides the three following cryptographic protocols:
 
@@ -72,16 +57,18 @@ following on any input data in a distributed network or setup:
 - **aPlonK**: based on **PlonK** [@gabizon2019plonk] and **aPlonK** [@ambrona2023aplonk]
 - **Semi-AVID**: based on **Semi-AVID-PR** [@nazirkhanova2022information]
 
-**Komodo** is based on the Arkworks library [@arkworks] which provides
-implementations of elliptic curves, fields and polynomial algebra.
+**Komodo** is based on the Arkworks library [@arkworks] which provides implementations of elliptic curves, fields and polynomial algebra.
 
 [^1]: GitLab source code: [https://gitlab.isae-supaero.fr/dragoon/komodo](https://gitlab.isae-supaero.fr/dragoon/komodo)
 [^2]: GitHub mirror for issues and pull requests: [https://github.com/dragoon-rs/komodo](https://github.com/dragoon-rs/komodo)
 
 # Keywords
 
-Cryptography; Erasure codes; Distributed systems; Verifiable information
-dispersal; Data availability;
+Cryptography;
+Erasure codes;
+Distributed systems;
+Verifiable information dispersal;
+Data availability;
 
 # Statement of need
 
