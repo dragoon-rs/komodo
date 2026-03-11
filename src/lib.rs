@@ -17,6 +17,8 @@
 //! When some data $\Delta$ is $(k,n)$-encoded, shards $(s_i)_{1 \leq i \leq n}$ are generated
 //!                         $$(s_i) = \texttt{encode}(\Delta, k, n)$$
 //!
+//! > see [`fec`] for details about the encoding process
+//!
 //! A [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) could be used to prove that a given
 //! shard $s$ has been drawn from the pool of encoded shards
 //! (see [`github.com:antouhou/rs-merkle`](https://github.com/antouhou/rs-merkle)). However such
