@@ -10,7 +10,7 @@ use komodo::{
     algebra::linalg::Matrix,
     error::KomodoError,
     fec::{decode, encode},
-    semi_avid::{build, prove, recode, verify, Block},
+    semi_avid::{build, commit, recode, verify, Block},
     zk::setup,
 };
 
@@ -33,12 +33,12 @@ where
     let powers = setup::<F, G>(bytes.len(), &mut rng)?;
     eprintln!("done");
 
-    // encode and prove the data with a _random_ encoding
+    // encode and commit the data with a _random_ encoding
     eprint!("building blocks... ");
     let encoding_mat = &Matrix::random(k, n, &mut rng);
     let shards = encode(&bytes, encoding_mat)?;
-    let proof = prove(&bytes, &powers, encoding_mat.height)?;
-    let blocks = build::<F, G, P>(&shards, &proof);
+    let commitment = commit(&bytes, &powers, encoding_mat.height)?;
+    let blocks = build::<F, G, P>(&shards, &commitment);
     eprintln!("done");
 
     // verify that all the blocks are valid

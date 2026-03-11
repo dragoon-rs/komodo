@@ -82,12 +82,12 @@
 //! let powers = komodo::zk::setup::<F, G>(10 * 1_024, &mut rng).unwrap();
 //! # }
 //! ```
-//! - we can now build an encoding matrix, encode the data, prove the shards and build [`Block`]s
+//! - we can now build an encoding matrix, encode the data, commit it and build [`Block`]s
 //! ```
 //! # use ark_bls12_381::{Fr as F, G1Projective as G};
 //! # use ark_poly::univariate::DensePolynomial as DP;
 //! #
-//! # use komodo::semi_avid::{build, prove, verify};
+//! # use komodo::semi_avid::{build, commit, verify};
 //! #
 //! # fn main() {
 //! # let mut rng = ark_std::test_rng();
@@ -99,8 +99,8 @@
 //! #
 //! let encoding_mat = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
 //! let shards = komodo::fec::encode(&bytes, encoding_mat).unwrap();
-//! let proof = prove::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
-//! let blocks = build::<F, G, DP<F>>(&shards, &proof);
+//! let commitment = commit::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
+//! let blocks = build::<F, G, DP<F>>(&shards, &commitment);
 //! # }
 //! ```
 //! - finally, each [`Block`] can be verified individually, using the same trusted setup
@@ -108,7 +108,7 @@
 //! # use ark_bls12_381::{Fr as F, G1Projective as G};
 //! # use ark_poly::univariate::DensePolynomial as DP;
 //! #
-//! # use komodo::semi_avid::{build, prove, verify};
+//! # use komodo::semi_avid::{build, commit, verify};
 //! #
 //! # fn main() {
 //! # let mut rng = ark_std::test_rng();
@@ -120,8 +120,8 @@
 //! #
 //! # let encoding_mat = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
 //! # let shards = komodo::fec::encode(&bytes, encoding_mat).unwrap();
-//! # let proof = prove::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
-//! # let blocks = build::<F, G, DP<F>>(&shards, &proof);
+//! # let commitment = commit::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
+//! # let blocks = build::<F, G, DP<F>>(&shards, &commitment);
 //! #
 //! for block in &blocks {
 //!     assert!(verify::<F, G, DP<F>>(block, &powers).unwrap());
@@ -133,7 +133,7 @@
 //! # use ark_bls12_381::{Fr as F, G1Projective as G};
 //! # use ark_poly::univariate::DensePolynomial as DP;
 //! #
-//! # use komodo::semi_avid::{build, prove};
+//! # use komodo::semi_avid::{build, commit};
 //! #
 //! # fn main() {
 //! # let mut rng = ark_std::test_rng();
@@ -145,8 +145,8 @@
 //! #
 //! # let encoding_mat = &komodo::algebra::linalg::Matrix::random(k, n, &mut rng);
 //! # let shards = komodo::fec::encode(&bytes, encoding_mat).unwrap();
-//! # let proof = prove::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
-//! # let blocks = build::<F, G, DP<F>>(&shards, &proof);
+//! # let commitment = commit::<F, G, DP<F>>(&bytes, &powers, encoding_mat.height).unwrap();
+//! # let blocks = build::<F, G, DP<F>>(&shards, &commitment);
 //! #
 //! let shards = blocks[0..k].iter().cloned().map(|b| b.shard).collect();
 //! assert_eq!(bytes, komodo::fec::decode(shards).unwrap());
@@ -339,8 +339,8 @@ pub fn recode<F: PrimeField, G: CurveGroup<ScalarField = F>>(
     }))
 }
 
-/// Computes the Semi-AVID proof for some data.
-pub fn prove<F, G, P>(
+/// Computes the Semi-AVID commitment for some data.
+pub fn commit<F, G, P>(
     bytes: &[u8],
     powers: &Powers<F, G>,
     k: usize,
@@ -447,7 +447,7 @@ mod tests {
         zk::{setup, Commitment, Powers},
     };
 
-    use super::{build, prove, recode, verify, Block};
+    use super::{build, commit, recode, verify, Block};
 
     fn bytes() -> Vec<u8> {
         include_bytes!("../assets/dragoon_133x133.png").to_vec()
@@ -455,7 +455,7 @@ mod tests {
 
     macro_rules! full {
         ($b:ident, $p:ident, $m:ident) => {
-            build::<F, G, P>(&encode($b, $m)?, &prove($b, &$p, $m.height)?)
+            build::<F, G, P>(&encode($b, $m)?, &commit($b, &$p, $m.height)?)
         };
     }
 
@@ -780,7 +780,7 @@ mod tests {
         let encoding_mat = Matrix::random(k, n, &mut rng);
         let shards = encode(&bytes, &encoding_mat).unwrap();
         let proof =
-            prove::<Fr, G1Projective, DensePolynomial<Fr>>(&bytes, &powers, encoding_mat.height)
+            commit::<Fr, G1Projective, DensePolynomial<Fr>>(&bytes, &powers, encoding_mat.height)
                 .unwrap();
 
         let blocks = build::<Fr, G1Projective, DensePolynomial<Fr>>(&shards, &proof);
@@ -819,6 +819,6 @@ mod tests {
         let powers: Powers<Fr, G1Projective> = setup(300, &mut rng).unwrap();
 
         let data = std::fs::read("assets/bin_with_holes").unwrap();
-        prove::<Fr, G1Projective, DensePolynomial<Fr>>(&data, &powers, 5).unwrap();
+        commit::<Fr, G1Projective, DensePolynomial<Fr>>(&data, &powers, 5).unwrap();
     }
 }

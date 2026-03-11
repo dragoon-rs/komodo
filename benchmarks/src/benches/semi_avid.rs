@@ -54,9 +54,9 @@ where
         None
     };
 
-    let proofs = if step >= Step::Proof {
+    let commitment = if step >= Step::Proof {
         crate::pretty::bar::dimmed(maybe_bar, msg.clone().map(|m| format!("{m} proof")));
-        Some(semi_avid::prove(&bytes, &powers, encoding_mat.height).unwrap())
+        Some(semi_avid::commit(&bytes, &powers, encoding_mat.height).unwrap())
     } else {
         None
     };
@@ -65,7 +65,7 @@ where
         crate::pretty::bar::dimmed(maybe_bar, msg.clone().map(|m| format!("{m} build")));
         Some(semi_avid::build(
             &shards.clone().unwrap(),
-            &proofs.clone().unwrap(),
+            &commitment.clone().unwrap(),
         ))
     } else {
         None
@@ -73,7 +73,7 @@ where
 
     crate::pretty::bar::normal(maybe_bar, msg);
 
-    (bytes, powers, encoding_mat, shards, proofs, blocks)
+    (bytes, powers, encoding_mat, shards, commitment, blocks)
 }
 
 pub(crate) fn build<F, G, P>(
@@ -95,7 +95,7 @@ where
                     setup_bench::<F, G, P>(nb_bytes, k, n, Step::Setup, Some(&bar));
 
                 crate::timeit_and_discard_output! {
-                    semi_avid::prove(&bytes, &powers, encoding_mat.height);
+                    semi_avid::commit(&bytes, &powers, encoding_mat.height);
                 }
             }),
         ),
