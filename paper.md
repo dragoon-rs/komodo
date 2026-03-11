@@ -72,42 +72,40 @@ Data availability;
 
 # Statement of need
 
-**Komodo** provides mechanisms that satisfy various distributed systems' needs such
-as verifiable information dispersal or data availability. Such systems range
-from private drone swarms to public blockchains.
+The verification mechanisms provided by **Komodo** can help implementing verifiable information
+dispersal or data availability schemes in a distributed storage system or in a blockchain.
 
-For instance, in a distributed storage system, nodes can encode data into
-shards, prove their validity, and distribute them across the network. Other
-nodes can then verify the shards' validity before storing or retrieving them,
-ensuring data robustness and trustworthiness.
+For instance, in a distributed storage system, nodes can use **Komodo** to encode an incoming data
+into shards; commit them to the initial data; compute individual shard proofs; bundle shards,
+commitments and proofs into messages; and distribute these messages across the network. Any node that
+receives a block can then verify its validity before storing or forwarding it. This ensures data
+robustness and trustworthiness when a node eventually decodes the data from the shards bundled in
+valid messages.
 
-In blockchain systems, **Komodo** can be used as the key enabling mechanism for
-checking data availability, similar to how 2D Reed-Solomon codes and Danksharding
-[@ethereum2024danksharding] are used within Ethereum 2.0, or similar mechanisms in the
-Celestia or Avail blockchains, among many others.
+Several blockchain projects use some of these mechanisms to verify data availability: Celestia
+uses 2D Reed-Solomon-based codes with Merkle trees [@rsmt2d; @albassam2019frauddataavailabilityproofs], 
+while Ethereum Danksharding [@ethereum2024danksharding] 
+uses 2D Reed-Solomon with KZG polynomial commitments. Such projects could use or
+extend Komodo to benchmark different schemes.
 
-A few libraries provide similar functionalities, with a few gaps filled by
-**Komodo**.
+A few libraries provide similar functionalities, with a few gaps filled by **Komodo**:
 
-The `arkworks` ecosystem [@arkworks] is probably the closest library, providing
-many of the necessary building blocks involved in Data Availability Sampling:
-prime fields, possibly paired with elliptic curves like BLS12-381 or BN254 among
-many others; linear algebra operations like polynomial operations and polynomial commitment.
-On top of those features, **Komodo** adds
-Reed-Solomon encoding, tightly integrated with proof generation.
+- The `arkworks` ecosystem [@arkworks] is probably the closest library, providing many of the
+  necessary building blocks involved in Data Availability Sampling: prime fields, possibly paired
+  with elliptic curves like BLS12-381 or BN254 among many others; linear algebra operations like
+  polynomial operations and polynomial commitment. On top of those features, **Komodo** adds
+  Reed-Solomon encoding, tightly integrated with proof generation.
 
-The Rust implementation of Reed-Solomon erasure coding [@rust-rse] provides
-mechanisms to encode and decode data into raw shards, using elements of finite
-fields $\mathbb{F}_{2^8}$ or $\mathbb{F}_{2^{16}}$, containing respectively
-$2^8$ and $2^{16}$ elements. **Komodo** adds the proving mechanisms, and makes it
-possible to use elements from `arkworks`' prime fields.
+- The Rust implementation of Reed-Solomon erasure coding [@rust-rse] provides mechanisms to encode
+  and decode data into raw shards, using elements of finite fields $\mathbb{F}_{2^8}$ or
+  $\mathbb{F}_{2^{16}}$, containing respectively $2^8$ and $2^{16}$ elements. **Komodo** adds the
+  proving mechanisms, and makes it possible to use elements from `arkworks`' prime fields.
 
-**Komodo** also adds a unified benchmarking API, allowing to compare
-different combinations of prime fields, elliptic curves and polynomial
-commitment schemes, as we did in two publications [@stevan2024performance;
-@stevan2023assessing]. Finally, a modular design allows to extend **Komodo**
-with new polynomial commitment schemes or new encoding methods, which
-performance can be evaluated in the same benchmarking conditions.
+- **Komodo** also adds a unified benchmarking API, allowing to compare different combinations of
+  prime fields, elliptic curves and polynomial commitment schemes, as we did in two publications
+  [@stevan2024performance; @stevan2023assessing]. Finally, a modular design allows to extend
+  **Komodo** with new polynomial commitment schemes or new encoding methods, which performance can
+  be evaluated in the same benchmarking conditions.
 
 # Some measurements
 
