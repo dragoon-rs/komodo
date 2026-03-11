@@ -1,4 +1,4 @@
-image: "gitlab-registry.isae-supaero.fr/dragoon/komodo:406e2b0c1ca04443d9219fa2fbb07f62dc81c796"
+image: "gitlab-registry.isae-supaero.fr/dragoon/komodo:31e608d6db6c841bd58692723552db8fd2efa67c"
 
 stages:
   - fmt

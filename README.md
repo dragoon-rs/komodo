@@ -7,11 +7,14 @@
 [![mirror](https://github.com/dragoon-rs/komodo/actions/workflows/ci.yml/badge.svg)](https://github.com/dragoon-rs/komodo/actions)
 
 Komodo uses a build system entirely writen in Rust.
-- [`cargo-script`](https://crates.io/crates/cargo-script) to build the script
+- [`rust-script`](https://github.com/fornwall/rust-script) to build the script
 - [`nob.rs`](https://gitlab.isae-supaero.fr/a.stevan/nob.rs) to run commands
 - [`clap`](https://crates.io/crates/clap) to provide a nice and complete build API
 
-First, [install `cargo-script`](https://github.com/DanielKeep/cargo-script#installation).
+First, install `rust-script` with
+```bash
+cargo +1.74 install rust-script --locked --rev 99d2c790b303c1d75de5cd90499800283e4b9681 --git https://github.com/fornwall/rust-script
+```
 
 Then, run the script with `./make.rs --help`
 
