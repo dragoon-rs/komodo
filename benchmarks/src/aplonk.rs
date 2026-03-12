@@ -61,7 +61,8 @@ where
     }
 
     let degree = fec_params.k - 1;
-    let params = aplonk::setup::<E, P>(degree, polynomials.len()).expect("komodo::aplonk::setup");
+    let params =
+        aplonk::setup::<E, P>(degree, polynomials.len(), rng).expect("komodo::aplonk::setup");
     let (_, vk_psi) = zk::trim(&params.kzg.clone(), degree);
 
     let vk = aplonk::VerifierKey {

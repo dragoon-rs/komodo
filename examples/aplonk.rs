@@ -2,6 +2,7 @@ use ark_bls12_381::Bls12_381;
 use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
+use ark_std::test_rng;
 use std::ops::Div;
 
 use komodo::{
@@ -31,7 +32,7 @@ where
     let degree = k - 1;
     let vector_length_bound =
         bytes.len() / (E::ScalarField::MODULUS_BIT_SIZE as usize / 8) / (degree + 1);
-    let params = setup::<E, P>(degree, vector_length_bound).expect("setup failed");
+    let params = setup::<E, P>(degree, vector_length_bound, &mut test_rng()).expect("setup failed");
     let (_, vk_psi) = trim(&params.kzg, degree);
     let vk = VerifierKey {
         vk_psi,
