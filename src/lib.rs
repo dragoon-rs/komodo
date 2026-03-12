@@ -1,6 +1,6 @@
 //! Komodo: Cryptographically-proven Erasure Coding.
 //!
-//! Komodo provides an easy-to-use Rust library and ecosystem that is composed of two main parts:
+//! Komodo provides a Rust library and ecosystem that is composed of two main parts:
 //! - support for FEC encoding and decoding with the [`fec`] submodule
 //! - support for proving and verifying shards of encoded data with the [`semi_avid`], [`kzg`]\*,
 //! [`aplonk`]\* and [`fri`]\* submodules
