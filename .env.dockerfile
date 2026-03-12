@@ -9,6 +9,6 @@ RUN apt install --yes protobuf-compiler
 COPY rust-toolchain.toml /
 RUN rustup show && cargo --version
 
-RUN cargo +1.85 install cargo-script  # IMPORTANT: change the toolchain only AFTER testing
+RUN cargo +1.74 install rust-script --locked --rev 99d2c790b303c1d75de5cd90499800283e4b9681 --git https://github.com/fornwall/rust-script
 
 RUN apt clean && rm -rf /var/lib/apt/lists/*

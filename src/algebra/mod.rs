@@ -1,15 +1,14 @@
 //! Manipulate elements from finite field $\mathbb{F}_p$.
-#[cfg(any(feature = "kzg", feature = "aplonk"))]
-use ark_ec::pairing::Pairing;
 #[cfg(feature = "aplonk")]
 use ark_ec::pairing::PairingOutput;
 use ark_ff::{BigInteger, PrimeField};
 #[cfg(any(feature = "kzg", feature = "aplonk"))]
-use ark_poly::DenseUVPolynomial;
-#[cfg(any(feature = "kzg", feature = "aplonk"))]
-use ark_std::One;
-#[cfg(any(feature = "kzg", feature = "aplonk"))]
-use std::ops::{Div, Mul};
+use {
+    ark_ec::pairing::Pairing,
+    ark_poly::DenseUVPolynomial,
+    ark_std::One,
+    std::ops::{Div, Mul},
+};
 
 pub mod linalg;
 
@@ -354,7 +353,7 @@ mod tests {
 
         type UniPoly381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;
 
-        fn vec_to_elements<E: Pairing>(elements: Vec<u8>) -> Vec<E::ScalarField> {
+        fn vec_to_elements<E: Pairing>(elements: &[u8]) -> Vec<E::ScalarField> {
             elements
                 .iter()
                 .map(|&x| E::ScalarField::from_le_bytes_mod_order(&[x]))
@@ -368,12 +367,12 @@ mod tests {
             for<'a, 'b> &'a P: Div<&'b P, Output = P>,
         {
             let polynomials = vec![
-                P::from_coefficients_vec(vec_to_elements::<E>(vec![1])),
-                P::from_coefficients_vec(vec_to_elements::<E>(vec![0, 1])),
-                P::from_coefficients_vec(vec_to_elements::<E>(vec![0, 0, 1])),
-                P::from_coefficients_vec(vec_to_elements::<E>(vec![0, 0, 0, 1])),
+                P::from_coefficients_vec(vec_to_elements::<E>(&[1])),
+                P::from_coefficients_vec(vec_to_elements::<E>(&[0, 1])),
+                P::from_coefficients_vec(vec_to_elements::<E>(&[0, 0, 1])),
+                P::from_coefficients_vec(vec_to_elements::<E>(&[0, 0, 0, 1])),
             ];
-            let coeffs = vec_to_elements::<E>(vec![2, 3, 4, 5]);
+            let coeffs = vec_to_elements::<E>(&[2, 3, 4, 5]);
 
             assert_eq!(
                 super::super::scalar_product_polynomial::<E, P>(&coeffs, &polynomials),
@@ -387,7 +386,7 @@ mod tests {
         }
 
         #[cfg(feature = "aplonk")]
-        fn scalar_template<E: Pairing>(lhs: Vec<u8>, rhs: Vec<u8>, result: u8) {
+        fn scalar_template<E: Pairing>(lhs: &[u8], rhs: &[u8], result: u8) {
             let lhs = lhs
                 .iter()
                 .map(|x| E::ScalarField::from_le_bytes_mod_order(&[*x]))
@@ -404,8 +403,8 @@ mod tests {
         #[cfg(feature = "aplonk")]
         #[test]
         fn scalar() {
-            scalar_template::<Bls12_381>(vec![1, 2], vec![3, 4], 11);
-            scalar_template::<Bls12_381>(vec![5, 6], vec![7, 8], 83);
+            scalar_template::<Bls12_381>(&[1, 2], &[3, 4], 11);
+            scalar_template::<Bls12_381>(&[5, 6], &[7, 8], 83);
         }
 
         #[cfg(feature = "aplonk")]

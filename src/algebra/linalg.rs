@@ -2,6 +2,8 @@
 //!
 //! This module mainly contains an implementation of matrices over a finite
 //! field $\mathbb{F}_p$.
+use std::ops::Deref;
+
 use ark_ff::Field;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::{Rng, RngCore};
@@ -34,7 +36,7 @@ impl<T: Field> Matrix<T> {
     ///     . & . & 3 & . \\\\
     ///     . & . & . & 4 \\\\
     /// \end{pmatrix} $.
-    pub fn from_diagonal(diagonal: Vec<T>) -> Self {
+    pub fn from_diagonal(diagonal: &[T]) -> Self {
         let size = diagonal.len();
 
         let mut elements = Vec::new();
@@ -60,7 +62,7 @@ impl<T: Field> Matrix<T> {
     ///     . & . & 1 \\\\
     /// \end{pmatrix} $.
     pub fn identity(size: usize) -> Self {
-        Self::from_diagonal(vec![T::one(); size])
+        Self::from_diagonal(&vec![T::one(); size])
     }
 
     /// Builds a _Vandermonde_ matrix for some _seed points_.
@@ -200,11 +202,11 @@ impl<T: Field> Matrix<T> {
     /// ]);
     ///
     /// assert_eq!(
-    ///     Matrix::<T>::from_vec_vec(elements).unwrap(),
+    ///     Matrix::<T>::from_vec_vec(&elements).unwrap(),
     ///     Matrix { elements: expected, height, width }
     /// );
     /// ```
-    pub fn from_vec_vec(matrix: Vec<Vec<T>>) -> Result<Self, KomodoError> {
+    pub fn from_vec_vec(matrix: &[impl Deref<Target = [T]>]) -> Result<Self, KomodoError> {
         if matrix.is_empty() {
             return Ok(Self {
                 elements: vec![],
@@ -228,7 +230,7 @@ impl<T: Field> Matrix<T> {
     }
 
     /// The unchecked version of [`Self::from_vec_vec`].
-    pub fn from_vec_vec_unchecked(matrix: Vec<Vec<T>>) -> Self {
+    pub fn from_vec_vec_unchecked(matrix: &[impl Deref<Target = [T]>]) -> Self {
         let height = matrix.len();
         let width = matrix[0].len();
 
@@ -594,16 +596,16 @@ mod tests {
     // two wrapped functions to make the tests more readable
 
     fn vec_to_elements<T: Field>(elements: Vec<u128>) -> Vec<T> {
-        elements.iter().map(|&x| T::from(x)).collect()
+        elements.into_iter().map(|x| T::from(x)).collect()
     }
 
     fn mat_to_elements<T: Field>(mat: Vec<Vec<u128>>) -> Vec<Vec<T>> {
-        mat.iter().cloned().map(vec_to_elements).collect()
+        mat.into_iter().map(vec_to_elements).collect()
     }
 
     #[test]
     fn from_vec_vec() {
-        let actual = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+        let actual = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![
             vec![2, 0, 0],
             vec![0, 3, 0],
             vec![0, 0, 4],
@@ -617,7 +619,7 @@ mod tests {
         };
         assert_eq!(actual, expected);
 
-        let matrix = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![vec![0], vec![0, 0]]));
+        let matrix = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![vec![0], vec![0, 0]]));
         assert!(matrix.is_err());
         assert_eq!(
             matrix.err().unwrap(),
@@ -631,8 +633,8 @@ mod tests {
 
     #[test]
     fn diagonal() {
-        let actual = Matrix::<Fr>::from_diagonal(vec_to_elements(vec![2, 3, 4]));
-        let expected = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+        let actual = Matrix::<Fr>::from_diagonal(&vec_to_elements(vec![2, 3, 4]));
+        let expected = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![
             vec![2, 0, 0],
             vec![0, 3, 0],
             vec![0, 0, 4],
@@ -644,7 +646,7 @@ mod tests {
     #[test]
     fn identity() {
         let actual = Matrix::<Fr>::identity(3);
-        let expected = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+        let expected = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![
             vec![1, 0, 0],
             vec![0, 1, 0],
             vec![0, 0, 1],
@@ -655,13 +657,13 @@ mod tests {
 
     #[test]
     fn multiplication() {
-        let a = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+        let a = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![
             vec![9, 4, 3],
             vec![8, 5, 2],
             vec![7, 6, 1],
         ]))
         .unwrap();
-        let b = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+        let b = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![
             vec![1, 2, 3],
             vec![4, 5, 6],
             vec![7, 8, 9],
@@ -669,7 +671,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            a.mul(&Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![vec![1, 2]])).unwrap()),
+            a.mul(&Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![vec![1, 2]])).unwrap()),
             Err(KomodoError::IncompatibleMatrixShapes {
                 left: (3, 3),
                 right: (1, 2)
@@ -677,7 +679,7 @@ mod tests {
         );
 
         let product = a.mul(&b).unwrap();
-        let expected = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+        let expected = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![
             vec![46, 62, 78],
             vec![42, 57, 72],
             vec![38, 52, 66],
@@ -708,7 +710,7 @@ mod tests {
         let inverse = matrix.invert().unwrap();
         assert_eq!(Matrix::<Fr>::identity(3), inverse);
 
-        let matrix = Matrix::<Fr>::from_diagonal(vec_to_elements(vec![2, 3, 4]));
+        let matrix = Matrix::<Fr>::from_diagonal(&vec_to_elements(vec![2, 3, 4]));
         let inverse = matrix.invert().unwrap();
         assert_eq!(matrix.mul(&inverse).unwrap(), Matrix::<Fr>::identity(3));
         assert_eq!(inverse.mul(&matrix).unwrap(), Matrix::<Fr>::identity(3));
@@ -721,17 +723,17 @@ mod tests {
         }
 
         let inverse =
-            Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![vec![1, 0, 0], vec![0, 1, 0]]))
+            Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![vec![1, 0, 0], vec![0, 1, 0]]))
                 .unwrap()
                 .invert();
         assert!(inverse.is_err());
         assert_eq!(inverse.err().unwrap(), KomodoError::NonSquareMatrix(2, 3));
 
-        let inverse = Matrix::<Fr>::from_diagonal(vec_to_elements(vec![0, 3, 4])).invert();
+        let inverse = Matrix::<Fr>::from_diagonal(&vec_to_elements(vec![0, 3, 4])).invert();
         assert!(inverse.is_err());
         assert_eq!(inverse.err().unwrap(), KomodoError::NonInvertibleMatrix(0));
 
-        let inverse = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+        let inverse = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![
             vec![1, 1, 0],
             vec![0, 0, 0],
             vec![0, 0, 1],
@@ -756,7 +758,7 @@ mod tests {
 
         let actual = Matrix::<Fr>::vandermonde_unchecked(&vec_to_elements(vec![0, 1, 2, 3, 4]), 4);
         #[rustfmt::skip]
-        let expected = Matrix::from_vec_vec(mat_to_elements(vec![
+        let expected = Matrix::from_vec_vec(&mat_to_elements(vec![
             vec![1, 1, 1,  1,  1],
             vec![0, 1, 2,  3,  4],
             vec![0, 1, 4,  9, 16],
@@ -768,13 +770,13 @@ mod tests {
 
     #[test]
     fn transpose() {
-        let matrix = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+        let matrix = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![
             vec![1, 2, 3, 10],
             vec![4, 5, 6, 11],
             vec![7, 8, 9, 12],
         ]))
         .unwrap();
-        let transpose = Matrix::from_vec_vec(mat_to_elements(vec![
+        let transpose = Matrix::from_vec_vec(&mat_to_elements(vec![
             vec![1, 4, 7],
             vec![2, 5, 8],
             vec![3, 6, 9],
@@ -787,7 +789,7 @@ mod tests {
 
     #[test]
     fn truncate() {
-        let matrix = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+        let matrix = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![
             vec![1, 2, 3, 10],
             vec![4, 5, 6, 11],
             vec![7, 8, 9, 12],
@@ -800,13 +802,13 @@ mod tests {
         assert_eq!(matrix.truncate(Some(0), Some(0)), matrix);
 
         let truncated =
-            Matrix::from_vec_vec(mat_to_elements(vec![vec![1, 2], vec![4, 5]])).unwrap();
+            Matrix::from_vec_vec(&mat_to_elements(vec![vec![1, 2], vec![4, 5]])).unwrap();
         assert_eq!(matrix.truncate(Some(1), Some(2)), truncated);
     }
 
     #[test]
     fn get_cols() {
-        let matrix = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+        let matrix = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![
             vec![1, 2, 3, 10],
             vec![4, 5, 6, 11],
             vec![7, 8, 9, 12],
@@ -832,7 +834,7 @@ mod tests {
             assert_eq!(m.rank(), m.transpose().rank());
         }
 
-        let m = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+        let m = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![
             vec![1, 0, 0],
             vec![0, 2, 0],
             vec![0, 0, 3],
@@ -840,7 +842,7 @@ mod tests {
         .unwrap();
         assert_eq!(m.rank(), 3);
 
-        let m = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+        let m = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![
             vec![1, 0, 0],
             vec![0, 2, 0],
             vec![0, 0, 3],
@@ -849,7 +851,7 @@ mod tests {
         .unwrap();
         assert_eq!(m.rank(), 3);
 
-        let m = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+        let m = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![
             vec![1, 0, 0],
             vec![0, 2, 0],
             vec![0, 0, 0],
@@ -857,7 +859,7 @@ mod tests {
         .unwrap();
         assert_eq!(m.rank(), 2);
 
-        let m = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+        let m = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![
             vec![0, 0, 0],
             vec![0, 0, 0],
             vec![0, 0, 0],
@@ -865,7 +867,7 @@ mod tests {
         .unwrap();
         assert_eq!(m.rank(), 0);
 
-        let m = Matrix::<Fr>::from_vec_vec(mat_to_elements(vec![
+        let m = Matrix::<Fr>::from_vec_vec(&mat_to_elements(vec![
             vec![0, 0, 1, 0],
             vec![1, 0, 0, 1],
             vec![0, 1, 0, 1],
