@@ -11,7 +11,7 @@
 //! > name
 //!
 //! Other submodules define several fundamental building blocks to Komodo, but are not
-//! mandatory to explore to understand the protocols.
+//! mandatory to explore and understand the protocols.
 //!
 //! # What does Komodo prove ?
 //! When some data $\Delta$ is $(k,n)$-encoded, shards $(s_i)_{1 \leq i \leq n}$ are generated
