@@ -164,13 +164,13 @@
 //! However, this operation will introduce linear dependencies between recoded shards and their
 //! _parents_, which might decrease the diversity of shards and harm the decoding process.
 
-use std::ops::Index;
+use std::{marker::PhantomData, ops::Index};
 
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::ops::Div;
+use ark_std::{ops::Div, rand::Rng};
 use tracing::{debug, info};
 
 use crate::{
@@ -259,6 +259,84 @@ where
         .map(|(i, w)| commitment[i].into() * w)
         .sum();
     Ok(commit.0.into() == rhs)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SemiAVID<F, G, P>
+where
+    F: PrimeField,
+    G: CurveGroup<ScalarField = F>,
+    P: DenseUVPolynomial<F>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    k: usize,
+    _field: PhantomData<F>,
+    _group: PhantomData<G>,
+    _polynomial: PhantomData<P>,
+}
+
+impl<F, G, P> SemiAVID<F, G, P>
+where
+    F: PrimeField,
+    G: CurveGroup<ScalarField = F>,
+    P: DenseUVPolynomial<F>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    pub fn new(k: usize) -> Self {
+        Self {
+            k,
+            _field: PhantomData,
+            _group: PhantomData,
+            _polynomial: PhantomData,
+        }
+    }
+}
+
+impl<F, G, P> crate::Protocol for SemiAVID<F, G, P>
+where
+    F: PrimeField,
+    G: CurveGroup<ScalarField = F>,
+    P: DenseUVPolynomial<F>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    type Setup = Powers<F, G>;
+    type Commitment = Commitment<F, G>;
+    type Proof = ();
+    type Shard = Shard<F>;
+    type VerifierKey = Self::Setup;
+
+    fn setup(
+        &self,
+        degree: usize,
+        rng: &mut impl Rng,
+    ) -> Result<(Self::Setup, Self::VerifierKey), KomodoError> {
+        let powers = zk::setup::<F, G>(degree, rng)?;
+        Ok((powers.clone(), powers))
+    }
+
+    fn commit(&self, bytes: &[u8], setup: &Self::Setup) -> Result<Self::Commitment, KomodoError> {
+        commit::<F, G, P>(bytes, setup, self.k)
+    }
+
+    fn prove(
+        &self,
+        _bytes: &[u8],
+        _commitment: &Self::Commitment,
+        shards: &[Self::Shard],
+        _setup: &Self::Setup,
+    ) -> Result<Vec<Self::Proof>, KomodoError> {
+        Ok(shards.iter().map(|_| ()).collect())
+    }
+
+    fn verify(
+        &self,
+        commitment: &Self::Commitment,
+        shard: &Self::Shard,
+        _proof: &Self::Proof,
+        vk: &Self::VerifierKey,
+    ) -> Result<bool, KomodoError> {
+        verify::<F, G, P>(shard, commitment, vk)
+    }
 }
 
 #[cfg(test)]

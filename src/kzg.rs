@@ -68,8 +68,9 @@ use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
 use ark_poly_commit::{kzg10, PCRandomness};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
-use ark_std::{ops::Div, Zero};
+use ark_std::{ops::Div, rand::Rng, Zero};
 use rs_merkle::{algorithms::Sha256, Hasher};
+use std::marker::PhantomData;
 use std::ops::{AddAssign, Index, Mul};
 
 use crate::error::KomodoError;
@@ -273,6 +274,97 @@ where
     // e(sum(r^i * proof_i, T * g2) = e(sum(r^i * (commit_i  - y_i * g1 + alpha_i * proof_i)),g2)
     Ok(E::pairing(proof_agg, verifier_key.beta_h)
         == E::pairing(inner_agg, verifier_key.h.into_group()))
+}
+
+pub struct Kzg<E, P>
+where
+    E: Pairing,
+    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    k: usize,
+    _pairing: PhantomData<E>,
+    _polynomial: PhantomData<P>,
+}
+
+impl<E, P> Kzg<E, P>
+where
+    E: Pairing,
+    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    pub fn new(k: usize) -> Self {
+        Self {
+            k,
+            _pairing: PhantomData,
+            _polynomial: PhantomData,
+        }
+    }
+}
+
+impl<E, P> crate::Protocol for Kzg<E, P>
+where
+    E: Pairing,
+    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    type Setup = kzg10::Powers<'static, E>;
+    type Commitment = Commitment<E>;
+    type Proof = Proof<E>;
+    type Shard = Shard<E::ScalarField>;
+    type VerifierKey = kzg10::VerifierKey<E>;
+
+    fn setup(
+        &self,
+        degree: usize,
+        rng: &mut impl Rng,
+    ) -> Result<(Self::Setup, Self::VerifierKey), KomodoError> {
+        match kzg10::KZG10::<E, P>::setup(degree, false, rng) {
+            Ok(params) => Ok(zk::trim(&params, degree)),
+            Err(e) => Err(KomodoError::Other(format!("{}", e))),
+        }
+    }
+
+    fn commit(&self, bytes: &[u8], setup: &Self::Setup) -> Result<Self::Commitment, KomodoError> {
+        commit(
+            setup,
+            &algebra::convert_bytes_to_polynomials::<E::ScalarField, P>(bytes, self.k),
+        )
+    }
+
+    fn prove(
+        &self,
+        bytes: &[u8],
+        _commitment: &Self::Commitment,
+        shards: &[Self::Shard],
+        setup: &Self::Setup,
+    ) -> Result<Vec<Self::Proof>, KomodoError> {
+        prove::<E, P>(
+            &algebra::convert_bytes_to_polynomials::<E::ScalarField, P>(bytes, self.k),
+            shards,
+            &shards
+                .iter()
+                .map(|s| s.linear_combination[1])
+                .collect::<Vec<_>>(),
+            setup,
+        )
+    }
+
+    fn verify(
+        &self,
+        commitment: &Self::Commitment,
+        shard: &Self::Shard,
+        proof: &Self::Proof,
+        vk: &Self::VerifierKey,
+    ) -> Result<bool, KomodoError> {
+        Ok(verify::<E, P>(
+            shard,
+            commitment,
+            proof,
+            shard.linear_combination[1],
+            vk,
+        ))
+    }
 }
 
 #[cfg(test)]

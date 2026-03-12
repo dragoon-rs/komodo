@@ -98,6 +98,19 @@ pub(crate) fn merge_elements_into_bytes<F: PrimeField>(elements: &[F]) -> Vec<u8
 }
 
 #[cfg(any(feature = "kzg", feature = "aplonk"))]
+pub(crate) fn convert_bytes_to_polynomials<F, P>(bytes: &[u8], k: usize) -> Vec<P>
+where
+    F: PrimeField,
+    P: DenseUVPolynomial<F>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    split_data_into_field_elements::<F>(bytes, k)
+        .chunks(k)
+        .map(|c| P::from_coefficients_vec(c.to_vec()))
+        .collect()
+}
+
+#[cfg(any(feature = "kzg", feature = "aplonk"))]
 /// Computes the linear combination of polynomials.
 ///
 /// [`scalar_product_polynomial`] computes the linear combination $P$ of $n$
