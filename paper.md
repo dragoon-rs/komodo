@@ -82,11 +82,12 @@ receives a block can then verify its validity before storing or forwarding it. T
 robustness and trustworthiness when a node eventually decodes the data from the shards bundled in
 valid messages.
 
-Several blockchain projects use some of these mechanisms to verify data availability: Celestia
-uses 2D Reed-Solomon-based codes with Merkle trees [@rsmt2d; @albassam2019frauddataavailabilityproofs], 
-while Ethereum Danksharding [@ethereum2024danksharding] 
-uses 2D Reed-Solomon with KZG polynomial commitments. Such projects could use or
-extend Komodo to benchmark different schemes.
+Several blockchain projects use some of these mechanisms to verify data availability:
+
+- Celestia uses 2D Reed-Solomon-based codes with Merkle trees [@rsmt2d; @albassam2019frauddataavailabilityproofs]
+- Ethereum Danksharding [@ethereum2024danksharding] uses 2D Reed-Solomon with KZG polynomial commitments
+
+Such projects could use or extend Komodo to benchmark different schemes.
 
 A few libraries provide similar functionalities, with a few gaps filled by **Komodo**:
 
