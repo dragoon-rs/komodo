@@ -364,7 +364,7 @@ mod tests {
 
         let mu: Vec<E::G1> = (0..k).map(|_| E::G1::rand(rng)).collect();
 
-        let params = setup::<E, P>(degree, k)?;
+        let params = setup::<E, P>(degree, k, rng)?;
         let ck_tau = params.ipa.ck_tau;
 
         let r = E::ScalarField::rand(rng);

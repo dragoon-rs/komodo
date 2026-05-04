@@ -6,3 +6,5 @@ target/
 # IDEs
 .idea
 .vscode
+
+paper.pdf

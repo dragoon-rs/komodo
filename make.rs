@@ -27,6 +27,8 @@ const DOCKERFILE: &str = ".env.dockerfile";
 const BASE: &str = "https://gitlab.isae-supaero.fr/dragoon/komodo";
 const MIRROR: &str = "https://github.com/dragoon-rs/komodo";
 
+const KATEX_HEADER_PATH: &str = "katex.html";
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -68,6 +70,12 @@ enum Commands {
         /// Document all features.
         #[arg(short, long)]
         features: bool,
+    },
+    /// Builds the paper
+    Paper {
+        /// Build as a draft
+        #[arg(short, long)]
+        draft: bool,
     },
     /// Run all that is needed for the Continuous Integration of the project.
     CI {
@@ -236,7 +244,7 @@ fn version() {
 }
 
 fn doc(open: bool, private: bool, features: bool) {
-    let mut cmd = vec!["cargo", "doc", "--no-deps"];
+    let mut cmd = vec!["cargo", "doc"];
     if open {
         cmd.push("--open")
     }
@@ -246,6 +254,38 @@ fn doc(open: bool, private: bool, features: bool) {
     if features {
         cmd.push("--all-features")
     }
+
+    nob::run_cmd_as_vec_and_fail!(cmd;
+        "RUSTDOCFLAGS" => &format!(
+            "--html-in-header {}",
+            std::env::current_dir()
+                .unwrap()
+                .join(KATEX_HEADER_PATH)
+                .display(),
+        )
+    );
+}
+
+fn paper(draft: bool) {
+    let uid = run_and_capture_silent(vec!["id", "-u"]);
+    let group = run_and_capture_silent(vec!["id", "-g"]);
+
+    let v = format!("{}:/data", std::env::var("PWD").unwrap());
+    let u = format!("{}:{}", uid.trim(), group.trim());
+
+    #[rustfmt::skip]
+    let mut cmd = vec![
+        "docker", "run", "--rm", "-it",
+        "-v", &v,
+        "-u", &u,
+        "openjournals/inara",
+        "-o", "pdf",
+        "paper.md",
+    ];
+    if !draft {
+        cmd.push("-p")
+    }
+
     nob::run_cmd_as_vec_and_fail!(cmd);
 }
 
@@ -263,6 +303,7 @@ fn main() {
             private,
             features,
         }) => doc(*open, *private, *features),
+        Some(Commands::Paper { draft }) => paper(*draft),
         Some(Commands::CI {
             fmt: fmt_stage,
             test: test_stage,
@@ -409,8 +450,13 @@ fn extend_and_run(cmd: &[&str], args: &[&str]) {
 }
 
 // NOTE: this could be migrated to [`nob.rs`](https://gitlab.isae-supaero.fr/a.stevan/nob.rs)
+fn run_and_capture_silent(cmd: Vec<&str>) -> String {
+    String::from_utf8(nob::run_cmd_as_vec_and_fail!(@+cmd).stdout).expect("Invalid UTF-8 string")
+}
+
+// NOTE: this could be migrated to [`nob.rs`](https://gitlab.isae-supaero.fr/a.stevan/nob.rs)
 fn extend_and_run_and_capture_silent(cmd: &[&str], args: &[&str]) -> String {
     let mut cmd = cmd.to_vec();
     cmd.extend_from_slice(&args);
-    String::from_utf8(nob::run_cmd_as_vec_and_fail!(@+cmd).stdout).expect("Invalid UTF-8 string")
+    run_and_capture_silent(cmd)
 }

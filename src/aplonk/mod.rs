@@ -1,6 +1,11 @@
 //! $\text{aPlonK}$: an extension of $\text{KZG}^+$ where commits are _folded_ into one
 //! > - [Ambrona et al., 2022](https://link.springer.com/chapter/10.1007/978-3-031-41326-1_11)
 //!
+//! # What does aPlonK prove ?
+//! aPlonK does prove the [same property as $\text{KZG}^+$][crate::kzg#what-does-textkzg-prove-]
+//! but reduces the size of the _commitment_ at the expense of longer proving time.
+//!
+//! # Example
 #![doc = simple_mermaid::mermaid!("mod.mmd")]
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
@@ -13,10 +18,13 @@ use ark_poly_commit::{
     PCRandomness,
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress};
-use ark_std::{test_rng, One, UniformRand};
+use ark_std::{rand::Rng, One, UniformRand};
 use rs_merkle::algorithms::Sha256;
 use rs_merkle::Hasher;
-use std::ops::{Div, Mul};
+use std::{
+    marker::PhantomData,
+    ops::{Div, Mul},
+};
 
 use crate::{
     algebra,
@@ -81,13 +89,13 @@ pub struct SetupParams<E: Pairing> {
 pub fn setup<E, P>(
     degree_bound: usize,
     nb_polynomials: usize,
+    rng: &mut impl Rng,
 ) -> Result<SetupParams<E>, ark_poly_commit::Error>
 where
     E: Pairing,
     P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
     for<'a, 'b> &'a P: Div<&'b P, Output = P>,
 {
-    let rng = &mut test_rng();
     let params = KZG10::<E, P>::setup(degree_bound, true, rng)?;
 
     let g_1 = params.powers_of_g[0];
@@ -415,6 +423,103 @@ where
     Ok(b_tau)
 }
 
+pub struct Aplonk<E, P>
+where
+    E: Pairing,
+    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    k: usize,
+    m: usize,
+    _pairing: PhantomData<E>,
+    _polynomial: PhantomData<P>,
+}
+
+impl<E, P> Aplonk<E, P>
+where
+    E: Pairing,
+    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    pub fn new(k: usize, m: usize) -> Self {
+        Self {
+            k,
+            m,
+            _pairing: PhantomData,
+            _polynomial: PhantomData,
+        }
+    }
+}
+
+impl<E, P> crate::Protocol for Aplonk<E, P>
+where
+    E: Pairing,
+    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    type Setup = SetupParams<E>;
+    type Commitment = Commitment<E>;
+    type Proof = Proof<E>;
+    type Shard = Shard<E::ScalarField>;
+    type VerifierKey = VerifierKey<E>;
+
+    fn setup(
+        &self,
+        degree: usize,
+        rng: &mut impl Rng,
+    ) -> Result<(Self::Setup, Self::VerifierKey), KomodoError> {
+        match setup::<E, P>(degree, self.m, rng) {
+            Ok(params) => {
+                let (_, vk_psi) = trim(&params.kzg, degree);
+                let vk = VerifierKey {
+                    vk_psi,
+                    tau_1: params.ipa.tau_1,
+                    g_1: params.kzg.powers_of_g[0].into_group(),
+                    g_2: params.kzg.h.into_group(),
+                };
+
+                Ok((params, vk))
+            }
+            Err(e) => Err(KomodoError::Other(format!("{}", e))),
+        }
+    }
+
+    fn commit(&self, bytes: &[u8], setup: &Self::Setup) -> Result<Self::Commitment, KomodoError> {
+        commit(
+            &algebra::convert_bytes_to_polynomials::<E::ScalarField, P>(bytes, self.k),
+            setup,
+        )
+    }
+
+    fn prove(
+        &self,
+        bytes: &[u8],
+        commitment: &Self::Commitment,
+        shards: &[Self::Shard],
+        setup: &Self::Setup,
+    ) -> Result<Vec<Self::Proof>, KomodoError> {
+        prove::<E, P>(
+            &commitment.clone(),
+            &algebra::convert_bytes_to_polynomials::<E::ScalarField, P>(bytes, self.k),
+            &shards
+                .iter()
+                .map(|s| s.linear_combination[1])
+                .collect::<Vec<_>>(),
+            setup,
+        )
+    }
+
+    fn verify(
+        &self,
+        commitment: &Self::Commitment,
+        shard: &Self::Shard,
+        proof: &Self::Proof,
+        vk: &Self::VerifierKey,
+    ) -> Result<bool, KomodoError> {
+        verify::<E, P>(shard, commitment, proof, shard.linear_combination[1], vk)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -428,6 +533,7 @@ mod tests {
     use ark_ec::{pairing::Pairing, AffineRepr};
     use ark_ff::{Field, PrimeField};
     use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
+    use ark_std::{rand::Rng, test_rng};
     use std::ops::{Div, MulAssign};
 
     type UniPoly381 = DensePolynomial<<Bls12_381 as Pairing>::ScalarField>;
@@ -442,6 +548,7 @@ mod tests {
         bytes: &[u8],
         k: usize,
         n: usize,
+        rng: &mut impl Rng,
     ) -> Result<
         (
             super::Commitment<E>,
@@ -459,7 +566,7 @@ mod tests {
         let vector_length_bound =
             bytes.len() / (E::ScalarField::MODULUS_BIT_SIZE as usize / 8) / (degree + 1);
 
-        let params = super::setup::<E, P>(degree, vector_length_bound)?;
+        let params = super::setup::<E, P>(degree, vector_length_bound, rng)?;
         let (_, vk_psi) = trim(&params.kzg, degree);
 
         let elements = algebra::split_data_into_field_elements::<E::ScalarField>(bytes, k);
@@ -492,14 +599,19 @@ mod tests {
         ))
     }
 
-    fn verify_template<E, P>(bytes: &[u8], k: usize, n: usize) -> Result<(), ark_poly_commit::Error>
+    fn verify_template<E, P>(
+        bytes: &[u8],
+        k: usize,
+        n: usize,
+        rng: &mut impl Rng,
+    ) -> Result<(), ark_poly_commit::Error>
     where
         E: Pairing,
         P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
         let (commitment, blocks, vk) =
-            test_setup::<E, P>(bytes, k, n).expect("proof failed for bls12-381");
+            test_setup::<E, P>(bytes, k, n, rng).expect("proof failed for bls12-381");
 
         for (i, (shard, proof)) in blocks.iter().enumerate() {
             assert!(super::verify::<E, P>(
@@ -519,6 +631,7 @@ mod tests {
         bytes: &[u8],
         k: usize,
         n: usize,
+        rng: &mut impl Rng,
     ) -> Result<(), ark_poly_commit::Error>
     where
         E: Pairing,
@@ -526,7 +639,7 @@ mod tests {
         for<'a, 'b> &'a P: Div<&'b P, Output = P>,
     {
         let (commitment, blocks, vk) =
-            test_setup::<E, P>(bytes, k, n).expect("proof failed for bls12-381");
+            test_setup::<E, P>(bytes, k, n, rng).expect("proof failed for bls12-381");
 
         for (i, (shard, proof)) in blocks.iter().enumerate() {
             let mut p = proof.clone();
@@ -553,38 +666,53 @@ mod tests {
 
     #[test]
     fn verify_2() {
-        verify_template::<Bls12_381, UniPoly381>(&bytes::<Bls12_381>(4, 2), 4, 6)
+        verify_template::<Bls12_381, UniPoly381>(&bytes::<Bls12_381>(4, 2), 4, 6, &mut test_rng())
             .expect("verification failed for bls12-381");
     }
 
     #[test]
     fn verify_4() {
-        verify_template::<Bls12_381, UniPoly381>(&bytes::<Bls12_381>(4, 4), 4, 6)
+        verify_template::<Bls12_381, UniPoly381>(&bytes::<Bls12_381>(4, 4), 4, 6, &mut test_rng())
             .expect("verification failed for bls12-381");
     }
 
     #[test]
     fn verify_8() {
-        verify_template::<Bls12_381, UniPoly381>(&bytes::<Bls12_381>(4, 8), 4, 6)
+        verify_template::<Bls12_381, UniPoly381>(&bytes::<Bls12_381>(4, 8), 4, 6, &mut test_rng())
             .expect("verification failed for bls12-381");
     }
 
     #[test]
     fn verify_with_errors_2() {
-        verify_with_errors_template::<Bls12_381, UniPoly381>(&bytes::<Bls12_381>(4, 2), 4, 6)
-            .expect("verification failed for bls12-381");
+        verify_with_errors_template::<Bls12_381, UniPoly381>(
+            &bytes::<Bls12_381>(4, 2),
+            4,
+            6,
+            &mut test_rng(),
+        )
+        .expect("verification failed for bls12-381");
     }
 
     #[test]
     fn verify_with_errors_4() {
-        verify_with_errors_template::<Bls12_381, UniPoly381>(&bytes::<Bls12_381>(4, 4), 4, 6)
-            .expect("verification failed for bls12-381");
+        verify_with_errors_template::<Bls12_381, UniPoly381>(
+            &bytes::<Bls12_381>(4, 4),
+            4,
+            6,
+            &mut test_rng(),
+        )
+        .expect("verification failed for bls12-381");
     }
 
     #[test]
     fn verify_with_errors_8() {
-        verify_with_errors_template::<Bls12_381, UniPoly381>(&bytes::<Bls12_381>(4, 8), 4, 6)
-            .expect("verification failed for bls12-381");
+        verify_with_errors_template::<Bls12_381, UniPoly381>(
+            &bytes::<Bls12_381>(4, 8),
+            4,
+            6,
+            &mut test_rng(),
+        )
+        .expect("verification failed for bls12-381");
     }
 
     // TODO: implement padding for aPlonK
@@ -592,7 +720,12 @@ mod tests {
     #[test]
     fn verify_with_padding_test() {
         let bytes = bytes::<Bls12_381>(4, 2);
-        verify_template::<Bls12_381, UniPoly381>(&bytes[0..(bytes.len() - 33)], 4, 6)
-            .expect("verification failed for bls12-381 with padding");
+        verify_template::<Bls12_381, UniPoly381>(
+            &bytes[0..(bytes.len() - 33)],
+            4,
+            6,
+            &mut test_rng(),
+        )
+        .expect("verification failed for bls12-381 with padding");
     }
 }

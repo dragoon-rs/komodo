@@ -159,9 +159,8 @@ pub fn recode_random<F: PrimeField>(
 
 /// Applies a given encoding matrix to some data to generate encoded shards.
 ///
-/// We arrange the source shards to be encoded in an $m \times k$ matrix $S$, i.e. $k$ shards of
-/// length $m$. The encoding matrix $M$ then is a $k \times n$ matrix and the encoded shards are
-/// the $n$ columns of
+/// We arrange the source shards to be encoded in an $m \times k$ matrix $S$, i.e. $k$ column shards of length $m$.
+/// The encoding matrix $M$ then is a $k \times n$ matrix and the encoded shards are the $n$ columns of
 ///
 /// $$E = S M$$
 ///

@@ -3,12 +3,6 @@
 //! (`10.1007/978-3-642-17373-8_11`; [PDF](https://www.cypherpunks.ca/~iang/pubs/PolyCommit-AsiaCrypt.pdf))
 //! > - [Boneh et al., 2020](https://eprint.iacr.org/2020/081) ([PDF](https://eprint.iacr.org/2020/081.pdf))
 //!
-//! # The protocol
-//! Here, we assume that the input data has been encoded with a _Reed-Solomon_ encoding, as can be
-//! done with the [`crate::fec`] module.
-//!
-//! > **Note**
-//! >
 //! > In the following, the data $\Delta$ is arranged in an $m \times k$ matrix and $i$ will denote
 //! > the number of a row and $j$ the number of a column
 //! > - $0 \leq i \leq m - 1$
@@ -17,6 +11,28 @@
 //! > Also, $H$ is a secure hash function and
 //! > $E: \mathbb{G}_1 \times \mathbb{G}_2 \mapsto \mathbb{G}_T$ is the bilinear pairing mapping
 //! > such as BLS12-381.
+//!
+//! # What does $\text{KZG}^+$ prove ?
+//! > Here, we assume that the input data has been encoded with a _Reed-Solomon_ encoding, as can be
+//! > done with the [`fec`][crate::fec] module.
+//!
+//! The rows of the $\Delta$ matrix are interpreted as polynomials $(P_i)$.
+//! A shard $s_x$ is constructed by evaluating all these polynomials on a single point $x$.
+//!
+//! $$
+//! s_x = \begin{bmatrix}
+//!           P_{0}(x)   \\\\
+//!           P_{1}(x)   \\\\
+//!           \vdots     \\\\
+//!           P_{m-1}(x) \\\\
+//!       \end{bmatrix}
+//! $$
+//!
+//! $\text{KZG}^+$ proves that $\hat{s_x} = [y_{0}, y_{1}, \dots, y_{m-1}]^T$ is the correct
+//! evaluation of $(P_i)$ on $x$
+//! $$\forall i \in 0..m, \quad y_i = P_i(x)$$
+//!
+//! # The protocol
 #![doc = simple_mermaid::mermaid!("kzg.mmd")]
 //!
 //! Conveniently, each one of the $n$ encoded shards is a linear combination of the $k$ source
@@ -52,8 +68,9 @@ use ark_ff::PrimeField;
 use ark_poly::DenseUVPolynomial;
 use ark_poly_commit::{kzg10, PCRandomness};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
-use ark_std::{ops::Div, Zero};
+use ark_std::{ops::Div, rand::Rng, Zero};
 use rs_merkle::{algorithms::Sha256, Hasher};
+use std::marker::PhantomData;
 use std::ops::{AddAssign, Index, Mul};
 
 use crate::error::KomodoError;
@@ -257,6 +274,97 @@ where
     // e(sum(r^i * proof_i, T * g2) = e(sum(r^i * (commit_i  - y_i * g1 + alpha_i * proof_i)),g2)
     Ok(E::pairing(proof_agg, verifier_key.beta_h)
         == E::pairing(inner_agg, verifier_key.h.into_group()))
+}
+
+pub struct Kzg<E, P>
+where
+    E: Pairing,
+    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    k: usize,
+    _pairing: PhantomData<E>,
+    _polynomial: PhantomData<P>,
+}
+
+impl<E, P> Kzg<E, P>
+where
+    E: Pairing,
+    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    pub fn new(k: usize) -> Self {
+        Self {
+            k,
+            _pairing: PhantomData,
+            _polynomial: PhantomData,
+        }
+    }
+}
+
+impl<E, P> crate::Protocol for Kzg<E, P>
+where
+    E: Pairing,
+    P: DenseUVPolynomial<E::ScalarField, Point = E::ScalarField>,
+    for<'a, 'b> &'a P: Div<&'b P, Output = P>,
+{
+    type Setup = kzg10::Powers<'static, E>;
+    type Commitment = Commitment<E>;
+    type Proof = Proof<E>;
+    type Shard = Shard<E::ScalarField>;
+    type VerifierKey = kzg10::VerifierKey<E>;
+
+    fn setup(
+        &self,
+        degree: usize,
+        rng: &mut impl Rng,
+    ) -> Result<(Self::Setup, Self::VerifierKey), KomodoError> {
+        match kzg10::KZG10::<E, P>::setup(degree, false, rng) {
+            Ok(params) => Ok(zk::trim(&params, degree)),
+            Err(e) => Err(KomodoError::Other(format!("{}", e))),
+        }
+    }
+
+    fn commit(&self, bytes: &[u8], setup: &Self::Setup) -> Result<Self::Commitment, KomodoError> {
+        commit(
+            setup,
+            &algebra::convert_bytes_to_polynomials::<E::ScalarField, P>(bytes, self.k),
+        )
+    }
+
+    fn prove(
+        &self,
+        bytes: &[u8],
+        _commitment: &Self::Commitment,
+        shards: &[Self::Shard],
+        setup: &Self::Setup,
+    ) -> Result<Vec<Self::Proof>, KomodoError> {
+        prove::<E, P>(
+            &algebra::convert_bytes_to_polynomials::<E::ScalarField, P>(bytes, self.k),
+            shards,
+            &shards
+                .iter()
+                .map(|s| s.linear_combination[1])
+                .collect::<Vec<_>>(),
+            setup,
+        )
+    }
+
+    fn verify(
+        &self,
+        commitment: &Self::Commitment,
+        shard: &Self::Shard,
+        proof: &Self::Proof,
+        vk: &Self::VerifierKey,
+    ) -> Result<bool, KomodoError> {
+        Ok(verify::<E, P>(
+            shard,
+            commitment,
+            proof,
+            shard.linear_combination[1],
+            vk,
+        ))
+    }
 }
 
 #[cfg(test)]

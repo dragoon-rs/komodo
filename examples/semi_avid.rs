@@ -38,6 +38,7 @@ where
     let encoding_mat = &Matrix::random(k, n, &mut rng);
     let shards = encode(&bytes, encoding_mat)?;
     eprintln!("done");
+
     eprint!("committing data... ");
     let commitment = commit(&bytes, &powers, encoding_mat.height)?;
     eprintln!("done");

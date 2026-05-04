@@ -16,11 +16,20 @@ First, install `rust-script` with
 cargo +1.74 install rust-script --locked --rev 99d2c790b303c1d75de5cd90499800283e4b9681 --git https://github.com/fornwall/rust-script
 ```
 
-Then, run the script with `./make.rs --help`
+Then, the executable script `make.rs` can be used to run commands
+```bash
+./make.rs --help
+```
 
 ## the library
-```shell
-./make.rs doc
+> [!tip]
+> entry point of the local documentation is `./target/doc/komodo/index.html`
+
+```bash
+cargo doc                # raw documentation
+cargo doc --all-features # raw documentation with optional features
+./make.rs doc            # with the KaTeX formulae
+./make.rs doc --features # with the KaTeX formulae and all the optional features
 ```
 
 ## the tests
@@ -54,6 +63,16 @@ Docker image to the [_container registry_][gitlab.isae-supaero.fr:dragoon/komodo
 ```shell
 ./make.rs container --push
 ```
+
+## contribute to Komodo
+- open bug reports in the [issue tracker](https://github.com/dragoon-rs/komodo/issues)
+- discuss the library and feature requests in the [discussion feed](https://github.com/dragoon-rs/komodo/discussions)
+- submit changes to the [pull requests](https://github.com/dragoon-rs/komodo/pulls)
+
+Even though [this repo](https://github.com/dragoon-rs/komodo) is a mirror of the
+[original project](https://gitlab.isae-supaero.fr/dragoon/komodo), bugs and new
+features can still be discussed and pull requests can be merged upstream by the
+DRAGOON team.
 
 ## contributors
 

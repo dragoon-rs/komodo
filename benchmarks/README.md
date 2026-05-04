@@ -1,10 +1,15 @@
 > [!note]
 > missing benchmarks from previous version (1.0.1) are listed in [`TODO.md`](TODO.md)
 
+## Requirements
+- install [Nushell](https://nushell.sh) (there are pre-built binaries for all major releases on all major OSes [here](https://github.com/nushell/nushell/releases))
+- activate the `benchmarks` module
+
 > [!tip]
 > everything below is made to be run from the root of the _Komodo_ repo
 
 ## an example
+
 ```bash
 use benchmarks/make.nu
 make bench (0..18 | each { 1024 * 2 ** $in }) -k 2 -n 6 --nb-rounds 10
