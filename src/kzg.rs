@@ -133,14 +133,6 @@ where
     // compute a random combination of the polynomials and compute a proof for this polynomial
     let mut proofs = Vec::new();
     for (s, pt) in shards.iter().zip(points.iter()) {
-        let mut eval_bytes = vec![];
-        for p in polynomials {
-            let elt = p.evaluate(pt);
-            if let Err(error) = elt.serialize_with_mode(&mut eval_bytes, Compress::Yes) {
-                return Err(KomodoError::Other(format!("Serialization: {}", error)));
-            }
-        }
-
         let mut compressed_bytes = Vec::new();
         for el in &s.data {
             el.serialize_uncompressed(&mut compressed_bytes).unwrap();
