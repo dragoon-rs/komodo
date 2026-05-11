@@ -1,0 +1,44 @@
+cff-version: "1.2.0"
+authors:
+- family-names: Stevan
+  given-names: Antoine
+  orcid: "https://orcid.org/0009-0003-5684-5862"
+- family-names: Detchart
+  given-names: Jonathan
+  orcid: "https://orcid.org/0000-0002-4237-5981"
+- family-names: Pérennou
+  given-names: Tanguy
+  orcid: "https://orcid.org/0009-0002-2542-0004"
+- family-names: Lacan
+  given-names: Jérôme
+  orcid: "https://orcid.org/0000-0002-3121-4824"
+doi: 10.34849/8djy-4z09
+message: If you use this software, please cite our article in the
+  Journal of Open Source Software.
+preferred-citation:
+  authors:
+  - family-names: Stevan
+    given-names: Antoine
+    orcid: "https://orcid.org/0009-0003-5684-5862"
+  - family-names: Detchart
+    given-names: Jonathan
+    orcid: "https://orcid.org/0000-0002-4237-5981"
+  - family-names: Pérennou
+    given-names: Tanguy
+    orcid: "https://orcid.org/0009-0002-2542-0004"
+  - family-names: Lacan
+    given-names: Jérôme
+    orcid: "https://orcid.org/0000-0002-3121-4824"
+  date-published: 2026-05-06
+  doi: 10.21105/joss.09791
+  issn: 2475-9066
+  issue: 121
+  journal: Journal of Open Source Software
+  publisher:
+    name: Open Journals
+  start: 9791
+  title: "Komodo: Cryptographically-proven Erasure Coding"
+  type: article
+  url: "https://joss.theoj.org/papers/10.21105/joss.09791"
+  volume: 11
+title: "Komodo: Cryptographically-proven Erasure Coding"

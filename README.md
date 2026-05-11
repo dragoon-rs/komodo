@@ -5,6 +5,7 @@
 [![docs](https://img.shields.io/docsrs/komodo)](https://docs.rs/komodo/latest/komodo/)
 [![source](https://gitlab.isae-supaero.fr/dragoon/komodo/badges/main/pipeline.svg?key_text=GitLab%20CI)](https://gitlab.isae-supaero.fr/dragoon/komodo/-/pipelines)
 [![mirror](https://github.com/dragoon-rs/komodo/actions/workflows/ci.yml/badge.svg)](https://github.com/dragoon-rs/komodo/actions)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.09791/status.svg)](https://doi.org/10.21105/joss.09791)
 
 Komodo uses a build system entirely writen in Rust.
 - [`rust-script`](https://github.com/fornwall/rust-script) to build the script
@@ -103,6 +104,9 @@ If you use the `komodo` library in your research projects, please cite it using 
 
 > [!tip] TIP
 > mentions to `main` can be removed
+
+Komodo has been accepted in the **J**ournal of **O**pen **S**ource **S**oftware (JOSS): [`10.21105/joss.09791`](https://joss.theoj.org/papers/10.21105/joss.09791)  
+The JOSS paper can also be cited using [`CITATION.cff`](CITATION.cff).
 
 [pcs-fec-id]: https://gitlab.isae-supaero.fr/dragoon/pcs-fec-id
 [gitlab.isae-supaero.fr:dragoon/komodo@containers]: https://gitlab.isae-supaero.fr/dragoon/komodo/container_registry/42
